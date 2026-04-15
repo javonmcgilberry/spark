@@ -8,6 +8,7 @@ import {registerHandlers} from './slack/registerHandlers.js';
 async function main() {
   const env = loadEnv();
   const logger = createLogger('spark');
+  logger.info(`Starting Spark (pid=${process.pid}, port=${env.port})`);
   const services = createServices(env, logger);
   const slackApp = createSlackApp(env);
 

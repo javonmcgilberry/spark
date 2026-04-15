@@ -1,7 +1,8 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../app/services.js';
-import {buildHomeView} from '../onboarding/homeBlocks.js';
+import {buildHomePendingView, buildHomeView} from '../onboarding/homeBlocks.js';
 import type {PreparedJourneyData} from '../services/journeyService.js';
+import {formatSlackError} from './platformError.js';
 
 export async function publishHomeDashboard(
   app: App,
@@ -11,11 +12,26 @@ export async function publishHomeDashboard(
 ): Promise<void> {
   try {
     services.logger.info(`Preparing Spark Home tab for ${userId}.`);
+    const existingPackage =
+      services.onboardingPackages.getPackageForUser(userId);
+    const reviewerDrafts =
+      services.onboardingPackages.getDraftsForReviewer(userId);
+    if (!existingPackage || existingPackage.status === 'draft') {
+      services.logger.info(
+        `Publishing pending Spark Home state for ${userId} (package=${existingPackage?.status ?? 'none'}, drafts=${reviewerDrafts.length}).`
+      );
+      await publishHomeView(
+        services,
+        client,
+        userId,
+        buildHomePendingView(reviewerDrafts)
+      );
+      return;
+    }
+
     const {identityResolver, journey} = services;
     const profile = await identityResolver.resolveFromSlack(app, userId);
-    const prepared = await journey.prepareDashboard(profile, {
-      slackClient: client,
-    });
+    const prepared = await journey.prepareDashboard(profile);
 
     await publishPreparedHome(services, client, userId, prepared);
   } catch (error) {
@@ -27,16 +43,56 @@ export async function publishHomeDashboard(
 }
 
 export async function publishPreparedHome(
-  services: Pick<Services, 'logger'>,
+  services: Pick<Services, 'logger' | 'onboardingPackages'>,
   client: App['client'],
   userId: string,
   prepared: PreparedJourneyData
 ): Promise<void> {
-  const view = buildHomeView(prepared.profile, prepared.state);
+  const reviewerDrafts =
+    services.onboardingPackages.getDraftsForReviewer(userId);
+  const view =
+    prepared.onboardingPackage &&
+    prepared.onboardingPackage.status === 'published'
+      ? buildHomeView(prepared.onboardingPackage, prepared.state)
+      : buildHomePendingView(reviewerDrafts);
   services.logger.info(
-    `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks.`
+    `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}).`
   );
   await publishHomeView(services, client, userId, view);
+}
+
+export async function syncSharedOnboardingWorkspace(
+  app: App,
+  services: Pick<
+    Services,
+    'logger' | 'identityResolver' | 'journey' | 'canvas'
+  >,
+  userId: string,
+  client: App['client'] = app.client
+): Promise<void> {
+  try {
+    const profile = await services.identityResolver.resolveFromSlack(
+      app,
+      userId
+    );
+    const prepared = await services.journey.prepareDashboard(profile);
+    if (
+      !prepared.onboardingPackage ||
+      prepared.onboardingPackage.status !== 'published'
+    ) {
+      return;
+    }
+    await services.canvas.syncSharedProgress(
+      client,
+      prepared.onboardingPackage,
+      prepared.state
+    );
+  } catch (error) {
+    services.logger.warn(
+      `Failed to sync shared onboarding workspace for ${userId}.`,
+      error
+    );
+  }
 }
 
 export async function publishHomeView(
@@ -53,33 +109,8 @@ export async function publishHomeView(
     services.logger.info(`Published Spark Home tab for ${userId}.`);
   } catch (error) {
     services.logger.warn(
-      `Failed to publish Spark Home tab for ${userId}: ${describeSlackError(error)}`,
+      `Failed to publish Spark Home tab for ${userId}: ${formatSlackError(error)}`,
       error
     );
   }
-}
-
-function describeSlackError(error: unknown): string {
-  const slackError = error as {
-    code?: string;
-    data?: {
-      error?: string;
-      needed?: string;
-      provided?: string;
-    };
-  };
-
-  if (slackError.code === 'slack_webapi_platform_error') {
-    return [
-      slackError.data?.error,
-      slackError.data?.needed ? `needed=${slackError.data.needed}` : undefined,
-      slackError.data?.provided
-        ? `provided=${slackError.data.provided}`
-        : undefined,
-    ]
-      .filter(Boolean)
-      .join(', ');
-  }
-
-  return error instanceof Error ? error.message : String(error);
 }

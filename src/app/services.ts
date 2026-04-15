@@ -8,6 +8,7 @@ import {ContributionGuideService} from '../services/contributionGuideService.js'
 import {IdentityResolver} from '../services/identityResolver.js';
 import {JourneyService} from '../services/journeyService.js';
 import {LlmService} from '../services/llmService.js';
+import {OnboardingPackageService} from '../services/onboardingPackageService.js';
 import {SkillDiscoveryService} from '../services/skillDiscoveryService.js';
 import {StatsigService} from '../services/statsigService.js';
 import {TaskScannerService} from '../services/taskScannerService.js';
@@ -26,6 +27,7 @@ export interface Services {
   skillDiscovery: SkillDiscoveryService;
   taskScanner: TaskScannerService;
   contributionGuide: ContributionGuideService;
+  onboardingPackages: OnboardingPackageService;
   journey: JourneyService;
 }
 
@@ -41,12 +43,16 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
   const taskScanner = new TaskScannerService(skillDiscovery, statsig, codebase);
   const contributionGuide = new ContributionGuideService(llm);
   const identityResolver = new IdentityResolver(env, logger, docs, codeowners);
+  const onboardingPackages = new OnboardingPackageService(
+    confluenceSearch,
+    canvas,
+    logger
+  );
   const journey = new JourneyService(
     taskScanner,
     llm,
     contributionGuide,
-    confluenceSearch,
-    canvas
+    onboardingPackages
   );
 
   return {
@@ -62,6 +68,7 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     skillDiscovery,
     taskScanner,
     contributionGuide,
+    onboardingPackages,
     journey,
   };
 }

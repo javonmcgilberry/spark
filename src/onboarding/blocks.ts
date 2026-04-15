@@ -2,46 +2,62 @@ import type {KnownBlock} from '@slack/types';
 import {JOURNEY_LABELS} from './catalog.js';
 import {
   buildPeopleSections,
+  formatChecklistResourceLink,
   formatChannels,
-  formatConfluenceLinks,
-  formatDocs,
-  formatKeyPaths,
+  linkedChecklistItemsForMilestone,
+  formatResourceLibrary,
   formatRituals,
   formatTools,
 } from './display.js';
+import {actions, header, section} from '../slack/blockKit.js';
 import type {
   ContributionTask,
   JourneyState,
-  SuggestedNextStep,
-  TeamProfile,
+  OnboardingPackage,
 } from './types.js';
 
 export function buildWelcomeBlocks(
-  profile: TeamProfile,
+  onboardingPackage: OnboardingPackage,
   state: JourneyState
 ): KnownBlock[] {
+  const welcome = onboardingPackage.sections.welcome;
+  const checklistSections =
+    onboardingPackage.sections.onboardingChecklist.sections;
+  const pocs = welcome.onboardingPocs
+    .map((poc) => `• *${poc.label}* — ${poc.owner.name}\n  ${poc.summary}`)
+    .join('\n');
+  const milestones = welcome.journeyMilestones
+    .map((milestone) => {
+      const links = linkedChecklistItemsForMilestone(
+        checklistSections,
+        milestone.label
+      );
+      return `• *${milestone.label}* — ${milestone.goal}${
+        links.length > 0
+          ? `\n  Key links: ${links.map(formatChecklistResourceLink).join(' · ')}`
+          : ''
+      }`;
+    })
+    .join('\n');
+
   return [
-    header(`Welcome to Webflow, ${profile.firstName}`),
-    section(
-      `I'm Spark, your onboarding companion. You're joining *${profile.teamName}*${
-        profile.pillarName ? ` in *${profile.pillarName}*.` : '.'
-      }\n\n*Manager:* ${profile.manager.name}\n*Buddy:* ${profile.buddy.name}`
-    ),
-    section(formatKeyPaths(profile.keyPaths)),
-    section(formatDocs(profile.docs)),
-    ...(state.confluenceLinks.length > 0
-      ? [section(formatConfluenceLinks(state.confluenceLinks))]
+    header(`Welcome to Webflow`),
+    section(welcome.intro),
+    ...(welcome.personalizedNote
+      ? [section(`*Manager note*\n${welcome.personalizedNote}`)]
       : []),
-    ...(state.canvasUrl
+    section(`*Onboarding POCs*\n${pocs}`),
+    section(`*Onboarding journey*\n${milestones}`),
+    ...(onboardingPackage.draftCanvasUrl
       ? [
           section(
-            `*Shared onboarding canvas*\nOpen <${state.canvasUrl}|your onboarding canvas> if you want the long-form version of your checklist and docs in one place.`
+            `*Shared onboarding workspace*\nOpen <${onboardingPackage.draftCanvasUrl}|the onboarding canvas> if you want the shared long-form workspace for your onboarding package.`
           ),
         ]
       : []),
     actions([
       {
-        label: 'Day 2-3 guide',
+        label: 'Tools and Slack',
         actionId: 'spark_go_to_step',
         value: 'day2-3-follow-up',
         style: 'primary',
@@ -56,19 +72,19 @@ export function buildWelcomeBlocks(
 }
 
 export function buildFollowUpBlocks(
-  profile: TeamProfile,
+  onboardingPackage: OnboardingPackage,
   state: JourneyState
 ): KnownBlock[] {
+  const tools = onboardingPackage.sections.toolsAccess;
+  const slack = onboardingPackage.sections.slack;
   return [
-    header('Day 2-3: Tools, access, and people'),
-    section(
-      `Get unblocked on tooling, make the right introductions, and learn which rituals matter for *${profile.teamName}*.`
-    ),
-    section(formatTools(profile.tools)),
-    section(formatRituals(profile.rituals)),
+    header('Tools, access, and Slack'),
+    section(tools.intro),
+    section(formatTools(tools.tools)),
+    section(formatChannels(slack.channels, 'Core Slack channels')),
     actions([
       {
-        label: 'Day 4-5 guide',
+        label: 'Plan and resources',
         actionId: 'spark_go_to_step',
         value: 'day4-5-orientation',
         style: 'primary',
@@ -83,16 +99,34 @@ export function buildFollowUpBlocks(
 }
 
 export function buildOrientationBlocks(
-  profile: TeamProfile,
+  onboardingPackage: OnboardingPackage,
   state: JourneyState
 ): KnownBlock[] {
+  const planPreview = onboardingPackage.sections.plan306090.items
+    .slice(0, 4)
+    .map((item) => {
+      const links = linkedChecklistItemsForMilestone(
+        onboardingPackage.sections.onboardingChecklist.sections,
+        item.timeframe
+      );
+      return `• *${item.timeframe}* — ${item.goalSummary}\n  New hire: ${item.keyActivities}${
+        links.length > 0
+          ? `\n  Key links: ${links.map(formatChecklistResourceLink).join(' · ')}`
+          : ''
+      }`;
+    })
+    .join('\n');
+
   return [
-    header('Day 4-5: Docs, channels, and context'),
+    header('Plan, rituals, and resources'),
+    section(onboardingPackage.sections.plan306090.intro),
+    section(`*30-60-90 preview*\n${planPreview}`),
+    section(formatRituals(onboardingPackage.sections.rituals.rituals)),
     section(
-      'Read the docs that matter for your role, join the right channels, and build context before your first contribution.'
+      formatResourceLibrary(
+        onboardingPackage.sections.engineeringResourceLibrary
+      )
     ),
-    section(formatChannels(profile.recommendedChannels, 'Channels to join')),
-    section(formatChecklist(profile)),
     actions([
       {
         label: 'Find tasks',
@@ -105,19 +139,20 @@ export function buildOrientationBlocks(
   ];
 }
 
-export function buildPeopleBlocks(profile: TeamProfile): KnownBlock[] {
-  const people = [profile.manager, profile.buddy, ...profile.teammates];
+export function buildPeopleBlocks(
+  onboardingPackage: OnboardingPackage
+): KnownBlock[] {
+  const people = onboardingPackage.sections.peopleToMeet.people;
 
   return [
     header('People to meet'),
-    section(
-      'These are the people most worth spending time with early. Use the conversation prompt on each card so the first meeting feels useful instead of awkward.'
-    ),
+    section(onboardingPackage.sections.peopleToMeet.intro),
     ...buildPeopleSections(people),
   ];
 }
 
 export function buildContributionBlocks(
+  onboardingPackage: OnboardingPackage,
   explanation: string,
   tasks: ContributionTask[],
   state: JourneyState
@@ -139,24 +174,38 @@ export function buildContributionBlocks(
   }));
 
   return [
-    header('Your first contribution'),
+    header(onboardingPackage.sections.initialEngineeringTasks.title),
+    section(onboardingPackage.sections.initialEngineeringTasks.intro),
+    section(
+      `*Manager note*\n${onboardingPackage.sections.initialEngineeringTasks.managerPrompt}`
+    ),
     section(explanation),
-    section(taskText),
-    {
-      type: 'actions',
-      elements: [
-        {
-          type: 'static_select',
-          action_id: 'spark_select_task',
-          placeholder: {
-            type: 'plain_text',
-            text: 'Choose a contribution task',
-            emoji: false,
+    ...(taskText
+      ? [section(taskText)]
+      : [
+          section(
+            'No starter task is ready yet. Ask your manager to add one or try the task scan again after more onboarding context is in place.'
+          ),
+        ]),
+    ...(options.length > 0
+      ? [
+          {
+            type: 'actions' as const,
+            elements: [
+              {
+                type: 'static_select' as const,
+                action_id: 'spark_select_task',
+                placeholder: {
+                  type: 'plain_text' as const,
+                  text: 'Choose a contribution task',
+                  emoji: false,
+                },
+                options,
+              },
+            ],
           },
-          options,
-        },
-      ],
-    },
+        ]
+      : []),
     progressContext(state),
   ];
 }
@@ -226,10 +275,13 @@ export function buildCelebrationBlocks(
   return blocks;
 }
 
-function formatChecklist(profile: TeamProfile): string {
-  return `*Checklist*\n${profile.checklist
-    .map((section) => `• *${section.title}* — ${section.goal}`)
-    .join('\n')}`;
+export function buildDraftPendingBlocks(): KnownBlock[] {
+  return [
+    header('Onboarding draft in progress'),
+    section(
+      'Your manager or onboarding team is still reviewing the draft onboarding package. Once they publish it, Spark will show the full Home experience and DM you the cleaned-up version.'
+    ),
+  ];
 }
 
 function progressContext(state: JourneyState): KnownBlock {
@@ -245,43 +297,5 @@ function progressContext(state: JourneyState): KnownBlock {
         text: `Progress: ${completed}`,
       },
     ],
-  };
-}
-
-function header(text: string): KnownBlock {
-  return {
-    type: 'header',
-    text: {
-      type: 'plain_text',
-      text,
-      emoji: false,
-    },
-  };
-}
-
-function section(text: string): KnownBlock {
-  return {
-    type: 'section',
-    text: {
-      type: 'mrkdwn',
-      text,
-    },
-  };
-}
-
-function actions(nextSteps: SuggestedNextStep[]): KnownBlock {
-  return {
-    type: 'actions',
-    elements: nextSteps.map((step) => ({
-      type: 'button',
-      text: {
-        type: 'plain_text',
-        text: step.label,
-        emoji: false,
-      },
-      action_id: step.actionId,
-      value: step.value ?? step.label,
-      style: step.style,
-    })),
   };
 }

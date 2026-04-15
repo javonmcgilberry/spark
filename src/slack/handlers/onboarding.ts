@@ -1,7 +1,10 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {resolveJourneyText} from '../journeyText.js';
-import {publishPreparedHome} from '../publishHome.js';
+import {
+  publishPreparedHome,
+  syncSharedOnboardingWorkspace,
+} from '../publishHome.js';
 
 export function registerOnboardingHandlers(app: App, services: Services): void {
   const {logger, identityResolver, journey} = services;
@@ -22,7 +25,7 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
     );
 
     const profile = await identityResolver.resolveFromSlack(app, event.user);
-    const prepared = await journey.prepareStart(profile, {slackClient: client});
+    const prepared = await journey.prepareStart(profile);
     const reply = journey.buildStartReply(prepared);
 
     await client.chat.postMessage({
@@ -37,11 +40,15 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
   app.event('app_mention', async ({event, say, client}) => {
     if (!event.user) return;
     const profile = await identityResolver.resolveFromSlack(app, event.user);
-    const prepared = await journey.prepareStart(profile, {slackClient: client});
+    const prepared = await journey.prepareStart(profile);
     const reply = journey.buildStartReply(prepared);
+    const hasPublishedPackage =
+      prepared.onboardingPackage?.status === 'published';
 
     await say({
-      text: `Hey <@${event.user}>! I sent you a DM with your onboarding guide. Open Spark in the sidebar any time if you want to keep going there.`,
+      text: hasPublishedPackage
+        ? `Hey <@${event.user}>! I sent you a DM with your onboarding guide. Open Spark in the sidebar any time if you want to keep going there.`
+        : `Hey <@${event.user}>! I sent you a DM with your current onboarding status. Spark will unlock once your manager or onboarding team publishes your package.`,
 
       thread_ts: event.ts,
     });
@@ -63,12 +70,14 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
     const response = await resolveJourneyText(
       profile,
       message.text ?? '',
-      journey,
-      app.client
+      journey
     );
 
     if (response.kind === 'reply') {
       await say({text: response.reply.text, blocks: response.reply.blocks});
+      if (response.syncProgress) {
+        await syncSharedOnboardingWorkspace(app, services, message.user);
+      }
       return;
     }
 

@@ -1,10 +1,14 @@
 import type {Logger} from '../app/logger.js';
 import type {EnvConfig} from '../config/env.js';
-import type {ConfluenceLink, TeamProfile} from '../onboarding/types.js';
+import type {
+  ConfluenceLink,
+  OnboardingPerson,
+  OnboardingReferences,
+  TeamProfile,
+} from '../onboarding/types.js';
 
 const CONFLUENCE_CACHE_TTL_MS = 10 * 60 * 1000;
 const CONFLUENCE_REQUEST_TIMEOUT_MS = 8000;
-const MAX_RESULTS = 6;
 
 interface ConfluenceSearchResponse {
   results?: ConfluenceSearchResult[];
@@ -12,7 +16,6 @@ interface ConfluenceSearchResponse {
 
 interface ConfluenceSearchResult {
   title?: string;
-  url?: string;
   excerpt?: string;
   _links?: {
     base?: string;
@@ -28,14 +31,14 @@ interface ConfluenceSearchResult {
 }
 
 interface ConfluenceQuery {
-  phrase: string;
+  phrases: string[];
   summary: string;
 }
 
 export class ConfluenceSearchService {
   private readonly cache = new Map<
     string,
-    {links: ConfluenceLink[]; expiresAt: number}
+    {value: ConfluenceLink | undefined; expiresAt: number}
   >();
 
   constructor(
@@ -43,65 +46,135 @@ export class ConfluenceSearchService {
     private readonly logger: Logger
   ) {}
 
-  async findOnboardingPages(profile: TeamProfile): Promise<ConfluenceLink[]> {
-    if (
-      !this.env.confluenceApiToken ||
-      !this.env.confluenceBaseUrl ||
-      !profile.email
-    ) {
-      return [];
+  async findOnboardingReferences(
+    profile: TeamProfile
+  ): Promise<OnboardingReferences> {
+    if (!this.env.confluenceApiToken || !this.env.confluenceBaseUrl) {
+      return {};
     }
+
     const email = profile.email;
-
-    const cacheKey = [
-      profile.teamName,
-      profile.pillarName ?? '',
-      profile.displayName,
-    ]
-      .join('|')
-      .toLowerCase();
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.links;
+    if (!email) {
+      return {};
     }
 
-    const links: ConfluenceLink[] = [];
-    const seenUrls = new Set<string>();
-    const queryMatches = await Promise.all(
-      buildQueries(profile).map((query) => this.search(query, email))
-    );
+    const [teamPage, pillarPage, newHireGuide] = await Promise.all([
+      this.searchFirst(
+        {
+          phrases: [
+            `${profile.teamName} team`,
+            `${profile.teamName} onboarding`,
+          ],
+          summary: `Canonical team page for ${profile.teamName}.`,
+        },
+        email
+      ),
+      profile.pillarName
+        ? this.searchFirst(
+            {
+              phrases: [
+                `${profile.pillarName} engineering`,
+                `${profile.pillarName} pillar`,
+              ],
+              summary: `Canonical pillar page for ${profile.pillarName}.`,
+            },
+            email
+          )
+        : Promise.resolve(undefined),
+      this.searchFirst(
+        {
+          phrases: [`${profile.displayName} user guide`],
+          summary: `User guide for ${profile.displayName}.`,
+        },
+        email
+      ),
+    ]);
 
-    for (const matches of queryMatches) {
-      for (const match of matches) {
-        if (seenUrls.has(match.url)) {
-          continue;
-        }
-        seenUrls.add(match.url);
-        links.push(match);
-        if (links.length >= MAX_RESULTS) {
-          break;
-        }
-      }
-      if (links.length >= MAX_RESULTS) {
-        break;
-      }
-    }
-
-    this.cache.set(cacheKey, {
-      links,
-      expiresAt: Date.now() + CONFLUENCE_CACHE_TTL_MS,
-    });
-
-    return links;
+    return {teamPage, pillarPage, newHireGuide};
   }
 
-  private async search(
+  async findPeopleGuides(
+    profile: TeamProfile,
+    people: OnboardingPerson[]
+  ): Promise<Record<string, ConfluenceLink>> {
+    if (!this.env.confluenceApiToken || !this.env.confluenceBaseUrl) {
+      return {};
+    }
+
+    const email = profile.email;
+    if (!email) {
+      return {};
+    }
+
+    const relevantPeople = people
+      .filter((person) => person.name && !person.name.startsWith('Your '))
+      .slice(0, 8);
+
+    const entries = await Promise.all(
+      relevantPeople.map(async (person) => {
+        const guide = await this.searchFirst(
+          {
+            phrases: [`${person.name} user guide`],
+            summary: `User guide for ${person.name}.`,
+          },
+          email
+        );
+
+        return guide ? [personKey(person), guide] : undefined;
+      })
+    );
+
+    return Object.fromEntries(
+      entries.filter((entry): entry is [string, ConfluenceLink] =>
+        Array.isArray(entry)
+      )
+    );
+  }
+
+  async findOnboardingPages(profile: TeamProfile): Promise<ConfluenceLink[]> {
+    const references = await this.findOnboardingReferences(profile);
+    return [
+      references.teamPage,
+      references.pillarPage,
+      references.newHireGuide,
+    ].filter((link): link is ConfluenceLink => Boolean(link));
+  }
+
+  private async searchFirst(
     query: ConfluenceQuery,
     email: string
-  ): Promise<ConfluenceLink[]> {
+  ): Promise<ConfluenceLink | undefined> {
+    for (const phrase of query.phrases) {
+      const cacheKey = `${email}|${phrase}`.toLowerCase();
+      const cached = this.cache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        if (cached.value) {
+          return cached.value;
+        }
+        continue;
+      }
+
+      const match = await this.searchPhrase(phrase, query.summary, email);
+      this.cache.set(cacheKey, {
+        value: match,
+        expiresAt: Date.now() + CONFLUENCE_CACHE_TTL_MS,
+      });
+      if (match) {
+        return match;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async searchPhrase(
+    phrase: string,
+    summary: string,
+    email: string
+  ): Promise<ConfluenceLink | undefined> {
     const {confluenceApiToken, confluenceBaseUrl} = this.env;
     if (!confluenceApiToken || !confluenceBaseUrl) {
-      return [];
+      return undefined;
     }
 
     const requestUrl = new URL(
@@ -110,9 +183,9 @@ export class ConfluenceSearchService {
     );
     requestUrl.searchParams.set(
       'cql',
-      `type = page AND siteSearch ~ "\\\"${escapeCqlPhrase(query.phrase)}\\\"" ORDER BY lastmodified DESC`
+      `type = page AND siteSearch ~ "\\\"${escapeCqlPhrase(phrase)}\\\"" ORDER BY lastmodified DESC`
     );
-    requestUrl.searchParams.set('limit', '3');
+    requestUrl.searchParams.set('limit', '1');
 
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -133,54 +206,26 @@ export class ConfluenceSearchService {
 
       if (!response.ok) {
         this.logger.warn(
-          `Confluence search failed for "${query.phrase}" (${response.status}).`
+          `Confluence search failed for "${phrase}" (${response.status}).`
         );
-        return [];
+        return undefined;
       }
 
       const payload: ConfluenceSearchResponse = await response.json();
-      return (payload.results ?? [])
-        .map((result) => toConfluenceLink(result, query.summary, this.env))
-        .filter((link): link is ConfluenceLink => Boolean(link));
+      const first = payload.results?.[0];
+      return first
+        ? (toConfluenceLink(first, summary, this.env) ?? undefined)
+        : undefined;
     } catch (error) {
       this.logger.warn(
-        `Confluence lookup failed for "${query.phrase}", continuing without enrichment.`,
+        `Confluence lookup failed for "${phrase}", continuing without enrichment.`,
         error
       );
-      return [];
+      return undefined;
     } finally {
       clearTimeout(timeout);
     }
   }
-}
-
-function buildQueries(profile: TeamProfile): ConfluenceQuery[] {
-  return [
-    {
-      phrase: `${profile.teamName} onboarding`,
-      summary: `Potential onboarding page for ${profile.teamName}.`,
-    },
-    {
-      phrase: `${profile.teamName} team`,
-      summary: `Potential team overview for ${profile.teamName}.`,
-    },
-    ...(profile.pillarName
-      ? [
-          {
-            phrase: `${profile.pillarName} engineering`,
-            summary: `Potential pillar context for ${profile.pillarName}.`,
-          },
-        ]
-      : []),
-    {
-      phrase: `${profile.displayName} user guide`,
-      summary: `Potential personal user guide related to ${profile.displayName}.`,
-    },
-    {
-      phrase: `${profile.displayName} onboarding`,
-      summary: `Potential personal onboarding notes related to ${profile.displayName}.`,
-    },
-  ];
 }
 
 function toConfluenceLink(
@@ -222,4 +267,8 @@ function stripHtml(value?: string): string {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function personKey(person: OnboardingPerson): string {
+  return (person.slackUserId || person.email || person.name).toLowerCase();
 }

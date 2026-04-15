@@ -1,9 +1,12 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
-import {publishPreparedHome} from '../publishHome.js';
+import {
+  buildDraftSetupModal,
+  buildSparkCommandMenuBlocks,
+} from '../workflowUi.js';
 
 export function registerCommandHandlers(app: App, services: Services): void {
-  const {logger, identityResolver, journey} = services;
+  const {logger} = services;
 
   app.command('/spark', async ({command, ack, respond, client}) => {
     await ack();
@@ -12,24 +15,27 @@ export function registerCommandHandlers(app: App, services: Services): void {
       `/spark invoked by ${command.user_id} in ${command.channel_id}`
     );
 
-    const profile = await identityResolver.resolveFromSlack(
-      app,
-      command.user_id
-    );
-    const prepared = await journey.prepareStart(profile, {slackClient: client});
-    const reply = journey.buildStartReply(prepared);
-
-    await client.chat.postMessage({
-      channel: command.user_id,
-      text: reply.text,
-      blocks: reply.blocks,
-    });
+    const directTarget = parseMention(command.text);
+    if (directTarget) {
+      logger.info(
+        `/spark routed ${command.user_id} directly into draft setup for ${directTarget}`
+      );
+      await client.views.open({
+        trigger_id: command.trigger_id,
+        view: buildDraftSetupModal(directTarget),
+      });
+      return;
+    }
 
     await respond({
       response_type: 'ephemeral',
-      text: `Hey <@${command.user_id}>! Check your DMs for your starter guide, then open Spark in the sidebar whenever you want to keep going.`,
+      text: 'Use Spark to create a draft here, then review it from the draft channel or Spark Home.',
+      blocks: buildSparkCommandMenuBlocks(),
     });
-
-    await publishPreparedHome(services, client, command.user_id, prepared);
   });
+}
+
+function parseMention(text: string): string | undefined {
+  const match = text.match(/<@([A-Z0-9]+)>/i);
+  return match?.[1];
 }

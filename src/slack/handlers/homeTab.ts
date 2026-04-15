@@ -3,16 +3,59 @@ import type {Services} from '../../app/services.js';
 import {
   buildHomeView,
   HOME_CHECKLIST_ACTION_ID,
+  HOME_NAV_ACTION_ID,
   parseChecklistSectionId,
 } from '../../onboarding/homeBlocks.js';
-import {publishHomeDashboard, publishHomeView} from '../publishHome.js';
+import {isHomeSectionId} from '../../onboarding/types.js';
+import type {PreparedJourneyData} from '../../services/journeyService.js';
+import {
+  publishHomeDashboard,
+  publishHomeView,
+  syncSharedOnboardingWorkspace,
+} from '../publishHome.js';
 
 export function registerHomeTabHandlers(app: App, services: Services): void {
-  const {logger, identityResolver, journey} = services;
+  const {logger} = services;
 
   app.event('app_home_opened', async ({event, client}) => {
+    if (event.tab !== 'home') {
+      return;
+    }
     logger.info(`Publishing Spark Home tab for ${event.user}`);
     await publishHomeDashboard(app, services, event.user, client);
+  });
+
+  app.action(HOME_NAV_ACTION_ID, async ({ack, body, client, action}) => {
+    await ack();
+
+    if (
+      action.type !== 'button' ||
+      !action.value ||
+      !isHomeSectionId(action.value)
+    ) {
+      return;
+    }
+
+    const prepared = await loadPublishedPreparedOrRepublish(
+      app,
+      services,
+      client,
+      body.user.id
+    );
+    if (!prepared?.onboardingPackage) {
+      return;
+    }
+
+    const state = services.journey.setActiveHomeSection(
+      body.user.id,
+      action.value
+    );
+    await publishHomeView(
+      services,
+      client,
+      body.user.id,
+      buildHomeView(prepared.onboardingPackage, state)
+    );
   });
 
   app.action(HOME_CHECKLIST_ACTION_ID, async ({ack, body, client, action}) => {
@@ -29,12 +72,17 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
 
     logger.info(`Home checklist updated for ${body.user.id} (${sectionId})`);
 
-    const profile = await identityResolver.resolveFromSlack(app, body.user.id);
-    const prepared = await journey.prepareDashboard(profile, {
-      slackClient: client,
-    });
-    const state = journey.setCompletedChecklistForSection(
-      prepared.profile,
+    const prepared = await loadPublishedPreparedOrRepublish(
+      app,
+      services,
+      client,
+      body.user.id
+    );
+    if (!prepared?.onboardingPackage) {
+      return;
+    }
+    const state = services.journey.setCompletedChecklistForSection(
+      prepared.onboardingPackage,
       sectionId,
       action.selected_options
         .filter(hasOptionValue)
@@ -45,9 +93,29 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
       services,
       client,
       body.user.id,
-      buildHomeView(prepared.profile, state)
+      buildHomeView(prepared.onboardingPackage, state)
     );
+    await syncSharedOnboardingWorkspace(app, services, body.user.id, client);
   });
+}
+
+async function loadPublishedPreparedOrRepublish(
+  app: App,
+  services: Services,
+  client: App['client'],
+  userId: string
+): Promise<PreparedJourneyData | null> {
+  const profile = await services.identityResolver.resolveFromSlack(app, userId);
+  const prepared = await services.journey.prepareDashboard(profile);
+  if (
+    !prepared.onboardingPackage ||
+    prepared.onboardingPackage.status !== 'published'
+  ) {
+    await publishHomeDashboard(app, services, userId, client);
+    return null;
+  }
+
+  return prepared;
 }
 
 function hasOptionValue<T extends {value?: string}>(

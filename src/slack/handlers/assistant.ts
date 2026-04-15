@@ -1,7 +1,10 @@
 import {Assistant, type App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {resolveJourneyText} from '../journeyText.js';
-import {publishPreparedHome} from '../publishHome.js';
+import {
+  publishPreparedHome,
+  syncSharedOnboardingWorkspace,
+} from '../publishHome.js';
 
 const DEFAULT_PROMPTS = {
   title: 'Try one of these',
@@ -51,9 +54,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
         });
 
         const profile = await identityResolver.resolveFromSlack(app, userId);
-        const prepared = await journey.prepareStart(profile, {
-          slackClient: client,
-        });
+        const prepared = await journey.prepareStart(profile);
         const reply = journey.buildStartReply(prepared);
 
         await setTitle(`Spark for ${profile.firstName}`);
@@ -81,12 +82,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           app,
           message.user
         );
-        const response = await resolveJourneyText(
-          profile,
-          text,
-          journey,
-          client
-        );
+        const response = await resolveJourneyText(profile, text, journey);
 
         await setTitle(response.title);
 
@@ -96,6 +92,14 @@ export function registerAssistantHandlers(app: App, services: Services): void {
             text: response.reply.text,
             blocks: response.reply.blocks,
           });
+          if (response.syncProgress) {
+            await syncSharedOnboardingWorkspace(
+              app,
+              services,
+              message.user,
+              client
+            );
+          }
           return;
         }
 

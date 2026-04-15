@@ -1,12 +1,17 @@
 import type {KnownBlock} from '@slack/types';
 import type {
+  ChecklistItem,
+  ChecklistSection,
   ConfluenceLink,
   DocLink,
+  EngineeringResourceLibrarySection,
+  OnboardingReferences,
   OnboardingPerson,
   RitualGuide,
   SlackChannelGuide,
   ToolGuide,
 } from './types.js';
+import {section} from '../slack/blockKit.js';
 
 export function buildPeopleSections(people: OnboardingPerson[]): KnownBlock[] {
   const blocks: KnownBlock[] = [];
@@ -53,7 +58,6 @@ export function formatTools(tools: ToolGuide[]): string {
 
 export function formatRituals(rituals: RitualGuide[]): string {
   return `*Rituals*\n${rituals
-    .slice(0, 5)
     .map(
       (ritual) =>
         `• *${ritual.meeting}* — ${ritual.cadence}, ${ritual.attendance.toLowerCase()}`
@@ -83,9 +87,46 @@ export function formatConfluenceLinks(
     .join('\n')}`;
 }
 
+export function formatReferences(
+  references: OnboardingReferences,
+  heading = 'Focused Confluence references'
+): string {
+  const links = [
+    references.teamPage,
+    references.pillarPage,
+    references.newHireGuide,
+  ].filter((link): link is ConfluenceLink => Boolean(link));
+
+  if (links.length === 0) {
+    return `*${heading}*\nNo focused team page, pillar page, or user guide found yet.`;
+  }
+
+  return formatConfluenceLinks(links, heading);
+}
+
+export function formatResourceLibrary(
+  resources: EngineeringResourceLibrarySection
+): string {
+  const parts = [formatDocs(resources.docs, 'Core engineering docs')];
+  if (
+    resources.references.teamPage ||
+    resources.references.pillarPage ||
+    resources.references.newHireGuide
+  ) {
+    parts.push(formatReferences(resources.references));
+  }
+  parts.push(
+    formatKeyPaths(
+      resources.keyPaths,
+      'Ask your buddy which CODEOWNERS paths matter most for your team.'
+    )
+  );
+  return parts.join('\n\n');
+}
+
 export function formatKeyPaths(
   keyPaths: string[],
-  emptyText = "Spark couldn't infer team-owned paths yet — check with your buddy or look at CODEOWNERS."
+  emptyText = "Team-owned paths aren't listed yet — check with your buddy or look at CODEOWNERS."
 ): string {
   if (keyPaths.length === 0) {
     return `*Key repo paths*\n${emptyText}`;
@@ -104,16 +145,79 @@ export function countCompletedInSection(
     .length;
 }
 
+export function formatChecklistItem(item: ChecklistItem): string {
+  if (!hasChecklistResource(item)) {
+    return `• *${item.label}* — ${item.notes}`;
+  }
+  if (!item.resourceLabel || item.resourceLabel === item.label) {
+    return `• ${formatChecklistResourceLink(item)} — ${item.notes}`;
+  }
+  return `• *${item.label}* — ${item.notes}\n  ${formatChecklistResourceLink(item)}`;
+}
+
+export function formatCanvasChecklistItem(item: ChecklistItem): string[] {
+  if (!hasChecklistResource(item)) {
+    return [`- [ ] ${item.label}`, `  - ${item.notes}`];
+  }
+  if (!item.resourceLabel || item.resourceLabel === item.label) {
+    return [
+      `- [ ] ${formatCanvasChecklistResourceLink(item)}`,
+      `  - ${item.notes}`,
+    ];
+  }
+  return [
+    `- [ ] ${item.label}`,
+    `  - ${item.notes}`,
+    `  - ${formatCanvasChecklistResourceLink(item)}`,
+  ];
+}
+
+export function linkedChecklistItemsForMilestone(
+  checklistSections: ChecklistSection[],
+  milestoneLabel: string
+): Array<ChecklistItem & {resourceUrl: string}> {
+  const sectionId = checklistSectionIdForMilestone(milestoneLabel);
+  if (!sectionId) {
+    return [];
+  }
+
+  return (
+    checklistSections
+      .find((s) => s.id === sectionId)
+      ?.items.filter(hasChecklistResource)
+      .slice(0, 4) ?? []
+  );
+}
+
+export function formatChecklistResourceLink(
+  item: ChecklistItem & {resourceUrl: string}
+): string {
+  return `<${item.resourceUrl}|${item.resourceLabel ?? item.label}>`;
+}
+
+export function formatCanvasChecklistResourceLink(
+  item: ChecklistItem & {resourceUrl: string}
+): string {
+  return `[${item.resourceLabel ?? item.label}](${item.resourceUrl})`;
+}
+
 export function formatCanvasPerson(person: OnboardingPerson): string {
   return person.slackUserId ? `![](@${person.slackUserId})` : person.name;
 }
 
 function buildPersonSection(person: OnboardingPerson): KnownBlock {
+  const guideLine = person.userGuide
+    ? `\n<${person.userGuide.url}|User guide> — ${person.userGuide.summary}`
+    : '';
+  const roleLabel =
+    person.title && person.title !== person.role
+      ? `${person.role} · ${person.title}`
+      : person.role;
   const block = {
     type: 'section' as const,
     text: {
       type: 'mrkdwn' as const,
-      text: `*${formatSlackPerson(person)}* · ${person.role}\n${person.discussionPoints}`,
+      text: `*${formatSlackPerson(person)}* · ${roleLabel}\n${person.discussionPoints}${guideLine}`,
     },
   };
 
@@ -133,12 +237,27 @@ function formatSlackPerson(person: OnboardingPerson): string {
   return person.slackUserId ? `<@${person.slackUserId}>` : person.name;
 }
 
-function section(text: string): KnownBlock {
-  return {
-    type: 'section',
-    text: {
-      type: 'mrkdwn',
-      text,
-    },
-  };
+function hasChecklistResource(
+  item: ChecklistItem
+): item is ChecklistItem & {resourceUrl: string} {
+  return typeof item.resourceUrl === 'string' && item.resourceUrl.length > 0;
+}
+
+function checklistSectionIdForMilestone(
+  milestoneLabel: string
+): string | undefined {
+  const normalized = milestoneLabel.toLowerCase();
+  if (normalized.includes('week 1')) {
+    return 'week1-setup';
+  }
+  if (normalized.includes('week 2')) {
+    return 'week2-workflows';
+  }
+  if (normalized.includes('week 3')) {
+    return 'week3-contribution';
+  }
+  if (normalized.includes('week 4')) {
+    return 'week4-citizenship';
+  }
+  return undefined;
 }

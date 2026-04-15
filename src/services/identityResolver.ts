@@ -1,5 +1,11 @@
 import pg from 'pg';
 import type {App} from '@slack/bolt';
+import type {
+  TeamProfileGetResponse,
+  UsersInfoResponse,
+  UsersLookupByEmailResponse,
+  UsersProfileGetResponse,
+} from '@slack/web-api';
 import type {Logger} from '../app/logger.js';
 import type {EnvConfig} from '../config/env.js';
 import {
@@ -36,27 +42,9 @@ interface ProfileSeed {
   manager?: OnboardingPerson;
 }
 
-interface SlackProfileFieldDefinition {
-  id: string;
-  label: string;
-}
-
-interface TeamProfileFieldsResponse {
-  profile?: {
-    fields?: SlackProfileFieldDefinition[];
-  };
-}
-
-interface SlackProfileFieldValue {
-  value?: string;
-  alt?: string;
-}
-
-interface UsersProfileResponse {
-  profile?: {
-    fields?: Record<string, SlackProfileFieldValue>;
-  };
-}
+type SlackProfileFieldValue = NonNullable<
+  NonNullable<UsersProfileGetResponse['profile']>['fields']
+>[string];
 
 interface SlackCustomFields {
   division?: SlackProfileFieldValue;
@@ -64,17 +52,9 @@ interface SlackCustomFields {
   manager?: SlackProfileFieldValue;
 }
 
-interface SlackUserRecord {
-  id?: string;
-  real_name?: string;
-  profile?: {
-    real_name?: string;
-    display_name?: string;
-    email?: string;
-    image_192?: string;
-    image_72?: string;
-  };
-}
+type SlackUserRecord =
+  | UsersInfoResponse['user']
+  | UsersLookupByEmailResponse['user'];
 
 export class IdentityResolver {
   private readonly profileCache = new Map<
@@ -176,7 +156,6 @@ export class IdentityResolver {
       tools: buildDefaultTools(),
       rituals: buildDefaultRituals(),
       checklist: buildChecklist(),
-      confluenceLinks: [],
     };
   }
 
@@ -215,8 +194,8 @@ export class IdentityResolver {
       buddy: personalizePerson(people[1], teamName),
       teammates:
         teammates.length > 0
-          ? [...teammates, ...people.slice(3)]
-          : people.slice(2),
+          ? [...scheduleTeammates(teammates), ...people.slice(3)]
+          : [buildFallbackTeammate(teamName, people[2]), ...people.slice(3)],
     };
   }
 
@@ -303,10 +282,11 @@ export class IdentityResolver {
         results.push({
           name: row.name,
           email: row.email,
+          kind: 'teammate',
+          editableBy: 'team',
           role: 'Teammate',
-          discussionPoints:
-            'How the team works day-to-day and what they are currently focused on.',
-          weekBucket: 'week1-2',
+          discussionPoints: `How ${firstName(row.name)} contributes to ${teamName}, which systems they tend to touch, and what they would tell a new teammate to learn first.`,
+          weekBucket: 'week2-3',
         });
         if (results.length >= 8) break;
       }
@@ -348,13 +328,13 @@ export class IdentityResolver {
       const result = await slackClient.users.info({
         user: person.slackUserId,
       });
-      return mergeSlackUserProfile(person, result.user as SlackUserRecord);
+      return mergeSlackUserProfile(person, result.user);
     }
 
     const result = await slackClient.users.lookupByEmail({
       email: person.email!,
     });
-    return mergeSlackUserProfile(person, result.user as SlackUserRecord);
+    return mergeSlackUserProfile(person, result.user);
   }
 
   private async lookupSlackSeedByEmail(
@@ -371,11 +351,7 @@ export class IdentityResolver {
         slackClient,
         result.user.id
       );
-      return buildSlackSeed(
-        result.user.id,
-        result.user as SlackUserRecord,
-        customFields
-      );
+      return buildSlackSeed(result.user.id, result.user, customFields);
     } catch {
       return null;
     }
@@ -389,11 +365,7 @@ export class IdentityResolver {
       slackClient.users.info({user: userId}),
       this.lookupSlackCustomFields(slackClient, userId),
     ]);
-    return buildSlackSeed(
-      userId,
-      userInfo.user as SlackUserRecord,
-      customFields
-    );
+    return buildSlackSeed(userId, userInfo.user, customFields);
   }
 
   private async lookupSlackCustomFields(
@@ -401,12 +373,14 @@ export class IdentityResolver {
     userId: string
   ): Promise<SlackCustomFields> {
     try {
-      const [fieldIds, response] = await Promise.all([
+      const [fieldIds, response]: [
+        Map<string, string>,
+        UsersProfileGetResponse,
+      ] = await Promise.all([
         this.getSlackFieldIds(slackClient),
         slackClient.users.profile.get({user: userId}),
       ]);
-      const profile = response as UsersProfileResponse;
-      const fields = profile.profile?.fields ?? {};
+      const fields = response.profile?.fields ?? {};
 
       return {
         division: readSlackField(fields, fieldIds, 'division'),
@@ -429,13 +403,12 @@ export class IdentityResolver {
     }
 
     try {
-      const response =
-        (await slackClient.team.profile.get()) as TeamProfileFieldsResponse;
+      const response: TeamProfileGetResponse =
+        await slackClient.team.profile.get();
       const fieldIds = new Map(
-        (response.profile?.fields ?? []).map((field) => [
-          field.label.toLowerCase(),
-          field.id,
-        ])
+        (response.profile?.fields ?? []).flatMap((field) =>
+          field.label && field.id ? [[field.label.toLowerCase(), field.id]] : []
+        )
       );
       this.slackFieldIdsCache = {
         fieldIds,
@@ -562,12 +535,12 @@ function buildSlackSeed(
   user: SlackUserRecord,
   customFields: SlackCustomFields
 ): ProfileSeed {
-  const profile = user.profile;
+  const profile = user?.profile;
 
   return {
     userId,
     displayName:
-      user.real_name ||
+      user?.real_name ||
       profile?.real_name ||
       profile?.display_name ||
       'New hire',
@@ -582,17 +555,20 @@ function mergeSlackUserProfile(
   person: OnboardingPerson,
   user: SlackUserRecord
 ): OnboardingPerson {
-  const profile = user.profile;
+  const profile = user?.profile;
+  const title = profile?.title?.trim();
 
   return {
     ...person,
     name:
-      user.real_name ||
+      user?.real_name ||
       profile?.real_name ||
       profile?.display_name ||
       'Slack user',
+    role: title || person.role,
+    title,
     email: profile?.email,
-    slackUserId: user.id,
+    slackUserId: user?.id,
     avatarUrl: profile?.image_192 ?? profile?.image_72,
   };
 }
@@ -617,6 +593,8 @@ function buildManagerPerson(
   return {
     name,
     role: 'Engineering Manager',
+    kind: 'manager',
+    editableBy: 'manager',
     discussionPoints:
       'Role expectations, day-to-day support, performance goals, and the team roadmap.',
     weekBucket: 'week1-2',
@@ -634,4 +612,26 @@ function slackFieldText(
 function parseSlackUserId(value?: string): string | undefined {
   const cleaned = value?.trim().replace(/[<@>]/g, '');
   return cleaned && /^U[A-Z0-9]+$/.test(cleaned) ? cleaned : undefined;
+}
+
+function buildFallbackTeammate(
+  teamName: string,
+  template: OnboardingPerson
+): OnboardingPerson {
+  return {
+    ...template,
+    name: `${teamName} teammate`,
+    discussionPoints: `Ask about the parts of ${teamName} that are most important during the first month, the code paths they touch most often, and the best next person to meet after this conversation.`,
+  };
+}
+
+function scheduleTeammates(teammates: OnboardingPerson[]): OnboardingPerson[] {
+  return teammates.map((teammate, index) => ({
+    ...teammate,
+    weekBucket: index < 2 ? 'week1-2' : 'week2-3',
+  }));
+}
+
+function firstName(value: string): string {
+  return value.split(/\s+/)[0] || value;
 }
