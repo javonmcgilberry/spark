@@ -49,6 +49,12 @@ export class OnboardingPackageService {
     );
   }
 
+  getPackagesManagedBy(userId: string): OnboardingPackage[] {
+    return Array.from(this.packages.values()).filter(
+      (pkg) => pkg.createdByUserId === userId || pkg.managerUserId === userId
+    );
+  }
+
   async createDraftPackage(
     options: DraftPackageOptions
   ): Promise<OnboardingPackage> {

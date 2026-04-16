@@ -1,8 +1,18 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../app/services.js';
-import {buildHomePendingView, buildHomeView} from '../onboarding/home/index.js';
+import {
+  buildHomePendingView,
+  buildHomeView,
+  buildManagerSummaries,
+  type ManagerHireSummary,
+} from '../onboarding/home/index.js';
 import type {PreparedJourneyData} from '../services/journeyService.js';
 import {formatSlackError} from './platformError.js';
+
+type ManagerSummaryServices = Pick<
+  Services,
+  'logger' | 'onboardingPackages' | 'journey' | 'github' | 'jira'
+>;
 
 export async function publishHomeDashboard(
   app: App,
@@ -17,14 +27,19 @@ export async function publishHomeDashboard(
     const reviewerDrafts =
       services.onboardingPackages.getDraftsForReviewer(userId);
     if (!existingPackage || existingPackage.status === 'draft') {
+      const managerSummaries = await computeManagerSummaries(
+        services,
+        userId,
+        client
+      );
       services.logger.info(
-        `Publishing pending Spark Home state for ${userId} (package=${existingPackage?.status ?? 'none'}, drafts=${reviewerDrafts.length}).`
+        `Publishing pending Spark Home state for ${userId} (package=${existingPackage?.status ?? 'none'}, drafts=${reviewerDrafts.length}, managerHires=${managerSummaries.length}).`
       );
       await publishHomeView(
         services,
         client,
         userId,
-        buildHomePendingView(reviewerDrafts)
+        buildHomePendingView(reviewerDrafts, managerSummaries)
       );
       return;
     }
@@ -43,21 +58,34 @@ export async function publishHomeDashboard(
 }
 
 export async function publishPreparedHome(
-  services: Pick<Services, 'logger' | 'onboardingPackages' | 'peopleInsights'>,
+  services: Pick<
+    Services,
+    | 'logger'
+    | 'onboardingPackages'
+    | 'peopleInsights'
+    | 'journey'
+    | 'github'
+    | 'jira'
+  >,
   client: App['client'],
   userId: string,
   prepared: PreparedJourneyData
 ): Promise<void> {
   const reviewerDrafts =
     services.onboardingPackages.getDraftsForReviewer(userId);
+  const managerSummaries = await computeManagerSummaries(
+    services,
+    userId,
+    client
+  );
 
   if (
     !prepared.onboardingPackage ||
     prepared.onboardingPackage.status !== 'published'
   ) {
-    const view = buildHomePendingView(reviewerDrafts);
+    const view = buildHomePendingView(reviewerDrafts, managerSummaries);
     services.logger.info(
-      `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}).`
+      `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}, managerHires=${managerSummaries.length}).`
     );
     await publishHomeView(services, client, userId, view);
     return;
@@ -73,11 +101,43 @@ export async function publishPreparedHome(
 
   const view = buildHomeView(prepared.onboardingPackage, prepared.state, {
     peopleInsights,
+    managerSummaries,
   });
   services.logger.info(
-    `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}).`
+    `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}, managerHires=${managerSummaries.length}).`
   );
   await publishHomeView(services, client, userId, view);
+}
+
+async function computeManagerSummaries(
+  services: ManagerSummaryServices,
+  managerUserId: string,
+  client: App['client']
+): Promise<ManagerHireSummary[]> {
+  const managed =
+    services.onboardingPackages.getPackagesManagedBy(managerUserId);
+  if (managed.length === 0) {
+    return [];
+  }
+
+  return buildManagerSummaries(
+    {
+      journey: services.journey,
+      logger: services.logger,
+      github: services.github,
+      jira: services.jira,
+      resolveHireEmail: (hireUserId) => resolveHireEmail(client, hireUserId),
+    },
+    managed
+  );
+}
+
+async function resolveHireEmail(
+  client: App['client'],
+  hireUserId: string
+): Promise<string | undefined> {
+  const response = await client.users.info({user: hireUserId});
+  return response.user?.profile?.email ?? undefined;
 }
 
 export async function syncSharedOnboardingWorkspace(

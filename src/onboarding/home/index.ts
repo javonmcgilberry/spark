@@ -10,11 +10,21 @@ import {
   countChecklistItems,
   countCompletedChecklistItems,
 } from './sections/checklist.js';
+import {
+  type ManagerHireSummary,
+  renderManagerSummaryCard,
+} from './sections/managerSummary.js';
 import {renderPeopleSection} from './sections/people.js';
 import {renderResourcesSection} from './sections/resources.js';
 import {renderTasksSection} from './sections/tasks.js';
 import {renderWelcomeSection} from './sections/welcome.js';
 import {buildHomeSummaryBlock} from './summary.js';
+
+export type {ManagerHireSummary} from './sections/managerSummary.js';
+export {
+  buildManagerSummaries,
+  renderManagerSummaryCard,
+} from './sections/managerSummary.js';
 
 export {
   HOME_CHECKLIST_ACTION_ID,
@@ -29,6 +39,7 @@ export {
 
 export interface HomeViewContext {
   peopleInsights?: Record<string, PersonInsight>;
+  managerSummaries?: ManagerHireSummary[];
 }
 
 export function buildHomeView(
@@ -42,6 +53,7 @@ export function buildHomeView(
   const totalCount = countChecklistItems(checklistSections);
   const blocks: KnownBlock[] = [
     header(`${APP_NAME} onboarding`),
+    ...renderManagerSummaryCard(context.managerSummaries ?? []),
     buildHomeSummaryBlock(onboardingPackage, completedCount, totalCount),
     ...buildTabNavigation(state.activeHomeSection),
     divider(),
@@ -54,12 +66,16 @@ export function buildHomeView(
   };
 }
 
-export function buildHomePendingView(drafts: OnboardingPackage[] = []): {
+export function buildHomePendingView(
+  drafts: OnboardingPackage[] = [],
+  managerSummaries: ManagerHireSummary[] = []
+): {
   type: 'home';
   blocks: KnownBlock[];
 } {
   const blocks: KnownBlock[] = [
     header(`${APP_NAME} onboarding`),
+    ...renderManagerSummaryCard(managerSummaries),
     section(
       drafts.length > 0
         ? `These onboarding drafts still need a final review before ${APP_NAME} shares the new-hire experience.`
