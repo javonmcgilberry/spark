@@ -314,6 +314,90 @@ describe('computeLiveSignals / tool-access-gap signal', () => {
   });
 });
 
+describe('computeLiveSignals / admin-panel-access signal', () => {
+  it('fires when the package includes an "Admin Panel" tool and it is unchecked', async () => {
+    const pkg = buildPackage({
+      tools: [{category: 'engineering', tool: 'Admin Panel', description: ''}],
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state: buildState()})
+    );
+    const signal = signalById(signals, 'admin-panel-access');
+    expect(signal).toBeDefined();
+    expect(signal?.priority).toBe(8);
+  });
+
+  it('fires for the "Webflow Admin" phrasing too', async () => {
+    const pkg = buildPackage({
+      tools: [
+        {category: 'engineering', tool: 'Webflow Admin', description: ''},
+      ],
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state: buildState()})
+    );
+    expect(signalById(signals, 'admin-panel-access')).toBeDefined();
+  });
+
+  it('matches case-insensitively (lowercase "admin panel")', async () => {
+    const pkg = buildPackage({
+      tools: [{category: 'engineering', tool: 'admin panel', description: ''}],
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state: buildState()})
+    );
+    expect(signalById(signals, 'admin-panel-access')).toBeDefined();
+  });
+
+  it('does not fire when the Admin Panel tool is checked off', async () => {
+    const pkg = buildPackage({
+      tools: [{category: 'engineering', tool: 'Admin Panel', description: ''}],
+    });
+    const state = buildState({
+      toolAccess: {
+        [`engineering::${'Admin Panel'.toLowerCase()}`]: true,
+      },
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state})
+    );
+    expect(signalById(signals, 'admin-panel-access')).toBeUndefined();
+  });
+
+  it('does not fire when the package has no Admin Panel tool', async () => {
+    const pkg = buildPackage({
+      tools: [
+        {category: 'general', tool: 'okta', description: ''},
+        {category: 'engineering', tool: 'datadog', description: ''},
+      ],
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state: buildState()})
+    );
+    expect(signalById(signals, 'admin-panel-access')).toBeUndefined();
+  });
+
+  it('outranks the generic tool-access-gap signal when both fire', async () => {
+    const pkg = buildPackage({
+      tools: [
+        {category: 'engineering', tool: 'Admin Panel', description: ''},
+        {category: 'general', tool: 'okta', description: ''},
+      ],
+    });
+    const signals = await computeLiveSignals(
+      buildContext({onboardingPackage: pkg, state: buildState()})
+    );
+    const admin = signalById(signals, 'admin-panel-access');
+    const gap = signalById(signals, 'tool-access-gap');
+    expect(admin).toBeDefined();
+    expect(gap).toBeDefined();
+    const adminIndex = signals.findIndex((s) => s.id === 'admin-panel-access');
+    const gapIndex = signals.findIndex((s) => s.id === 'tool-access-gap');
+    expect(adminIndex).toBeLessThan(gapIndex);
+    expect(admin!.priority).toBeGreaterThan(gap!.priority);
+  });
+});
+
 describe('computeLiveSignals / GitHub signals', () => {
   function buildGitHubMock(overrides: {
     team?: Array<{author: string}>;
