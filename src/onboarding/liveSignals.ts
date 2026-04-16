@@ -35,6 +35,17 @@ export interface LiveSignal {
 const TITLE_MAX_CHARS = 24;
 const MAX_PILLS = 4;
 
+/**
+ * End-of-month milestone 1:1 deadlines, in days since onboarding publishedAt.
+ * Defined by the manager "Onboarding Milestone Conversations" guide.
+ */
+const MILESTONE_DEADLINE_DAYS = [30, 60, 90] as const;
+/**
+ * How many days before a deadline we start nudging. A value of 3 means the
+ * pill fires for 4 days: [deadline - 3, deadline] inclusive.
+ */
+const MILESTONE_REMINDER_LEAD_DAYS = 3;
+
 export async function computeLiveSignals(
   ctx: LiveSignalContext,
 ): Promise<LiveSignal[]> {
@@ -48,6 +59,7 @@ export async function computeLiveSignals(
     computeSurveyDueSignal(ctx),
     computeChecklistPendingSignal(ctx),
     computeToolAccessGapSignal(ctx),
+    computeMilestonePrepSignal(ctx),
     computeStageCheckpointSignal(ctx),
   ]);
 
@@ -321,6 +333,31 @@ async function computeSurveyDueSignal(
     title,
     "What's the onboarding survey about, and what should I be ready to answer? Don't draft my answers — just walk me through what it covers.",
     7,
+  );
+}
+
+async function computeMilestonePrepSignal(
+  ctx: LiveSignalContext
+): Promise<LiveSignal | null> {
+  const daysSince = ctx.stage.daysSince;
+  const deadline = MILESTONE_DEADLINE_DAYS.find(
+    (d) => daysSince >= d - MILESTONE_REMINDER_LEAD_DAYS && daysSince <= d
+  );
+  if (deadline === undefined) {
+    return null;
+  }
+
+  const daysRemaining = deadline - daysSince;
+  const title =
+    daysRemaining === 0
+      ? 'Milestone 1:1 today'
+      : `Milestone 1:1 in ${daysRemaining}d`;
+
+  return buildSignal(
+    'milestone-prep',
+    title,
+    "Summarize my observable onboarding progress — checklist %, channels joined, user guide status, tool access, any PRs or tickets. I want a one-pager snapshot I can bring to my milestone conversation. Don't coach me — just the data.",
+    7
   );
 }
 
