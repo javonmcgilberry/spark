@@ -1,5 +1,6 @@
 import {Assistant, type App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
+import {APP_NAME} from '../../config/constants.js';
 import {resolveJourneyText} from '../journeyText.js';
 import {
   publishPreparedHome,
@@ -49,7 +50,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           loading_messages: [
             'Looking up your team',
             'Pulling together your plan',
-            'Getting Spark ready',
+            `Getting ${APP_NAME} ready`,
           ],
         });
 
@@ -57,7 +58,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
         const prepared = await journey.prepareStart(profile);
         const reply = journey.buildStartReply(prepared);
 
-        await setTitle(`Spark for ${profile.firstName}`);
+        await setTitle(`${APP_NAME} for ${profile.firstName}`);
         await setSuggestedPrompts(DEFAULT_PROMPTS);
         await say({
           text: reply.text,

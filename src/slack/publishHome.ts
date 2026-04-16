@@ -1,6 +1,6 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../app/services.js';
-import {buildHomePendingView, buildHomeView} from '../onboarding/homeBlocks.js';
+import {buildHomePendingView, buildHomeView} from '../onboarding/home/index.js';
 import type {PreparedJourneyData} from '../services/journeyService.js';
 import {formatSlackError} from './platformError.js';
 

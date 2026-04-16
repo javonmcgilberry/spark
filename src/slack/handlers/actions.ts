@@ -1,6 +1,7 @@
 import type {App, BlockAction} from '@slack/bolt';
 import type {KnownBlock} from '@slack/types';
 import type {Services} from '../../app/services.js';
+import {APP_NAME} from '../../config/constants.js';
 import {buildChecklistForProfile} from '../../onboarding/catalog.js';
 import {
   isJourneyStepId,
@@ -167,7 +168,7 @@ export function registerActionHandlers(app: App, services: Services): void {
     if (pkg.draftChannelId) {
       await client.chat.postMessage({
         channel: pkg.draftChannelId,
-        text: `Spark refreshed the draft for ${profile.displayName}.`,
+        text: `${APP_NAME} refreshed the draft for ${profile.displayName}.`,
         blocks: buildDraftReadyBlocks(profile, pkg),
       });
     }
@@ -271,7 +272,7 @@ export function registerActionHandlers(app: App, services: Services): void {
           text:
             publishResult.reason === 'not_manager'
               ? "Only the new hire's manager can publish this onboarding plan."
-              : "Spark couldn't find that onboarding draft anymore.",
+              : `${APP_NAME} couldn't find that onboarding draft anymore.`,
         });
         return;
       }
@@ -306,7 +307,7 @@ export function registerActionHandlers(app: App, services: Services): void {
       if (body.channel?.id) {
         await client.chat.postMessage({
           channel: body.channel.id,
-          text: `Spark onboarding is live for <@${action.value}>.`,
+          text: `${APP_NAME} onboarding is live for <@${action.value}>.`,
         });
       }
     }
@@ -364,8 +365,8 @@ export function registerActionHandlers(app: App, services: Services): void {
           text:
             hasSlackErrorCode(error, 'not_in_channel') ||
             hasSlackErrorCode(error, 'channel_not_found')
-              ? "Spark couldn't post there yet. If it's a private channel, invite Spark first and then try again."
-              : `Spark couldn't share that milestone yet. ${formatSlackError(error)}`,
+              ? `${APP_NAME} couldn't post there yet. If it's a private channel, invite ${APP_NAME} first and then try again.`
+              : `${APP_NAME} couldn't share that milestone yet. ${formatSlackError(error)}`,
         });
       }
     }

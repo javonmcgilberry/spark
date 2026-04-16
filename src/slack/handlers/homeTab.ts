@@ -9,7 +9,7 @@ import {
   parseChecklistItemActionId,
   slugifyToolCategory,
   TOOL_CHECKBOX_CHUNK_SIZE,
-} from '../../onboarding/homeBlocks.js';
+} from '../../onboarding/home/index.js';
 import {
   buildChecklistItemStatusKey,
   isHomeSectionId,

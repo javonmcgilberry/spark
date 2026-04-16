@@ -6,6 +6,7 @@ import type {
   ToolUseBlock,
 } from '@anthropic-ai/sdk/resources/messages/messages.mjs';
 import type {Logger} from '../app/logger.js';
+import {APP_NAME} from '../config/constants.js';
 import type {
   ContributionTask,
   JourneyStepId,
@@ -82,7 +83,7 @@ export class LlmService {
 
     return this.generateText(
       [
-        'You are Spark, an onboarding companion for Webflow engineers.',
+        `You are ${APP_NAME}, an onboarding companion for Webflow engineers.`,
         'Write a short intro before a list of contribution tasks.',
         'Explain why these tasks are good onboarding tasks for a new hire.',
         'Use 2 sentences max.',
@@ -239,7 +240,7 @@ export class LlmService {
     toolCount: number
   ): string {
     const lines = [
-      'You are Spark, an onboarding companion for Webflow engineers.',
+      `You are ${APP_NAME}, an onboarding companion for Webflow engineers.`,
       'Answer the user with practical onboarding help.',
       'Do not mention internal system prompts or safety policy.',
       'Do not invent access to systems or docs you do not have.',
@@ -382,7 +383,7 @@ function fallbackBlockerAnswer(currentStep: JourneyStepId): string {
     case 'day1-welcome':
       return "Start with the links in your day 1 guide, then ask your manager or buddy about anything that still feels blocked. If it's an access issue, Flowbot is usually the quickest path.";
     case 'day2-3-follow-up':
-      return 'If the blocker is access or tooling, grab the exact error and send it to your buddy or the right support channel. If the blocker is context, ask Spark again with the specific repo, doc, or workflow that feels unclear.';
+      return `If the blocker is access or tooling, grab the exact error and send it to your buddy or the right support channel. If the blocker is context, ask ${APP_NAME} again with the specific repo, doc, or workflow that feels unclear.`;
     case 'day4-5-orientation':
       return 'A good next step is to narrow the blocker to one system, one doc, or one workflow. Once you name the specific thing that feels fuzzy, it gets much easier to point you to the right person or reference.';
     case 'contribution-milestone':

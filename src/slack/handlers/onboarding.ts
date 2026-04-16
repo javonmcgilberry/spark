@@ -1,5 +1,6 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
+import {APP_NAME} from '../../config/constants.js';
 import {resolveJourneyText} from '../journeyText.js';
 import {
   publishPreparedHome,
@@ -47,8 +48,8 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
 
     await say({
       text: hasPublishedPackage
-        ? `Hi <@${event.user}>. I sent your onboarding guide in a DM, and Spark is ready in the sidebar whenever you want to keep going there.`
-        : `Hi <@${event.user}>. I sent an update in DM. Spark will be ready once your manager or onboarding team publishes your plan.`,
+        ? `Hi <@${event.user}>. I sent your onboarding guide in a DM, and ${APP_NAME} is ready in the sidebar whenever you want to keep going there.`
+        : `Hi <@${event.user}>. I sent an update in DM. ${APP_NAME} will be ready once your manager or onboarding team publishes your plan.`,
 
       thread_ts: event.ts,
     });

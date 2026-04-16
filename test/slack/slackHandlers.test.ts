@@ -1,11 +1,12 @@
 import type {App} from '@slack/bolt';
 import {ErrorCode} from '@slack/web-api';
 import {describe, expect, it, vi} from 'vitest';
+import {APP_NAME} from '../../src/config/constants.js';
 import {
   HOME_CHECKLIST_ACTION_ID,
   HOME_NAV_ACTION_ID,
   HOME_TOOL_ACCESS_ACTION_ID,
-} from '../../src/onboarding/homeBlocks.js';
+} from '../../src/onboarding/home/index.js';
 import {HOME_SECTION_IDS} from '../../src/onboarding/types.js';
 import {registerActionHandlers} from '../../src/slack/handlers/actions.js';
 import {registerCommandHandlers} from '../../src/slack/handlers/commands.js';
@@ -137,7 +138,7 @@ describe('Slack handlers', () => {
     expect(missingSlack.calls.chatPostMessage).toHaveLength(1);
     expect(missingSlack.calls.chatPostMessage[0]).toMatchObject({
       channel: missingManagerUserId,
-      text: "Spark couldn't find that onboarding draft anymore.",
+      text: `${APP_NAME} couldn't find that onboarding draft anymore.`,
     });
     expect(missingSlack.calls.viewsPublish).toHaveLength(0);
   });
@@ -269,7 +270,8 @@ describe('Slack handlers', () => {
       slack.calls.chatPostMessage.some(
         (call) =>
           call.channel === 'C_REVIEW' &&
-          call.text === `Spark onboarding is live for <@${profile.userId}>.`
+          call.text ===
+            `${APP_NAME} onboarding is live for <@${profile.userId}>.`
       )
     ).toBe(true);
   });
@@ -450,7 +452,7 @@ describe('Slack handlers', () => {
 
     expect(slack.calls.chatPostMessage.at(-1)).toMatchObject({
       channel: managerUserId,
-      text: expect.stringContaining('invite Spark first'),
+      text: expect.stringContaining(`invite ${APP_NAME} first`),
     });
   });
 
@@ -511,7 +513,7 @@ describe('Slack handlers', () => {
 
     expect(slack.calls.viewsPublish).toHaveLength(1);
     expect(collectViewText(slack.calls.viewsPublish[0])).toContain(
-      'Spark onboarding'
+      `${APP_NAME} onboarding`
     );
     expect(collectViewBlocks(slack.calls.viewsPublish[0]).length).toBeLessThan(
       100

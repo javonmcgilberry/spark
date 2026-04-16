@@ -2,7 +2,7 @@ import express from 'express';
 import type {App} from '@slack/bolt';
 import type {EnvConfig} from '../config/env.js';
 import type {Services} from '../app/services.js';
-import {buildHomePendingView, buildHomeView} from '../onboarding/homeBlocks.js';
+import {buildHomePendingView, buildHomeView} from '../onboarding/home/index.js';
 import {isJourneyStepId} from '../onboarding/types.js';
 import {publishHomeView} from '../slack/publishHome.js';
 

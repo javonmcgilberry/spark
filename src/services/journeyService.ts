@@ -9,6 +9,7 @@ import {
   buildTaskPreviewBlocks,
   buildWelcomeBlocks,
 } from '../onboarding/blocks.js';
+import {APP_NAME} from '../config/constants.js';
 import type {
   ChecklistItemStatus,
   ContributionTask,
@@ -81,7 +82,7 @@ export class JourneyService {
   buildStartReply(prepared: PreparedJourneyData): JourneyReply {
     if (!prepared.onboardingPackage) {
       return {
-        text: 'Your manager or onboarding team is still getting your onboarding plan ready. Spark will open it as soon as it is published.',
+        text: `Your manager or onboarding team is still getting your onboarding plan ready. ${APP_NAME} will open it as soon as it is published.`,
         blocks: buildDraftPendingBlocks(),
       };
     }
@@ -309,7 +310,7 @@ export class JourneyService {
   ): Promise<JourneyReply> {
     if (!this.jira || !this.jira.isConfigured()) {
       return {
-        text: 'Jira lookups are not configured yet for Spark.',
+        text: `Jira lookups are not configured yet for ${APP_NAME}.`,
         blocks: [
           section(
             "Jira search isn't configured yet. Ask your admin to set `JIRA_BASE_URL`, `JIRA_API_EMAIL`, and `JIRA_API_TOKEN` to enable ticket lookups."
@@ -376,7 +377,7 @@ export class JourneyService {
   ): Promise<JourneyReply> {
     if (!this.github || !this.github.isConfigured()) {
       return {
-        text: 'GitHub lookups are not configured yet for Spark.',
+        text: `GitHub lookups are not configured yet for ${APP_NAME}.`,
         blocks: [
           section(
             "GitHub search isn't configured yet. Ask your admin to set `GITHUB_TOKEN` to enable pull-request lookups."

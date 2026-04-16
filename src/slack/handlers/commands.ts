@@ -1,5 +1,6 @@
 import type {App, RespondFn} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
+import {APP_NAME} from '../../config/constants.js';
 import {publishPreparedHome} from '../publishHome.js';
 import {
   buildDraftSetupModal,
@@ -46,7 +47,7 @@ export function registerCommandHandlers(app: App, services: Services): void {
 
     await respond({
       response_type: 'ephemeral',
-      text: 'Create a draft here, then review it in the draft channel or Spark Home when you are ready.',
+      text: `Create a draft here, then review it in the draft channel or ${APP_NAME} Home when you are ready.`,
       blocks: buildSparkCommandMenuBlocks(),
     });
   });

@@ -1,4 +1,5 @@
 import type {KnownBlock} from '@slack/types';
+import {APP_NAME} from '../config/constants.js';
 import {CHECKLIST_SECTIONS} from '../onboarding/catalog.js';
 import type {OnboardingPackage, TeamProfile} from '../onboarding/types.js';
 import {actions, header, plainText, section} from './blockKit.js';
@@ -48,9 +49,9 @@ const CHECKLIST_SECTION_OPTIONS = CHECKLIST_SECTIONS.map((sectionItem) => ({
 
 export function buildSparkCommandMenuBlocks(): KnownBlock[] {
   return [
-    header('Spark'),
+    header(APP_NAME),
     section(
-      'Create a draft here, then review it in Spark Home or the draft channel before you publish it.'
+      `Create a draft here, then review it in ${APP_NAME} Home or the draft channel before you publish it.`
     ),
     actions([
       {
@@ -306,7 +307,7 @@ export function buildCelebrationShareBlocks(
   return [
     header('Ready to share'),
     section(
-      `Share this milestone in a public channel, or in a private channel where Spark is already there.\n\n*Preview*\n>${previewText}`
+      `Share this milestone in a public channel, or in a private channel where ${APP_NAME} is already there.\n\n*Preview*\n>${previewText}`
     ),
     actions([
       {

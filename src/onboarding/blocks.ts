@@ -1,4 +1,5 @@
 import type {KnownBlock} from '@slack/types';
+import {APP_NAME} from '../config/constants.js';
 import {JOURNEY_LABELS} from './catalog.js';
 import {
   buildPeopleSections,
@@ -279,7 +280,7 @@ export function buildDraftPendingBlocks(): KnownBlock[] {
   return [
     header('Your onboarding plan is on the way'),
     section(
-      'Your manager or onboarding team is still getting your onboarding plan ready. As soon as they publish it, Spark will open the full Home experience and send you the latest version in DM.'
+      `Your manager or onboarding team is still getting your onboarding plan ready. As soon as they publish it, ${APP_NAME} will open the full Home experience and send you the latest version in DM.`
     ),
   ];
 }
