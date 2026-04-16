@@ -1,7 +1,6 @@
 import {Octokit} from '@octokit/rest';
 import type {Logger} from '../app/logger.js';
 import type {EnvConfig} from '../config/env.js';
-import type {TeamProfile} from '../onboarding/types.js';
 
 const GITHUB_CACHE_TTL_MS = 60 * 1000;
 const GITHUB_REQUEST_TIMEOUT_MS = 8000;
@@ -28,8 +27,9 @@ interface SearchCacheEntry {
  * Best-guess mapping from a Webflow email to a GitHub handle. The local
  * part of the email becomes the handle, with dots turned into dashes.
  */
-export function inferGithubUsername(profile: TeamProfile): string | undefined {
-  const email = profile.email;
+export function inferGithubUsername(
+  email: string | undefined
+): string | undefined {
   if (!email) {
     return undefined;
   }

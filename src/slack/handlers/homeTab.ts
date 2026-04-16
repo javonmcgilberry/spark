@@ -1,7 +1,6 @@
 import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {
-  buildHomeView,
   buildToolAccessKey,
   HOME_CHECKLIST_ACTION_ID,
   HOME_NAV_ACTION_ID,
@@ -18,7 +17,7 @@ import {
 import type {PreparedJourneyData} from '../../services/journeyService.js';
 import {
   publishHomeDashboard,
-  publishHomeView,
+  publishPreparedHome,
   syncSharedOnboardingWorkspace,
 } from '../publishHome.js';
 
@@ -56,16 +55,8 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
         return;
       }
 
-      const state = services.journey.setActiveHomeSection(
-        body.user.id,
-        action.value
-      );
-      await publishHomeView(
-        services,
-        client,
-        body.user.id,
-        buildHomeView(prepared.onboardingPackage, state)
-      );
+      services.journey.setActiveHomeSection(body.user.id, action.value);
+      await publishPreparedHome(services, client, body.user.id, prepared);
     }
   );
 
@@ -110,18 +101,13 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
         `Home checklist updated for ${body.user.id} (${parsed.sectionId}:${parsed.itemIndex})`
       );
 
-      const state = services.journey.setItemStatus(
+      services.journey.setItemStatus(
         body.user.id,
         buildChecklistItemStatusKey(parsed.sectionId, parsed.itemIndex),
         action.selected_option.value
       );
 
-      await publishHomeView(
-        services,
-        client,
-        body.user.id,
-        buildHomeView(prepared.onboardingPackage, state)
-      );
+      await publishPreparedHome(services, client, body.user.id, prepared);
       await syncSharedOnboardingWorkspace(app, services, body.user.id, client);
     }
   );
@@ -161,18 +147,13 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
         typeof action.action_id === 'string' ? action.action_id : ''
       );
 
-      const state = services.journey.setToolAccessForKeys(
+      services.journey.setToolAccessForKeys(
         body.user.id,
         allCategoryValues,
         selectedValues
       );
 
-      await publishHomeView(
-        services,
-        client,
-        body.user.id,
-        buildHomeView(prepared.onboardingPackage, state)
-      );
+      await publishPreparedHome(services, client, body.user.id, prepared);
     }
   );
 }

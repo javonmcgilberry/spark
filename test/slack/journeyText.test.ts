@@ -1,27 +1,10 @@
 import {describe, expect, it} from 'vitest';
+import {FALLBACK_UNREACHABLE} from '../../src/services/llmService.js';
 import {resolveJourneyText} from '../../src/slack/journeyText.js';
-import {collectTextContent} from '../helpers/collectTextContent.js';
 import {createTestServices} from '../helpers/createTestServices.js';
 
 describe('journeyText routing', () => {
-  it('points the user at Jira config when Jira is not set up', async () => {
-    const {profile, services} = createTestServices();
-
-    const result = await resolveJourneyText(
-      profile,
-      'show me my jira tickets',
-      services.journey
-    );
-
-    expect(result.kind).toBe('reply');
-    if (result.kind === 'reply') {
-      expect(collectTextContent(result.reply.blocks)).toContain(
-        "Jira search isn't configured yet"
-      );
-    }
-  });
-
-  it('recognizes a Jira issue key embedded in the message', async () => {
+  it('recognizes a Jira issue key embedded in the message and returns a structured reply', async () => {
     const {profile, services} = createTestServices();
 
     const result = await resolveJourneyText(
@@ -34,33 +17,36 @@ describe('journeyText routing', () => {
     expect(result.title).toBe('Jira ABC-123');
   });
 
-  it('points the user at GitHub config when GitHub is not set up', async () => {
+  it('routes everything else through the LLM answer path', async () => {
     const {profile, services} = createTestServices();
 
     const result = await resolveJourneyText(
       profile,
-      'show me my open prs',
+      'what are the fun channels around here?',
       services.journey
     );
 
-    expect(result.kind).toBe('reply');
-    if (result.kind === 'reply') {
-      expect(collectTextContent(result.reply.blocks)).toContain(
-        "GitHub search isn't configured yet"
-      );
+    expect(result.kind).toBe('answer');
+    if (result.kind === 'answer') {
+      // With no Anthropic key in tests, the LLM falls back to the neutral message.
+      expect(result.answer).toBe(FALLBACK_UNREACHABLE);
+      expect(result.suggestedPrompts).toBeNull();
     }
   });
 
-  it('routes review-requested phrasing to the review lookup', async () => {
+  it('threads history into the answer call without erroring', async () => {
     const {profile, services} = createTestServices();
 
     const result = await resolveJourneyText(
       profile,
-      'what is awaiting review for me?',
-      services.journey
+      'remind me about what we said before',
+      services.journey,
+      [
+        {role: 'user', content: 'hi'},
+        {role: 'assistant', content: 'hi there'},
+      ]
     );
 
-    expect(result.kind).toBe('reply');
-    expect(result.title).toBe('PRs to review');
+    expect(result.kind).toBe('answer');
   });
 });

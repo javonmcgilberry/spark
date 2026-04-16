@@ -1,18 +1,21 @@
-import {vi} from 'vitest';
+import {vi, type Mock} from 'vitest';
 import type {Logger} from '../../src/app/logger.js';
 
+type LoggerMethod = Logger['info'];
+type LoggerMock = Mock<LoggerMethod> & LoggerMethod;
+
 export interface TestLogger extends Logger {
-  info: ReturnType<typeof vi.fn>;
-  warn: ReturnType<typeof vi.fn>;
-  error: ReturnType<typeof vi.fn>;
-  debug: ReturnType<typeof vi.fn>;
+  info: LoggerMock;
+  warn: LoggerMock;
+  error: LoggerMock;
+  debug: LoggerMock;
 }
 
 export function createTestLogger(): TestLogger {
   return {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
+    info: vi.fn<LoggerMethod>(),
+    warn: vi.fn<LoggerMethod>(),
+    error: vi.fn<LoggerMethod>(),
+    debug: vi.fn<LoggerMethod>(),
   };
 }

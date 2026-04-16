@@ -5,7 +5,6 @@ import type {
   DocLink,
   EngineeringResourceLibrarySection,
   HomeSectionId,
-  MilestonePlanItem,
   OnboardingPackage,
   OnboardingPerson,
   OnboardingReferences,
@@ -39,27 +38,45 @@ export const HOME_SECTION_TABS: Array<{
 const WELCOME_JOURNEY_MILESTONES: WelcomeJourneyMilestone[] = [
   {
     label: 'Week 1: Meet the Team & Setup',
-    goal: 'Meet the team, complete HR tasks, set up tools, and build foundational knowledge.',
+    keyActivities:
+      'Complete HR and work tools, review Webflow 101, and meet your team and mentor.',
+    supportActions:
+      'Assign an onboarding buddy, schedule 1:1s, and confirm checklist progress.',
   },
   {
     label: 'Week 2: Intro to Eng Workflows',
-    goal: 'Learn about core engineering workflows and engineering career growth.',
+    keyActivities:
+      'Review The Codex, learn the PR and code-review process, and get hands-on with debugging and local development.',
+    supportActions:
+      'Review their early PRs, discuss career growth, and confirm engagement with team ceremonies.',
   },
   {
     label: 'Week 3: First Contribution & Scaling Up',
-    goal: 'Apply technical knowledge by contributing code and dive into role-specific training and onboarding.',
+    keyActivities:
+      'Submit a first PR, learn your team or system architecture, and attend retrospectives.',
+    supportActions:
+      'Give feedback on the first PR, encourage knowledge sharing, and track exposure to team OKRs.',
   },
   {
     label: 'Week 4: Project Onboarding & Eng Citizenship',
-    goal: 'Operate independently, contribute meaningfully, and start career development discussions.',
+    keyActivities:
+      'Contribute meaningfully to a project, understand incident response, and take on early ownership.',
+    supportActions:
+      'Support task ownership and guide the new hire through project onboarding and role-specific training.',
   },
   {
     label: '60 Days',
-    goal: 'Ship meaningful code, understand engineering workflows, participate in team processes, and develop operational confidence.',
+    keyActivities:
+      'Ship meaningful code, follow team workflows smoothly, and develop operational confidence.',
+    supportActions:
+      'Hold the milestone conversation and reinforce growth in tooling, collaboration, and delivery.',
   },
   {
     label: '90 Days',
-    goal: 'Own and deliver complex tasks, collaborate cross-functionally, and contribute to process improvements.',
+    keyActivities:
+      'Lead more complex work, collaborate cross-functionally, and suggest process improvements.',
+    supportActions:
+      'Conduct the career-growth conversation and mark the full ramp milestone.',
   },
 ];
 
@@ -1159,57 +1176,6 @@ export function buildDefaultRituals(): RitualGuide[] {
   return RITUAL_GUIDES.map((ritual) => ({...ritual}));
 }
 
-const PLAN_ITEMS: MilestonePlanItem[] = [
-  {
-    timeframe: 'Week 1',
-    goalSummary: 'Set up and foundations',
-    keyActivities:
-      'Complete HR and work tools, review Webflow 101, and meet your team and mentor.',
-    supportActions:
-      'Assign an onboarding buddy, schedule 1:1s, and confirm checklist progress.',
-  },
-  {
-    timeframe: 'Week 2',
-    goalSummary: 'Intro to engineering workflows',
-    keyActivities:
-      'Review The Codex, learn the PR and code-review process, and get hands-on with debugging and local development.',
-    supportActions:
-      'Review their early PRs, discuss career growth, and confirm engagement with team ceremonies.',
-  },
-  {
-    timeframe: 'Week 3',
-    goalSummary: 'First contribution and scaling',
-    keyActivities:
-      'Submit a first PR, learn your team or system architecture, and attend retrospectives.',
-    supportActions:
-      'Give feedback on the first PR, encourage knowledge sharing, and track exposure to team OKRs.',
-  },
-  {
-    timeframe: 'Week 4',
-    goalSummary: 'Project onboarding and engineering citizenship',
-    keyActivities:
-      'Contribute meaningfully to a project, understand incident response, and take on early ownership.',
-    supportActions:
-      'Support task ownership and guide the new hire through project onboarding and role-specific training.',
-  },
-  {
-    timeframe: '60 Days',
-    goalSummary: 'Operate with confidence',
-    keyActivities:
-      'Ship meaningful code, follow team workflows smoothly, and develop operational confidence.',
-    supportActions:
-      'Hold the milestone conversation and reinforce growth in tooling, collaboration, and delivery.',
-  },
-  {
-    timeframe: '90 Days',
-    goalSummary: 'Full ownership and autonomy',
-    keyActivities:
-      'Lead more complex work, collaborate cross-functionally, and suggest process improvements.',
-    supportActions:
-      'Conduct the career-growth conversation and mark the full ramp milestone.',
-  },
-];
-
 export function buildOnboardingPackageSections(params: {
   profile: TeamProfile;
   references?: OnboardingReferences;
@@ -1256,12 +1222,6 @@ export function buildOnboardingPackageSections(params: {
       intro:
         'Use this week-by-week checklist to keep your ramp clear and manageable. It mirrors the onboarding workbook, so you can focus on what matters now without piecing everything together yourself.',
       sections: checklist,
-    },
-    plan306090: {
-      title: '30-60-90 plan',
-      intro:
-        'This is the milestone view of the same ramp: what the new hire should focus on, and how the manager or buddy can support them along the way.',
-      items: PLAN_ITEMS.map((item) => ({...item})),
     },
     peopleToMeet: {
       title: 'People to meet',

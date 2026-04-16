@@ -1,5 +1,6 @@
 import type {KnownBlock} from '@slack/types';
 import {APP_NAME} from '../../config/constants.js';
+import type {PersonInsight} from '../../services/peopleInsightsService.js';
 import {actions, divider, header, section} from '../../slack/blockKit.js';
 import {SPARK_OPEN_DRAFT_EDIT_MODAL_ACTION_ID} from '../../slack/workflowUi.js';
 import type {JourneyState, OnboardingPackage} from '../types.js';
@@ -26,9 +27,14 @@ export {
   slugifyToolCategory,
 } from './actionIds.js';
 
+export interface HomeViewContext {
+  peopleInsights?: Record<string, PersonInsight>;
+}
+
 export function buildHomeView(
   onboardingPackage: OnboardingPackage,
-  state: JourneyState
+  state: JourneyState,
+  context: HomeViewContext = {}
 ) {
   const checklistSections =
     onboardingPackage.sections.onboardingChecklist.sections;
@@ -39,7 +45,7 @@ export function buildHomeView(
     buildHomeSummaryBlock(onboardingPackage, completedCount, totalCount),
     ...buildTabNavigation(state.activeHomeSection),
     divider(),
-    ...renderActiveSection(onboardingPackage, state),
+    ...renderActiveSection(onboardingPackage, state, context),
   ];
 
   return {
@@ -91,7 +97,8 @@ export function buildHomePendingView(drafts: OnboardingPackage[] = []): {
 
 function renderActiveSection(
   onboardingPackage: OnboardingPackage,
-  state: JourneyState
+  state: JourneyState,
+  context: HomeViewContext
 ): KnownBlock[] {
   switch (state.activeHomeSection) {
     case 'welcome':
@@ -99,7 +106,7 @@ function renderActiveSection(
     case 'onboarding-checklist':
       return renderChecklistSection(onboardingPackage, state);
     case 'people-to-meet':
-      return renderPeopleSection(onboardingPackage);
+      return renderPeopleSection(onboardingPackage, context.peopleInsights);
     case 'resources':
       return renderResourcesSection(onboardingPackage, state);
     case 'initial-engineering-tasks':

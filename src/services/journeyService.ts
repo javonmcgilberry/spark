@@ -28,9 +28,16 @@ import {
   type GitHubService,
 } from './githubService.js';
 import type {JiraService, JiraIssue} from './jiraService.js';
-import {LlmService} from './llmService.js';
+import {
+  type AnswerUserResult,
+  type ConversationHistoryTurn,
+  LlmService,
+  type SuggestedPrompt,
+} from './llmService.js';
 import {OnboardingPackageService} from './onboardingPackageService.js';
 import {TaskScannerService} from './taskScannerService.js';
+
+export type {AnswerUserResult, ConversationHistoryTurn, SuggestedPrompt};
 
 export interface JourneyReply {
   text: string;
@@ -295,12 +302,16 @@ export class JourneyService {
     };
   }
 
-  async answerQuestion(profile: TeamProfile, text: string): Promise<string> {
-    const state = this.getOrCreateState(profile.userId);
-    return this.llmService.answerBlocker({
+  async answerUser(
+    profile: TeamProfile,
+    text: string,
+    options: {history?: ConversationHistoryTurn[]} = {}
+  ): Promise<AnswerUserResult> {
+    this.getOrCreateState(profile.userId);
+    return this.llmService.answerUser({
       question: text,
-      currentStep: state.currentStep,
       profile,
+      history: options.history,
     });
   }
 
@@ -387,7 +398,7 @@ export class JourneyService {
     }
 
     const mode = options.mode ?? 'mine';
-    const username = inferGithubUsername(profile);
+    const username = inferGithubUsername(profile.email);
 
     if (mode === 'team' && profile.githubTeamSlug) {
       const prs = await this.github.findRecentPullRequestsForTeam(

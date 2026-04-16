@@ -158,7 +158,8 @@ export interface TeamProfile {
 
 export interface WelcomeJourneyMilestone {
   label: string;
-  goal: string;
+  keyActivities: string;
+  supportActions: string;
 }
 
 export interface WelcomePoc {
@@ -179,19 +180,6 @@ export interface OnboardingChecklistSection {
   title: string;
   intro: string;
   sections: ChecklistSection[];
-}
-
-export interface MilestonePlanItem {
-  timeframe: string;
-  goalSummary: string;
-  keyActivities: string;
-  supportActions: string;
-}
-
-export interface MilestonePlanSection {
-  title: string;
-  intro: string;
-  items: MilestonePlanItem[];
 }
 
 export interface PeopleToMeetSection {
@@ -259,7 +247,6 @@ export interface OnboardingPackage {
   sections: {
     welcome: WelcomeSection;
     onboardingChecklist: OnboardingChecklistSection;
-    plan306090: MilestonePlanSection;
     peopleToMeet: PeopleToMeetSection;
     toolsAccess: ToolsAccessSection;
     slack: SlackSection;

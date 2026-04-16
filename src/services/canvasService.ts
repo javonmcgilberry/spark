@@ -399,10 +399,10 @@ function buildDraftManagedSections(
       ),
     },
     {
-      title: '30-60-90 Plan',
-      markdown: buildPlanCanvasMarkdown(
+      title: 'Onboarding journey',
+      markdown: buildJourneyCanvasMarkdown(
         pkg.sections.onboardingChecklist.sections,
-        pkg.sections.plan306090.items
+        pkg.sections.welcome.journeyMilestones
       ),
     },
     {
@@ -480,19 +480,22 @@ function buildChecklistCanvasMarkdown(
   ].join('\n');
 }
 
-function buildPlanCanvasMarkdown(
+function buildJourneyCanvasMarkdown(
   checklist: OnboardingPackage['sections']['onboardingChecklist']['sections'],
-  plan: OnboardingPackage['sections']['plan306090']['items']
+  milestones: OnboardingPackage['sections']['welcome']['journeyMilestones']
 ): string {
   return [
-    '## 30-60-90 Plan',
+    '## Onboarding journey',
     '',
-    ...plan.flatMap((item) => {
-      const links = linkedChecklistItemsForMilestone(checklist, item.timeframe);
+    ...milestones.flatMap((milestone) => {
+      const links = linkedChecklistItemsForMilestone(
+        checklist,
+        milestone.label
+      );
       return [
-        `### ${item.timeframe} — ${item.goalSummary}`,
-        `- New hire focus: ${item.keyActivities}`,
-        `- Manager / buddy support: ${item.supportActions}`,
+        `### ${milestone.label}`,
+        `- New hire focus: ${milestone.keyActivities}`,
+        `- Manager / buddy support: ${milestone.supportActions}`,
         ...(links.length > 0
           ? [
               `- Key links: ${links
@@ -636,7 +639,7 @@ function buildDraftProgressMarkdown(): string {
     'This section updates automatically after publish, so the manager, onboarding buddy, and new hire can stay aligned in one place.',
     '- Status: Draft review',
     '- Checklist progress: Not started yet',
-    '- 30-60-90 plan: Starts after publish',
+    '- Onboarding journey: Starts after publish',
     '- Current ramp task: Confirm a starter task before you publish',
   ].join('\n');
 }
@@ -743,11 +746,11 @@ function buildSharedProgressMarkdown(
     '',
     ...(done.length > 0 ? done : ['- None yet']),
     '',
-    '### 30-60-90',
+    '### Onboarding journey',
     '',
-    ...pkg.sections.plan306090.items.map(
-      (item) =>
-        `- ${item.timeframe}: ${milestoneStatus(item.timeframe, daysSinceStart)} — ${item.goalSummary}`
+    ...pkg.sections.welcome.journeyMilestones.map(
+      (milestone) =>
+        `- ${milestone.label}: ${milestoneStatus(milestone.label, daysSinceStart)} — ${milestone.keyActivities}`
     ),
     '',
     '### Current ramp tasks',

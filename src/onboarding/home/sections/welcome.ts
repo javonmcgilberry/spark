@@ -8,16 +8,16 @@ import {
   richTextText,
   section,
   type RichTextInlineElement,
+  type RichTextBlockElement,
 } from '../../../slack/blockKit.js';
 import {linkedChecklistItemsForMilestone} from '../../display.js';
-import type {OnboardingPackage} from '../../types.js';
-import {
-  buildInlineLinkElements,
-  buildPersonCard,
-  buildRoleLabel,
-  formatPersonLabel,
-  paragraph,
-} from '../shared.js';
+import type {
+  ChecklistItem,
+  ChecklistSection,
+  OnboardingPackage,
+  WelcomeJourneyMilestone,
+} from '../../types.js';
+import {buildPersonCard, buildRoleLabel, formatPersonLabel} from '../shared.js';
 
 export function renderWelcomeSection(
   onboardingPackage: OnboardingPackage
@@ -39,16 +39,9 @@ export function renderWelcomeSection(
     ...welcome.onboardingPocs.flatMap((poc) => renderWelcomePoc(poc)),
     divider(),
     header('Onboarding journey', 2),
-    richText([
-      richTextList(
-        'bullet',
-        welcome.journeyMilestones.map((milestone) =>
-          buildMilestoneListItem(milestone, checklistSections)
-        )
-      ),
-    ]),
-    divider(),
-    ...renderPlanSubsection(onboardingPackage),
+    richText(
+      buildJourneyListElements(welcome.journeyMilestones, checklistSections)
+    ),
     ...(onboardingPackage.draftCanvasUrl
       ? [
           section(
@@ -57,53 +50,6 @@ export function renderWelcomeSection(
         ]
       : []),
   ];
-}
-
-function renderPlanSubsection(
-  onboardingPackage: OnboardingPackage
-): KnownBlock[] {
-  const plan = onboardingPackage.sections.plan306090;
-  const checklistSections =
-    onboardingPackage.sections.onboardingChecklist.sections;
-  const blocks: KnownBlock[] = [
-    header('30/60/90 plan', 2),
-    paragraph(plan.intro),
-  ];
-
-  plan.items.forEach((item) => {
-    blocks.push(header(item.timeframe, 3));
-    blocks.push(paragraph(item.goalSummary));
-
-    const milestoneItems: RichTextInlineElement[][] = [
-      [
-        richTextText('New hire focus: ', {bold: true}),
-        richTextText(item.keyActivities),
-      ],
-      [
-        richTextText('Manager / buddy support: ', {bold: true}),
-        richTextText(item.supportActions),
-      ],
-    ];
-    const links = linkedChecklistItemsForMilestone(
-      checklistSections,
-      item.timeframe
-    );
-    if (links.length > 0) {
-      milestoneItems.push([
-        richTextText('Helpful links: ', {bold: true}),
-        ...buildInlineLinkElements(
-          links.map((link) => ({
-            url: link.resourceUrl,
-            label: link.resourceLabel ?? link.label,
-          }))
-        ),
-      ]);
-    }
-
-    blocks.push(richText([richTextList('bullet', milestoneItems)]));
-  });
-
-  return blocks;
 }
 
 function renderWelcomePoc(
@@ -118,28 +64,69 @@ function renderWelcomePoc(
   ];
 }
 
-function buildMilestoneListItem(
-  milestone: OnboardingPackage['sections']['welcome']['journeyMilestones'][number],
-  checklistSections: OnboardingPackage['sections']['onboardingChecklist']['sections']
-): RichTextInlineElement[] {
-  const links = linkedChecklistItemsForMilestone(
-    checklistSections,
-    milestone.label
-  );
+/**
+ * Slack nested lists are produced by emitting sibling `rich_text_list`
+ * children inside the same `rich_text` block with increasing `indent`
+ * values. Each milestone contributes up to three `rich_text_list`
+ * elements: the label at indent 0, the focus/support/links headers at
+ * indent 1, and individual helpful-link items at indent 2.
+ */
+function buildJourneyListElements(
+  milestones: WelcomeJourneyMilestone[],
+  checklistSections: ChecklistSection[]
+): RichTextBlockElement[] {
+  const elements: RichTextBlockElement[] = [];
 
+  milestones.forEach((milestone) => {
+    const links = linkedChecklistItemsForMilestone(
+      checklistSections,
+      milestone.label
+    );
+
+    elements.push(
+      richTextList('bullet', [[richTextText(milestone.label, {bold: true})]], {
+        indent: 0,
+      })
+    );
+
+    const childItems: RichTextInlineElement[][] = [
+      [
+        richTextText('New hire focus: ', {bold: true}),
+        richTextText(milestone.keyActivities),
+      ],
+      [
+        richTextText('Manager / buddy support: ', {bold: true}),
+        richTextText(milestone.supportActions),
+      ],
+    ];
+    if (links.length > 0) {
+      childItems.push([richTextText('Helpful links:', {bold: true})]);
+    }
+
+    elements.push(richTextList('bullet', childItems, {indent: 1}));
+
+    if (links.length > 0) {
+      elements.push(
+        richTextList(
+          'bullet',
+          links.map((link) => buildLinkItem(link)),
+          {indent: 2}
+        )
+      );
+    }
+  });
+
+  return elements;
+}
+
+function buildLinkItem(
+  link: ChecklistItem & {resourceUrl: string}
+): RichTextInlineElement[] {
   return [
-    richTextText(`${milestone.label}: `, {bold: true}),
-    richTextText(milestone.goal),
-    ...(links.length > 0
-      ? [
-          richTextText(' Helpful links: ', {italic: true}),
-          ...buildInlineLinkElements(
-            links.map((link) => ({
-              url: link.resourceUrl,
-              label: link.resourceLabel ?? link.label,
-            }))
-          ),
-        ]
-      : []),
+    {
+      type: 'link',
+      url: link.resourceUrl,
+      text: link.resourceLabel ?? link.label,
+    },
   ];
 }

@@ -255,8 +255,11 @@ function registerTestHarness(
     }
 
     const profile = await identityResolver.resolveFromEmail(email, slackClient);
-    const answer = await journey.answerQuestion(profile, question);
-    res.json({answer});
+    const {text, suggestedPrompts} = await journey.answerUser(
+      profile,
+      question
+    );
+    res.json({answer: text, suggestedPrompts});
   });
 
   app.get('/test/journey/task/select', async (req, res) => {

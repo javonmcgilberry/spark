@@ -1,31 +1,33 @@
 import {Assistant, type App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {APP_NAME} from '../../config/constants.js';
+import type {
+  ConversationHistoryTurn,
+  SuggestedPrompt,
+} from '../../services/journeyService.js';
 import {resolveJourneyText} from '../journeyText.js';
 import {
   publishPreparedHome,
   syncSharedOnboardingWorkspace,
 } from '../publishHome.js';
 
-const DEFAULT_PROMPTS = {
+const HISTORY_LIMIT = 10;
+
+const HOME_TAB_PROMPT: SuggestedPrompt = {
+  title: 'Open my Home tab',
+  message: 'open my home tab',
+};
+
+export const DEFAULT_PROMPTS: {
+  title: string;
+  prompts: SuggestedPrompt[];
+} = {
   title: 'Try one of these next',
   prompts: [
-    {
-      title: 'See my plan',
-      message: 'Show me my onboarding plan',
-    },
-    {
-      title: 'People to meet',
-      message: 'Who should I meet first?',
-    },
-    {
-      title: 'Docs and channels',
-      message: 'Show me my docs and channels',
-    },
-    {
-      title: 'Starter task',
-      message: 'Find me a starter task',
-    },
+    HOME_TAB_PROMPT,
+    {title: 'My checklist today', message: "what's on my checklist today?"},
+    {title: 'Who should I meet', message: 'who should I meet this week?'},
+    {title: 'Find a starter task', message: 'find me a starter task'},
   ],
 };
 
@@ -71,6 +73,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
         client,
         setStatus,
         setTitle,
+        setSuggestedPrompts,
         say,
         sayStream,
       }) => {
@@ -83,7 +86,19 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           app,
           message.user
         );
-        const response = await resolveJourneyText(profile, text, journey);
+
+        const history = await fetchThreadHistory(
+          client,
+          message.channel,
+          message.thread_ts ?? message.ts
+        );
+
+        const response = await resolveJourneyText(
+          profile,
+          text,
+          journey,
+          history
+        );
 
         await setTitle(response.title);
 
@@ -93,14 +108,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
             text: response.reply.text,
             blocks: response.reply.blocks,
           });
-          if (response.syncProgress) {
-            await syncSharedOnboardingWorkspace(
-              app,
-              services,
-              message.user,
-              client
-            );
-          }
+          await setSuggestedPrompts(DEFAULT_PROMPTS);
           return;
         }
 
@@ -108,7 +116,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           status: response.status,
           loading_messages: [
             'Thinking through your question',
-            'Grounding the answer in your onboarding step',
+            'Grounding the answer in your onboarding',
             'Putting together a clear next step',
           ],
         });
@@ -118,9 +126,65 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           await stream.append({markdown_text: chunk});
         }
         await stream.stop();
+
+        // setSuggestedPrompts AFTER stopStream per Slack canonical order.
+        await setSuggestedPrompts(
+          mergeWithPinnedHome(response.suggestedPrompts)
+        );
       },
     })
   );
+}
+
+export function mergeWithPinnedHome(agentPrompts: SuggestedPrompt[] | null): {
+  title: string;
+  prompts: SuggestedPrompt[];
+} {
+  if (!agentPrompts || agentPrompts.length === 0) {
+    return DEFAULT_PROMPTS;
+  }
+
+  const dedupedAgentPrompts = agentPrompts.filter(
+    (prompt) =>
+      prompt.title.trim().toLowerCase() !== HOME_TAB_PROMPT.title.toLowerCase()
+  );
+
+  return {
+    title: 'Try one of these next',
+    prompts: [HOME_TAB_PROMPT, ...dedupedAgentPrompts].slice(0, 4),
+  };
+}
+
+export async function fetchThreadHistory(
+  client: App['client'],
+  channel: string | undefined,
+  threadTs: string | undefined
+): Promise<ConversationHistoryTurn[]> {
+  if (!channel || !threadTs) {
+    return [];
+  }
+
+  try {
+    const response = await client.conversations.replies({
+      channel,
+      ts: threadTs,
+      oldest: threadTs,
+      limit: HISTORY_LIMIT,
+    });
+
+    const messages = response.messages ?? [];
+    return messages
+      .slice(0, -1) // exclude the current user message we are about to answer
+      .map((m) => ({
+        role: (m.bot_id ? 'assistant' : 'user') as 'user' | 'assistant',
+        content: m.text ?? '',
+      }))
+      .filter((turn) => turn.content.trim().length > 0)
+      .slice(-HISTORY_LIMIT);
+  } catch {
+    // If history lookup fails, fall back to zero-shot.
+    return [];
+  }
 }
 
 function chunkMarkdown(text: string): string[] {

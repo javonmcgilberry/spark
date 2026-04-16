@@ -2,10 +2,7 @@ import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {APP_NAME} from '../../config/constants.js';
 import {resolveJourneyText} from '../journeyText.js';
-import {
-  publishPreparedHome,
-  syncSharedOnboardingWorkspace,
-} from '../publishHome.js';
+import {publishPreparedHome} from '../publishHome.js';
 
 export function registerOnboardingHandlers(app: App, services: Services): void {
   const {logger, identityResolver, journey} = services;
@@ -76,9 +73,6 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
 
     if (response.kind === 'reply') {
       await say({text: response.reply.text, blocks: response.reply.blocks});
-      if (response.syncProgress) {
-        await syncSharedOnboardingWorkspace(app, services, message.user);
-      }
       return;
     }
 

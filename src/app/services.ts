@@ -11,6 +11,7 @@ import {JiraService} from '../services/jiraService.js';
 import {JourneyService} from '../services/journeyService.js';
 import {LlmService} from '../services/llmService.js';
 import {OnboardingPackageService} from '../services/onboardingPackageService.js';
+import {PeopleInsightsService} from '../services/peopleInsightsService.js';
 import {SkillDiscoveryService} from '../services/skillDiscoveryService.js';
 import {StatsigService} from '../services/statsigService.js';
 import {TaskScannerService} from '../services/taskScannerService.js';
@@ -28,6 +29,7 @@ export interface Services {
   llm: LlmService;
   github: GitHubService;
   jira: JiraService;
+  peopleInsights: PeopleInsightsService;
   skillDiscovery: SkillDiscoveryService;
   taskScanner: TaskScannerService;
   contributionGuide: ContributionGuideService;
@@ -43,20 +45,22 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
   const canvas = new CanvasService(logger);
   const github = new GitHubService(env, logger);
   const jira = new JiraService(env, logger);
-  const llm = new LlmService(env.anthropicApiKey, logger, env.anthropicModel, {
-    github,
-    jira,
-  });
-  const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
-  const skillDiscovery = new SkillDiscoveryService();
-  const taskScanner = new TaskScannerService(skillDiscovery, statsig, codebase);
-  const contributionGuide = new ContributionGuideService(llm);
-  const identityResolver = new IdentityResolver(env, logger, docs, codeowners);
   const onboardingPackages = new OnboardingPackageService(
     confluenceSearch,
     canvas,
     logger
   );
+  const llm = new LlmService(env.anthropicApiKey, logger, env.anthropicModel, {
+    github,
+    jira,
+    onboardingPackages,
+  });
+  const peopleInsights = new PeopleInsightsService(llm, jira, github, logger);
+  const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
+  const skillDiscovery = new SkillDiscoveryService();
+  const taskScanner = new TaskScannerService(skillDiscovery, statsig, codebase);
+  const contributionGuide = new ContributionGuideService(llm);
+  const identityResolver = new IdentityResolver(env, logger, docs, codeowners);
   const journey = new JourneyService(
     taskScanner,
     llm,
@@ -77,6 +81,7 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     llm,
     github,
     jira,
+    peopleInsights,
     skillDiscovery,
     taskScanner,
     contributionGuide,

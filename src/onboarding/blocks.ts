@@ -33,7 +33,7 @@ export function buildWelcomeBlocks(
         checklistSections,
         milestone.label
       );
-      return `• *${milestone.label}* — ${milestone.goal}${
+      return `• *${milestone.label}* — ${milestone.keyActivities}${
         links.length > 0
           ? `\n  Key links: ${links.map(formatChecklistResourceLink).join(' · ')}`
           : ''
@@ -103,14 +103,14 @@ export function buildOrientationBlocks(
   onboardingPackage: OnboardingPackage,
   state: JourneyState
 ): KnownBlock[] {
-  const planPreview = onboardingPackage.sections.plan306090.items
+  const planPreview = onboardingPackage.sections.welcome.journeyMilestones
     .slice(0, 4)
-    .map((item) => {
+    .map((milestone) => {
       const links = linkedChecklistItemsForMilestone(
         onboardingPackage.sections.onboardingChecklist.sections,
-        item.timeframe
+        milestone.label
       );
-      return `• *${item.timeframe}* — ${item.goalSummary}\n  New hire: ${item.keyActivities}${
+      return `• *${milestone.label}*\n  New hire: ${milestone.keyActivities}${
         links.length > 0
           ? `\n  Key links: ${links.map(formatChecklistResourceLink).join(' · ')}`
           : ''
@@ -120,8 +120,7 @@ export function buildOrientationBlocks(
 
   return [
     header('Plan, rituals, and resources'),
-    section(onboardingPackage.sections.plan306090.intro),
-    section(`*30-60-90 preview*\n${planPreview}`),
+    section(`*Onboarding journey preview*\n${planPreview}`),
     section(formatRituals(onboardingPackage.sections.rituals.rituals)),
     section(
       formatResourceLibrary(

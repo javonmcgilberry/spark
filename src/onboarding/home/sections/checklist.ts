@@ -93,11 +93,8 @@ function formatChecklistItemBlock(
     ? `*<${item.resourceUrl}|${item.label}>*`
     : `*${item.label}*`;
   const notesLine = item.notes ? `\n${item.notes}` : '';
-  const typeLine = `\nType: ${formatChecklistKindEmoji(item.kind)} ${formatChecklistKindLabel(
-    item.kind
-  )}`;
 
-  return `${statusDot} ${title}${notesLine}${typeLine}`;
+  return `${statusDot} ${title}${notesLine}`;
 }
 
 function formatChecklistStatusEmoji(status: StatusValue): string {
@@ -108,36 +105,6 @@ function formatChecklistStatusEmoji(status: StatusValue): string {
       return '🟡';
     case 'completed':
       return '🟢';
-  }
-}
-
-function formatChecklistKindEmoji(kind: ChecklistItem['kind']): string {
-  switch (kind) {
-    case 'task':
-      return '✅';
-    case 'live-training':
-      return '🗣️';
-    case 'workramp':
-      return '🚀';
-    case 'reading':
-      return '📚';
-    case 'recording':
-      return '🎥';
-  }
-}
-
-function formatChecklistKindLabel(kind: ChecklistItem['kind']): string {
-  switch (kind) {
-    case 'task':
-      return 'Task';
-    case 'live-training':
-      return 'Live Training';
-    case 'workramp':
-      return 'WorkRamp';
-    case 'reading':
-      return 'Reading Material';
-    case 'recording':
-      return 'Recording';
   }
 }
 

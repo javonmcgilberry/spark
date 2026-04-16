@@ -26,6 +26,7 @@ import {JiraService} from '../../src/services/jiraService.js';
 import {JourneyService} from '../../src/services/journeyService.js';
 import {LlmService} from '../../src/services/llmService.js';
 import {OnboardingPackageService} from '../../src/services/onboardingPackageService.js';
+import {PeopleInsightsService} from '../../src/services/peopleInsightsService.js';
 import {SkillDiscoveryService} from '../../src/services/skillDiscoveryService.js';
 import {StatsigService} from '../../src/services/statsigService.js';
 import {TaskScannerService} from '../../src/services/taskScannerService.js';
@@ -59,7 +60,17 @@ export function createTestServices(
   );
   const github = new GitHubService(env, logger);
   const jira = new JiraService(env, logger);
-  const llm = new LlmService(undefined, logger, undefined, {github, jira});
+  const onboardingPackages = new OnboardingPackageService(
+    confluenceSearch,
+    canvas,
+    logger
+  );
+  const llm = new LlmService(undefined, logger, undefined, {
+    github,
+    jira,
+    onboardingPackages,
+  });
+  const peopleInsights = new PeopleInsightsService(llm, jira, github, logger);
   const skillDiscovery = new SkillDiscoveryService();
   const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
   const taskScanner = new FixedTaskScannerService(
@@ -69,11 +80,6 @@ export function createTestServices(
     codebase
   );
   const contributionGuide = new ContributionGuideService(llm);
-  const onboardingPackages = new OnboardingPackageService(
-    confluenceSearch,
-    canvas,
-    logger
-  );
   const journey = new JourneyService(
     taskScanner,
     llm,
@@ -101,6 +107,7 @@ export function createTestServices(
     llm,
     github,
     jira,
+    peopleInsights,
     skillDiscovery,
     taskScanner,
     contributionGuide,

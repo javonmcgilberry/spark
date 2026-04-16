@@ -43,18 +43,37 @@ export async function publishHomeDashboard(
 }
 
 export async function publishPreparedHome(
-  services: Pick<Services, 'logger' | 'onboardingPackages'>,
+  services: Pick<Services, 'logger' | 'onboardingPackages' | 'peopleInsights'>,
   client: App['client'],
   userId: string,
   prepared: PreparedJourneyData
 ): Promise<void> {
   const reviewerDrafts =
     services.onboardingPackages.getDraftsForReviewer(userId);
-  const view =
-    prepared.onboardingPackage &&
-    prepared.onboardingPackage.status === 'published'
-      ? buildHomeView(prepared.onboardingPackage, prepared.state)
-      : buildHomePendingView(reviewerDrafts);
+
+  if (
+    !prepared.onboardingPackage ||
+    prepared.onboardingPackage.status !== 'published'
+  ) {
+    const view = buildHomePendingView(reviewerDrafts);
+    services.logger.info(
+      `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}).`
+    );
+    await publishHomeView(services, client, userId, view);
+    return;
+  }
+
+  const peopleInsights =
+    prepared.state.activeHomeSection === 'people-to-meet'
+      ? await services.peopleInsights.getInsightsForPeople(
+          prepared.onboardingPackage.sections.peopleToMeet.people,
+          prepared.profile.teamName
+        )
+      : undefined;
+
+  const view = buildHomeView(prepared.onboardingPackage, prepared.state, {
+    peopleInsights,
+  });
   services.logger.info(
     `Publishing Spark Home tab for ${userId} with ${view.blocks.length} blocks (section=${prepared.state.activeHomeSection}, package=${prepared.onboardingPackage?.status ?? 'pending'}).`
   );
