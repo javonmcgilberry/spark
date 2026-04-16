@@ -43,6 +43,12 @@ export class OnboardingPackageService {
     );
   }
 
+  getPackagesWhereBuddyIs(userId: string): OnboardingPackage[] {
+    return Array.from(this.packages.values()).filter(
+      (pkg) => pkg.buddyUserId === userId && pkg.status === 'published'
+    );
+  }
+
   async createDraftPackage(
     options: DraftPackageOptions
   ): Promise<OnboardingPackage> {

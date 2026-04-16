@@ -18,6 +18,7 @@ export const SPARK_OPEN_CELEBRATION_SHARE_MODAL_ACTION_ID =
   'spark_open_celebration_share_modal';
 export const SPARK_SHARE_CELEBRATION_CALLBACK_ID =
   'spark_share_celebration_submit';
+export const SPARK_BUDDY_MARK_CHECKIN_ACTION_ID = 'spark_buddy_mark_checkin';
 
 const CHECKLIST_KIND_OPTIONS = [
   {

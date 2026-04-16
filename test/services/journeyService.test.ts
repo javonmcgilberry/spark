@@ -453,3 +453,92 @@ describe('JourneyService.showGitHubPullRequests', () => {
     expect(text).toContain('Your open pull requests');
   });
 });
+
+describe('JourneyService buddy check-ins', () => {
+  it('saveBuddyCheckin writes a timestamp to the buddy state keyed by hire id', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T00:00:00Z'));
+    const {services} = createTestServices();
+
+    services.journey.saveBuddyCheckin('U_BUDDY', 'U_HIRE_A');
+
+    const state = services.journey.getState('U_BUDDY');
+    expect(state.buddyCheckIns['U_HIRE_A']?.lastCheckinAt).toBe(
+      '2026-04-14T00:00:00.000Z'
+    );
+    expect(state.buddyCheckIns['U_HIRE_B']).toBeUndefined();
+    vi.useRealTimers();
+  });
+
+  it('saveBuddyCheckin overwrites on the second call', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T00:00:00Z'));
+    const {services} = createTestServices();
+    services.journey.saveBuddyCheckin('U_BUDDY', 'U_HIRE_A');
+
+    vi.setSystemTime(new Date('2026-04-21T12:34:56Z'));
+    services.journey.saveBuddyCheckin('U_BUDDY', 'U_HIRE_A');
+
+    const state = services.journey.getState('U_BUDDY');
+    expect(state.buddyCheckIns['U_HIRE_A']?.lastCheckinAt).toBe(
+      '2026-04-21T12:34:56.000Z'
+    );
+    vi.useRealTimers();
+  });
+
+  it('getBuddyCheckinDue is true with no prior check-in, true at 8 days, false at 3 days, true at exactly 7 days', () => {
+    const {services} = createTestServices();
+    const base = new Date('2026-04-14T00:00:00Z');
+
+    expect(
+      services.journey.getBuddyCheckinDue('U_BUDDY', 'U_HIRE_A', base)
+    ).toBe(true);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(base);
+    services.journey.saveBuddyCheckin('U_BUDDY', 'U_HIRE_A');
+    vi.useRealTimers();
+
+    const threeDaysLater = new Date(base.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const sevenDaysLater = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const eightDaysLater = new Date(base.getTime() + 8 * 24 * 60 * 60 * 1000);
+
+    expect(
+      services.journey.getBuddyCheckinDue(
+        'U_BUDDY',
+        'U_HIRE_A',
+        threeDaysLater
+      )
+    ).toBe(false);
+    expect(
+      services.journey.getBuddyCheckinDue(
+        'U_BUDDY',
+        'U_HIRE_A',
+        sevenDaysLater
+      )
+    ).toBe(true);
+    expect(
+      services.journey.getBuddyCheckinDue(
+        'U_BUDDY',
+        'U_HIRE_A',
+        eightDaysLater
+      )
+    ).toBe(true);
+  });
+
+  it('getBuddyCheckinDue is scoped per hire (saving for one hire does not satisfy another)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T00:00:00Z'));
+    const {services} = createTestServices();
+    services.journey.saveBuddyCheckin('U_BUDDY', 'U_HIRE_A');
+    vi.useRealTimers();
+
+    const oneDayLater = new Date('2026-04-15T00:00:00Z');
+    expect(
+      services.journey.getBuddyCheckinDue('U_BUDDY', 'U_HIRE_A', oneDayLater)
+    ).toBe(false);
+    expect(
+      services.journey.getBuddyCheckinDue('U_BUDDY', 'U_HIRE_B', oneDayLater)
+    ).toBe(true);
+  });
+});

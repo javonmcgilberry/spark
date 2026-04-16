@@ -10,6 +10,7 @@ import {
   buildWelcomeBlocks,
 } from '../onboarding/blocks.js';
 import {APP_NAME} from '../config/constants.js';
+import {BUDDY_EXPECTATIONS} from '../onboarding/buddyGuide.js';
 import type {
   ChecklistItemStatus,
   ContributionTask,
@@ -34,7 +35,7 @@ import {
   type GitHubService,
 } from './githubService.js';
 import type {JiraService, JiraIssue} from './jiraService.js';
-import type {OnboardingStage} from '../onboarding/weeklyAgenda.js';
+import type {OnboardingStage, OnboardingWeekKey} from '../onboarding/weeklyAgenda.js';
 import {
   type AnswerUserResult,
   type ConversationHistoryTurn,
@@ -58,6 +59,7 @@ export interface PreparedJourneyData {
 }
 
 const TASK_CACHE_TTL_MS = 10 * 60 * 1000;
+const BUDDY_CHECKIN_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface AgentToolkit {
   github?: GitHubService;
@@ -554,6 +556,50 @@ export class JourneyService {
     );
   }
 
+  /**
+   * Records a buddy check-in with a hire at the current time. Idempotent:
+   * calling it repeatedly just advances `lastCheckinAt`.
+   */
+  saveBuddyCheckin(buddyUserId: string, hireUserId: string): JourneyState {
+    const state = this.getOrCreateState(buddyUserId);
+    const now = new Date().toISOString();
+    state.buddyCheckIns[hireUserId] = {lastCheckinAt: now};
+    state.updatedAt = now;
+    return state;
+  }
+
+  /**
+   * Returns true when the buddy has never checked in with this hire, or
+   * when their last check-in is at least 7 days old. Used by the buddy DM
+   * handler to decide whether to nudge on the current message turn.
+   */
+  getBuddyCheckinDue(
+    buddyUserId: string,
+    hireUserId: string,
+    now: Date = new Date()
+  ): boolean {
+    const state = this.getOrCreateState(buddyUserId);
+    const entry = state.buddyCheckIns[hireUserId];
+    if (!entry?.lastCheckinAt) {
+      return true;
+    }
+    const lastMs = Date.parse(entry.lastCheckinAt);
+    if (Number.isNaN(lastMs)) {
+      return true;
+    }
+    return now.getTime() - lastMs >= BUDDY_CHECKIN_INTERVAL_MS;
+  }
+
+  /**
+   * Resolves the bullet list of buddy expectations for a given onboarding
+   * week. Drives the buddy nudge DM. Reads from the static map in
+   * buddyGuide.ts so adding a new week key without expectations trips the
+   * drift test.
+   */
+  buildBuddyExpectationBullets(weekKey: OnboardingWeekKey): string[] {
+    return BUDDY_EXPECTATIONS[weekKey];
+  }
+
   private getOrCreateState(userId: string): JourneyState {
     const existing = this.states.get(userId);
     if (existing) {
@@ -569,6 +615,7 @@ export class JourneyService {
       toolAccess: {},
       userGuideIntake: {answers: {}},
       tasks: [],
+      buddyCheckIns: {},
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

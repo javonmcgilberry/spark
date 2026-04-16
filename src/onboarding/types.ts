@@ -280,6 +280,11 @@ export interface JourneyState {
   taskExplanation?: string;
   tasksUpdatedAt?: string;
   selectedTaskId?: string;
+  /**
+   * Per-hire buddy check-in state, keyed by the hire's userId. Only present
+   * on buddies. Drives the weekly buddy nudge DM.
+   */
+  buddyCheckIns: Record<string, {lastCheckinAt?: string}>;
   startedAt: string;
   updatedAt: string;
 }

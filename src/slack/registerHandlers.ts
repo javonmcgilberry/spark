@@ -2,6 +2,7 @@ import type {App} from '@slack/bolt';
 import type {Services} from '../app/services.js';
 import {registerAssistantHandlers} from './handlers/assistant.js';
 import {registerOnboardingHandlers} from './handlers/onboarding.js';
+import {registerBuddyHandlers} from './handlers/buddy.js';
 import {registerCommandHandlers} from './handlers/commands.js';
 import {registerActionHandlers} from './handlers/actions.js';
 import {registerHomeTabHandlers} from './handlers/homeTab.js';
@@ -12,4 +13,5 @@ export function registerHandlers(app: App, services: Services): void {
   registerActionHandlers(app, services);
   registerHomeTabHandlers(app, services);
   registerOnboardingHandlers(app, services);
+  registerBuddyHandlers(app, services);
 }
