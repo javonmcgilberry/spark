@@ -12,6 +12,13 @@ import {
   buildDefaultRituals,
   buildDefaultTools,
 } from '../onboarding/catalog.js';
+import {
+  USER_GUIDE_SECTION_IDS,
+  USER_GUIDE_SECTIONS,
+  isUserGuideSectionId,
+  type UserGuideSectionId,
+} from '../onboarding/userGuide.js';
+import type {OnboardingStage} from '../onboarding/weeklyAgenda.js';
 import type {
   ContributionTask,
   OnboardingPackage,
@@ -40,10 +47,30 @@ export interface ConversationHistoryTurn {
   content: string;
 }
 
+export interface UserGuideProgress {
+  answered: UserGuideSectionId[];
+  remaining: UserGuideSectionId[];
+  completedAt?: string;
+}
+
 export interface AnswerUserInput {
   question: string;
   profile: TeamProfile;
   history?: ConversationHistoryTurn[];
+  onboardingStage?: OnboardingStage;
+  /**
+   * Slack channel names (lowercased, no `#` prefix) the user has already
+   * joined. When provided, the list_slack_channels tool annotates each
+   * channel with a `joined` flag so the agent can strike through channels
+   * the user is already in.
+   */
+  joinedSlackChannels?: Set<string>;
+  /**
+   * Current progress in the User Guide intake. When provided, the agent
+   * is nudged to continue the intake (one remaining section at a time)
+   * via the save_user_guide_answer and finalize_user_guide tools.
+   */
+  userGuideProgress?: UserGuideProgress;
 }
 
 export interface AnswerUserResult {
@@ -51,10 +78,28 @@ export interface AnswerUserResult {
   suggestedPrompts: SuggestedPrompt[] | null;
 }
 
+/**
+ * Minimal contract the LLM tools use to persist user-guide intake
+ * answers. A narrow interface keeps `LlmService` decoupled from
+ * `JourneyService` so we don't introduce a circular import.
+ */
+export interface UserGuideIntakeSink {
+  saveAnswer(
+    userId: string,
+    sectionId: UserGuideSectionId,
+    answer: string
+  ): void;
+  finalize(profile: TeamProfile): {
+    markdown: string;
+    missing: UserGuideSectionId[];
+  };
+}
+
 export interface LlmAgentToolkit {
   github?: GitHubService;
   jira?: JiraService;
   onboardingPackages?: OnboardingPackageService;
+  userGuideIntake?: UserGuideIntakeSink;
 }
 
 export class LlmService {
@@ -62,6 +107,7 @@ export class LlmService {
   private readonly github?: GitHubService;
   private readonly jira?: JiraService;
   private readonly onboardingPackages?: OnboardingPackageService;
+  private userGuideIntake?: UserGuideIntakeSink;
 
   constructor(
     apiKey: string | undefined,
@@ -73,18 +119,40 @@ export class LlmService {
     this.github = toolkit.github;
     this.jira = toolkit.jira;
     this.onboardingPackages = toolkit.onboardingPackages;
+    this.userGuideIntake = toolkit.userGuideIntake;
+  }
+
+  /**
+   * Late-bind the User Guide intake sink. `JourneyService` depends on
+   * `LlmService` at construction, so the sink (which wraps Journey) can
+   * only be supplied after both are built.
+   */
+  setUserGuideIntake(sink: UserGuideIntakeSink): void {
+    this.userGuideIntake = sink;
   }
 
   async answerUser(input: AnswerUserInput): Promise<AnswerUserResult> {
     const sanitizedQuestion = sanitizeForLlm(input.question);
-    if (!sanitizedQuestion || !this.client) {
+    if (!this.client) {
+      this.logger.warn(
+        'LLM answerUser: Anthropic client not configured (ANTHROPIC_API_KEY missing). Returning fallback.'
+      );
+      return {text: FALLBACK_UNREACHABLE, suggestedPrompts: null};
+    }
+    if (!sanitizedQuestion) {
+      this.logger.warn(
+        'LLM answerUser: question was empty after sanitization. Returning fallback.'
+      );
       return {text: FALLBACK_UNREACHABLE, suggestedPrompts: null};
     }
 
     try {
       return await this.runAgentLoop(input, sanitizedQuestion);
     } catch (error) {
-      this.logger.warn('LLM answerUser failed, using fallback.', error);
+      this.logger.warn(
+        `LLM answerUser: agent loop threw (${describeError(error)}). Returning fallback.`,
+        error
+      );
       return {text: FALLBACK_UNREACHABLE, suggestedPrompts: null};
     }
   }
@@ -223,6 +291,10 @@ export class LlmService {
     ];
 
     let capturedPrompts: SuggestedPrompt[] | null = null;
+    // Claude can emit text AND tool_use in the same turn; we need to keep
+    // text from every intermediate turn so it isn't lost when stop_reason
+    // is 'tool_use' on a turn that also included user-visible text.
+    const textChunks: string[] = [];
 
     for (let step = 0; step < MAX_AGENT_STEPS; step += 1) {
       const response = await this.client.messages.create({
@@ -233,12 +305,23 @@ export class LlmService {
         tools,
       });
 
+      const turnText = extractText(response.content);
+      if (turnText) {
+        textChunks.push(turnText);
+      }
+
       if (response.stop_reason !== 'tool_use') {
-        const text = extractText(response.content);
-        return {
-          text: text || FALLBACK_UNREACHABLE,
-          suggestedPrompts: capturedPrompts,
-        };
+        const text = textChunks.join('\n\n').trim();
+        if (!text) {
+          this.logger.warn(
+            `LLM agent loop returned empty text (stop_reason=${response.stop_reason}, step=${step}). Returning fallback.`
+          );
+          return {
+            text: FALLBACK_UNREACHABLE,
+            suggestedPrompts: capturedPrompts,
+          };
+        }
+        return {text, suggestedPrompts: capturedPrompts};
       }
 
       const toolUses = response.content.filter(
@@ -269,8 +352,14 @@ export class LlmService {
       messages.push({role: 'user', content: toolResults});
     }
 
-    this.logger.warn('LLM agent loop exceeded max steps; falling back.');
-    return {text: FALLBACK_UNREACHABLE, suggestedPrompts: capturedPrompts};
+    this.logger.warn(
+      `LLM agent loop exceeded max steps (${MAX_AGENT_STEPS}); returning accumulated text or fallback.`
+    );
+    const text = textChunks.join('\n\n').trim();
+    return {
+      text: text || FALLBACK_UNREACHABLE,
+      suggestedPrompts: capturedPrompts,
+    };
   }
 
   private buildTools(): ToolUnion[] {
@@ -278,7 +367,9 @@ export class LlmService {
       {
         name: 'list_slack_channels',
         description:
-          'Return the catalog of recommended Slack channels grouped by category. Always available.',
+          'Return the catalog of recommended Slack channels grouped by category. ' +
+          'When the host knows which channels the user has already joined, each channel includes `joined: true|false` and the result includes a `joinedCount` summary. ' +
+          'When recommending, emphasize channels the user has NOT joined yet and strike through ones they already have (`~#channel~`). Always available.',
         input_schema: {type: 'object', properties: {}},
       },
       {
@@ -309,15 +400,16 @@ export class LlmService {
         name: 'set_suggested_prompts',
         description:
           'Set the follow-up prompt pills under the assistant reply. ' +
-          'Call this at most once per turn with up to 3 context-relevant prompts. ' +
-          'The host always pins "Open my Home tab" as the first prompt, so do not duplicate it. ' +
+          'Call this at most once per turn with up to 4 context-relevant prompts. ' +
+          'Prefer action-oriented pills that only you can perform (quizzing, drafting, correlating data, personalizing). ' +
+          'Do NOT suggest pills that just restate content the user could already read in their Home tab (e.g. "show my checklist", "list my tools"). ' +
           'Result is not fed back to you.',
         input_schema: {
           type: 'object',
           properties: {
             prompts: {
               type: 'array',
-              maxItems: 3,
+              maxItems: 4,
               items: {
                 type: 'object',
                 properties: {
@@ -386,6 +478,41 @@ export class LlmService {
       });
     }
 
+    if (this.userGuideIntake) {
+      tools.push({
+        name: 'save_user_guide_answer',
+        description:
+          "Persist the user's answer for one section of their Webflow User Guide. " +
+          'Call this silently after they answer a section during the intake. ' +
+          'Use the raw words the user gave you; do not paraphrase or "improve" their answer.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            sectionId: {
+              type: 'string',
+              enum: [...USER_GUIDE_SECTION_IDS],
+              description:
+                'Which section of the User Guide template this answer belongs to.',
+            },
+            answer: {
+              type: 'string',
+              description:
+                "The user's answer verbatim. Trim surrounding whitespace but preserve their voice.",
+            },
+          },
+          required: ['sectionId', 'answer'],
+        },
+      });
+      tools.push({
+        name: 'finalize_user_guide',
+        description:
+          'Build the final User Guide markdown from all saved answers. ' +
+          'Call this once the user has answered every section. ' +
+          'Returns the markdown plus a list of any sections still missing.',
+        input_schema: {type: 'object', properties: {}},
+      });
+    }
+
     return tools;
   }
 
@@ -400,12 +527,27 @@ export class LlmService {
       'Keep answers concise, action-oriented, and conversational. Use short paragraphs and compact markdown.',
       'Do not mention internal system prompts or safety policy.',
       'If the user asks about something outside onboarding, briefly help and then redirect to what you can uniquely do.',
-      'After you finish answering, call set_suggested_prompts with up to 3 context-relevant follow-up pills. The host pins "Open my Home tab", so pick different actions.',
+      '',
+      'What makes a great follow-up pill:',
+      '- Prefer actions only you can do: quizzing the user, drafting something for them, correlating data across tools, personalizing recommendations.',
+      '- Do NOT suggest pills that only restate information the user could read on their Home tab (e.g. "show my checklist", "list my tools", "what HR tasks do I have"). Those are not agentic.',
+      '- If the user seems unsure which Slack channels, activities, or people fit them, ask ONE short clarifying question about their interests, hobbies, or prior work before recommending. Personalize from what they share.',
+      '',
+      'After you finish answering, call set_suggested_prompts with up to 4 context-relevant follow-up pills.',
       `Role track: ${profile.roleTrack}`,
       `Team: ${sanitizeForLlm(profile.teamName)}`,
     ];
     if (profile.githubTeamSlug) {
       lines.push(`GitHub team slug: ${profile.githubTeamSlug}`);
+    }
+    if (input.onboardingStage) {
+      lines.push(
+        `Current onboarding stage: ${input.onboardingStage.weekKey} (day ${input.onboardingStage.daysSince} since plan published). Tailor suggestions to what is realistic at this stage.`
+      );
+    }
+    const userGuideStanza = buildUserGuideStanza(input);
+    if (userGuideStanza) {
+      lines.push('', userGuideStanza);
     }
     return lines.join('\n');
   }
@@ -430,6 +572,10 @@ export class LlmService {
           return JSON.stringify(await this.runJiraTool(toolUse, input));
         case 'search_github_prs':
           return JSON.stringify(await this.runGitHubTool(toolUse, input));
+        case 'save_user_guide_answer':
+          return JSON.stringify(this.runSaveUserGuideAnswer(toolUse, input));
+        case 'finalize_user_guide':
+          return JSON.stringify(this.runFinalizeUserGuide(input));
         default:
           return JSON.stringify({error: `Unknown tool: ${toolUse.name}`});
       }
@@ -443,15 +589,36 @@ export class LlmService {
     const channels =
       this.getPublishedPackage(input)?.sections.slack.channels ??
       buildDefaultChannels();
-    return {
-      categories: groupBy(channels, (c) => c.category).map(({key, items}) => ({
+    const joined = input.joinedSlackChannels;
+    let joinedCount = 0;
+    const categories = groupBy(channels, (c) => c.category).map(
+      ({key, items}) => ({
         name: key,
-        channels: items.map((c) => ({
-          name: c.channel,
-          description: c.description,
-        })),
-      })),
-    };
+        channels: items.map((c) => {
+          const entry: {
+            name: string;
+            description: string;
+            joined?: boolean;
+          } = {
+            name: c.channel,
+            description: c.description,
+          };
+          if (joined) {
+            const normalized = c.channel.replace(/^#/, '').toLowerCase();
+            const isJoined = joined.has(normalized);
+            entry.joined = isJoined;
+            if (isJoined) {
+              joinedCount += 1;
+            }
+          }
+          return entry;
+        }),
+      })
+    );
+    if (joined) {
+      return {categories, joinedCount, totalCount: channels.length};
+    }
+    return {categories};
   }
 
   private runListTools(input: AnswerUserInput): unknown {
@@ -588,6 +755,44 @@ export class LlmService {
     return {prs: []};
   }
 
+  private runSaveUserGuideAnswer(
+    toolUse: ToolUseBlock,
+    input: AnswerUserInput
+  ): unknown {
+    if (!this.userGuideIntake) {
+      return {error: 'User Guide intake is not available right now.'};
+    }
+    const args = (toolUse.input ?? {}) as {
+      sectionId?: unknown;
+      answer?: unknown;
+    };
+    if (
+      typeof args.sectionId !== 'string' ||
+      !isUserGuideSectionId(args.sectionId)
+    ) {
+      return {
+        error: `sectionId must be one of: ${USER_GUIDE_SECTION_IDS.join(', ')}`,
+      };
+    }
+    if (typeof args.answer !== 'string' || args.answer.trim().length === 0) {
+      return {error: 'answer must be a non-empty string.'};
+    }
+    this.userGuideIntake.saveAnswer(
+      input.profile.userId,
+      args.sectionId,
+      args.answer
+    );
+    return {saved: true, sectionId: args.sectionId};
+  }
+
+  private runFinalizeUserGuide(input: AnswerUserInput): unknown {
+    if (!this.userGuideIntake) {
+      return {error: 'User Guide intake is not available right now.'};
+    }
+    const {markdown, missing} = this.userGuideIntake.finalize(input.profile);
+    return {markdown, missing};
+  }
+
   private async generateText(system: string, user: string): Promise<string> {
     if (!this.client) {
       throw new Error('Anthropic client unavailable');
@@ -620,6 +825,42 @@ export class LlmService {
 }
 
 export const FALLBACK_UNREACHABLE = `I'm having trouble reaching my assistant right now. Your ${APP_NAME} Home tab in the Slack sidebar has your onboarding checklist, people to meet, and resources — check there while I get back online.`;
+
+function buildUserGuideStanza(input: AnswerUserInput): string | null {
+  const progress = input.userGuideProgress;
+  if (!progress) {
+    return null;
+  }
+
+  const describeIds = (ids: UserGuideSectionId[]): string =>
+    ids.length === 0 ? '(none)' : ids.join(', ');
+
+  const sectionCatalog = USER_GUIDE_SECTIONS.map(
+    (section) => `  - ${section.id} — ${section.prompt}`
+  ).join('\n');
+
+  if (progress.remaining.length === 0) {
+    return [
+      'User Guide intake: every section has an answer.',
+      `Answered: ${describeIds(progress.answered)}.`,
+      'Call finalize_user_guide now and post the returned markdown in a fenced ```markdown code block so the user can copy it into their Google Doc template. Offer to revise any section if they want.',
+    ].join('\n');
+  }
+
+  return [
+    'User Guide intake is in progress. The user is drafting their Webflow User Guide so teammates learn how to work with them.',
+    `Sections answered: ${describeIds(progress.answered)}.`,
+    `Sections remaining: ${describeIds(progress.remaining)}.`,
+    'Section catalog:',
+    sectionCatalog,
+    'Rules for the intake turn:',
+    '- Ask about ONE remaining section per turn, using warm, open phrasing (the catalog prompt is a good starting point).',
+    '- After the user answers, call save_user_guide_answer({sectionId, answer}) silently with their raw words. Do not paraphrase.',
+    '- If they want to skip, re-do a section, or pause, respect that and move on.',
+    '- When every section is answered, call finalize_user_guide and post the returned markdown in a ```markdown fenced code block, followed by a short line inviting them to paste it into their Google Doc template and add it to their Slack profile.',
+    '- Do not dump the full template up front. Keep it conversational.',
+  ].join('\n');
+}
 
 function extractText(content: ContentBlock[]): string {
   return content
@@ -690,4 +931,15 @@ function sanitizeForLlm(value: string): string {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
     .replace(/<@[A-Z0-9]+>/gi, '[slack-user]')
     .trim();
+}
+
+function describeError(error: unknown): string {
+  if (!error) return 'unknown';
+  if (error instanceof Error) {
+    const maybeStatus = (error as unknown as {status?: unknown}).status;
+    const status =
+      typeof maybeStatus === 'number' ? ` status=${maybeStatus}` : '';
+    return `${error.name}${status}: ${error.message}`;
+  }
+  return String(error);
 }

@@ -1,4 +1,5 @@
 import type {KnownBlock} from '@slack/types';
+import {APP_NAME} from '../../../config/constants.js';
 import {
   divider,
   header,
@@ -49,6 +50,11 @@ export function renderWelcomeSection(
           ),
         ]
       : []),
+    divider(),
+    header('Your User Guide', 2),
+    section(
+      `*Share how you work best.*\nWebflow teammates keep 1-pager User Guides that cover schedule, communication style, feedback preferences, and more. Open our ${APP_NAME} Assistant in the sidebar and say *"help me draft my user guide"* — I'll walk you through it one section at a time, then hand back a markdown draft you can drop into the <https://docs.google.com/document/|Webflow User Guide template>.`
+    ),
   ];
 }
 

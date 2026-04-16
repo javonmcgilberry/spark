@@ -256,6 +256,18 @@ export interface OnboardingPackage {
   };
 }
 
+export interface UserGuideIntakeState {
+  /**
+   * Answers keyed by UserGuideSectionId (validated at the boundary). Kept
+   * as a plain record here to keep the type module free of a dependency
+   * on userGuide.ts.
+   */
+  answers: Record<string, string>;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+}
+
 export interface JourneyState {
   userId: string;
   currentStep: JourneyStepId;
@@ -263,6 +275,7 @@ export interface JourneyState {
   activeHomeSection: HomeSectionId;
   itemStatuses: Record<string, ChecklistItemStatus>;
   toolAccess: Record<string, boolean>;
+  userGuideIntake: UserGuideIntakeState;
   tasks: ContributionTask[];
   taskExplanation?: string;
   tasksUpdatedAt?: string;

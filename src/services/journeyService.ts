@@ -17,6 +17,12 @@ import type {
   OnboardingPackage,
   TeamProfile,
 } from '../onboarding/types.js';
+import {
+  USER_GUIDE_SECTION_IDS,
+  buildUserGuideMarkdown,
+  isUserGuideSectionId,
+  type UserGuideSectionId,
+} from '../onboarding/userGuide.js';
 import {actions, divider, header, section} from '../slack/blockKit.js';
 import {
   type ContributionGuide,
@@ -28,6 +34,7 @@ import {
   type GitHubService,
 } from './githubService.js';
 import type {JiraService, JiraIssue} from './jiraService.js';
+import type {OnboardingStage} from '../onboarding/weeklyAgenda.js';
 import {
   type AnswerUserResult,
   type ConversationHistoryTurn,
@@ -150,6 +157,83 @@ export class JourneyService {
     state.activeHomeSection = sectionId;
     state.updatedAt = new Date().toISOString();
     return state;
+  }
+
+  /**
+   * Read-only accessor for the per-user journey state. Creates a default
+   * state the first time it's called so callers (e.g. live-signal
+   * computation) always get a defined object.
+   */
+  getState(userId: string): JourneyState {
+    return this.getOrCreateState(userId);
+  }
+
+  saveUserGuideAnswer(
+    userId: string,
+    sectionId: UserGuideSectionId,
+    answer: string
+  ): JourneyState {
+    if (!isUserGuideSectionId(sectionId)) {
+      throw new Error(`Unknown user guide section: ${sectionId}`);
+    }
+    const trimmed = answer.trim();
+    if (!trimmed) {
+      throw new Error('User guide answer cannot be empty.');
+    }
+
+    const state = this.getOrCreateState(userId);
+    const now = new Date().toISOString();
+    if (!state.userGuideIntake.startedAt) {
+      state.userGuideIntake.startedAt = now;
+    }
+    state.userGuideIntake.answers[sectionId] = trimmed;
+    state.userGuideIntake.updatedAt = now;
+    // Re-opening an answered section invalidates the completed marker
+    // until finalizeUserGuide is called again with every section answered.
+    state.userGuideIntake.completedAt = undefined;
+    state.updatedAt = now;
+    return state;
+  }
+
+  getUserGuideProgress(userId: string): {
+    answered: UserGuideSectionId[];
+    remaining: UserGuideSectionId[];
+    completedAt?: string;
+  } {
+    const state = this.getOrCreateState(userId);
+    const answers = state.userGuideIntake.answers;
+    const answered: UserGuideSectionId[] = [];
+    const remaining: UserGuideSectionId[] = [];
+    for (const id of USER_GUIDE_SECTION_IDS) {
+      if (answers[id] && answers[id].trim().length > 0) {
+        answered.push(id);
+      } else {
+        remaining.push(id);
+      }
+    }
+    return {
+      answered,
+      remaining,
+      completedAt: state.userGuideIntake.completedAt,
+    };
+  }
+
+  finalizeUserGuide(profile: TeamProfile): {
+    markdown: string;
+    missing: UserGuideSectionId[];
+  } {
+    const state = this.getOrCreateState(profile.userId);
+    const {remaining} = this.getUserGuideProgress(profile.userId);
+    const markdown = buildUserGuideMarkdown(
+      profile.firstName,
+      state.userGuideIntake.answers
+    );
+    if (remaining.length === 0) {
+      const now = new Date().toISOString();
+      state.userGuideIntake.completedAt = now;
+      state.updatedAt = now;
+    }
+    return {markdown, missing: remaining};
   }
 
   async advance(
@@ -305,13 +389,35 @@ export class JourneyService {
   async answerUser(
     profile: TeamProfile,
     text: string,
-    options: {history?: ConversationHistoryTurn[]} = {}
+    options: {
+      history?: ConversationHistoryTurn[];
+      onboardingStage?: OnboardingStage;
+      joinedSlackChannels?: Set<string>;
+    } = {}
   ): Promise<AnswerUserResult> {
     this.getOrCreateState(profile.userId);
+    const {answered, remaining, completedAt} = this.getUserGuideProgress(
+      profile.userId
+    );
+    // Only surface the intake stanza to the LLM if the user is mid-intake
+    // (at least one answer saved) or has just asked about the User Guide.
+    // A fresh user with zero answers triggers the stanza the first time
+    // they say "draft my user guide" — the assistant handler falls back
+    // to an empty progress signal which still nudges the agent when the
+    // message text mentions the intake.
+    const userGuideProgress =
+      answered.length > 0
+        ? {answered, remaining, completedAt}
+        : mentionsUserGuideIntake(text)
+          ? {answered, remaining, completedAt}
+          : undefined;
     return this.llmService.answerUser({
       question: text,
       profile,
       history: options.history,
+      onboardingStage: options.onboardingStage,
+      joinedSlackChannels: options.joinedSlackChannels,
+      userGuideProgress,
     });
   }
 
@@ -461,6 +567,7 @@ export class JourneyService {
       activeHomeSection: 'welcome',
       itemStatuses: {},
       toolAccess: {},
+      userGuideIntake: {answers: {}},
       tasks: [],
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -485,6 +592,12 @@ function hasFreshTasks(state: JourneyState): boolean {
   }
 
   return Date.now() - Date.parse(state.tasksUpdatedAt) < TASK_CACHE_TTL_MS;
+}
+
+const USER_GUIDE_MENTION_PATTERN = /user\s*guide/i;
+
+function mentionsUserGuideIntake(text: string): boolean {
+  return USER_GUIDE_MENTION_PATTERN.test(text);
 }
 
 function buildGuideSummary(

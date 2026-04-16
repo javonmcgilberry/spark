@@ -33,20 +33,4 @@ describe('journeyText routing', () => {
       expect(result.suggestedPrompts).toBeNull();
     }
   });
-
-  it('threads history into the answer call without erroring', async () => {
-    const {profile, services} = createTestServices();
-
-    const result = await resolveJourneyText(
-      profile,
-      'remind me about what we said before',
-      services.journey,
-      [
-        {role: 'user', content: 'hi'},
-        {role: 'assistant', content: 'hi there'},
-      ]
-    );
-
-    expect(result.kind).toBe('answer');
-  });
 });

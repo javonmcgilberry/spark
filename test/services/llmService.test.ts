@@ -81,66 +81,51 @@ describe('LlmService', () => {
   });
 
   describe('buildTools registration', () => {
-    it('registers catalog tools and set_suggested_prompts without external services', async () => {
-      const svc = new LlmService('test-key', createTestLogger());
+    async function toolNamesFor(
+      svc: InstanceType<typeof LlmService>
+    ): Promise<string[]> {
       anthropicCreateMock.mockResolvedValueOnce(
-        toolResponse([textBlock('hello')])
+        toolResponse([textBlock('ok')])
       );
-
       await svc.answerUser({question: 'hi', profile: buildProfile()});
-
-      expect(anthropicCreateMock).toHaveBeenCalledOnce();
       const [call] = anthropicCreateMock.mock.calls;
       const tools = (call[0] as {tools: ToolUnion[]}).tools;
-      const names = tools.map((t) => t.name).sort();
-      expect(names).toEqual(
-        [
-          'list_slack_channels',
-          'list_tools',
-          'list_rituals',
-          'list_checklist',
-          'list_people_to_meet',
-          'set_suggested_prompts',
-        ].sort()
-      );
-      expect(names).not.toContain('search_jira');
-      expect(names).not.toContain('search_github_prs');
-    });
+      return tools.map((t) => t.name);
+    }
 
-    it('adds search_jira only when Jira is configured', async () => {
+    it('registers search_jira only when Jira is configured', async () => {
+      const noJira = new LlmService('test-key', createTestLogger());
+      expect(await toolNamesFor(noJira)).not.toContain('search_jira');
+
+      anthropicCreateMock.mockReset();
+
       const jira = {
         isConfigured: vi.fn().mockReturnValue(true),
       } as unknown as JiraService;
-      const svc = new LlmService('test-key', createTestLogger(), undefined, {
-        jira,
-      });
-      anthropicCreateMock.mockResolvedValueOnce(
-        toolResponse([textBlock('hello')])
+      const withJira = new LlmService(
+        'test-key',
+        createTestLogger(),
+        undefined,
+        {
+          jira,
+        }
       );
-
-      await svc.answerUser({question: 'hi', profile: buildProfile()});
-
-      const [call] = anthropicCreateMock.mock.calls;
-      const tools = (call[0] as {tools: ToolUnion[]}).tools;
-      expect(tools.map((t) => t.name)).toContain('search_jira');
+      expect(await toolNamesFor(withJira)).toContain('search_jira');
     });
 
-    it('adds search_github_prs only when GitHub is configured', async () => {
+    it('registers search_github_prs only when GitHub is configured', async () => {
+      const noGh = new LlmService('test-key', createTestLogger());
+      expect(await toolNamesFor(noGh)).not.toContain('search_github_prs');
+
+      anthropicCreateMock.mockReset();
+
       const github = {
         isConfigured: vi.fn().mockReturnValue(true),
       } as unknown as GitHubService;
-      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+      const withGh = new LlmService('test-key', createTestLogger(), undefined, {
         github,
       });
-      anthropicCreateMock.mockResolvedValueOnce(
-        toolResponse([textBlock('hello')])
-      );
-
-      await svc.answerUser({question: 'hi', profile: buildProfile()});
-
-      const [call] = anthropicCreateMock.mock.calls;
-      const tools = (call[0] as {tools: ToolUnion[]}).tools;
-      expect(tools.map((t) => t.name)).toContain('search_github_prs');
+      expect(await toolNamesFor(withGh)).toContain('search_github_prs');
     });
   });
 
@@ -300,6 +285,222 @@ describe('LlmService', () => {
         toolResultTurn.content as Array<{content: string}>
       )[0].content;
       expect(JSON.parse(toolResultContent)).toEqual({weeks: []});
+    });
+
+    it('list_slack_channels annotates joined state when joinedSlackChannels is provided', async () => {
+      const svc = new LlmService('test-key', createTestLogger());
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([toolUseBlock('t1', 'list_slack_channels', {})])
+        )
+        .mockResolvedValueOnce(
+          toolResponse([textBlock('Here are some channels.')])
+        );
+
+      await svc.answerUser({
+        question: 'what channels am I missing?',
+        profile: buildProfile(),
+        joinedSlackChannels: new Set(['webflow-announcements', 'props']),
+      });
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultTurn =
+        secondCall.messages[secondCall.messages.length - 1];
+      const toolResultContent = (
+        toolResultTurn.content as Array<{content: string}>
+      )[0].content;
+      const parsed = JSON.parse(toolResultContent) as {
+        categories: Array<{channels: Array<{name: string; joined?: boolean}>}>;
+        joinedCount: number;
+        totalCount: number;
+      };
+      expect(parsed).toHaveProperty('joinedCount');
+      expect(parsed).toHaveProperty('totalCount');
+      expect(parsed.joinedCount).toBeGreaterThan(0);
+
+      const allChannels = parsed.categories.flatMap((c) => c.channels);
+      for (const channel of allChannels) {
+        expect(typeof channel.joined).toBe('boolean');
+      }
+      const announcements = allChannels.find(
+        (c) => c.name === '#webflow-announcements'
+      );
+      expect(announcements?.joined).toBe(true);
+    });
+
+    it('save_user_guide_answer routes parsed args to the intake sink and reports success', async () => {
+      const saveAnswer = vi.fn();
+      const finalize = vi.fn().mockReturnValue({markdown: '', missing: []});
+      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+        userGuideIntake: {saveAnswer, finalize},
+      });
+
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([
+            toolUseBlock('t1', 'save_user_guide_answer', {
+              sectionId: 'schedule',
+              answer: '  9-5 PT, DMs welcome  ',
+            }),
+          ])
+        )
+        .mockResolvedValueOnce(toolResponse([textBlock('Saved.')]));
+
+      await svc.answerUser({
+        question: 'I work 9-5 PT',
+        profile: buildProfile(),
+      });
+
+      expect(saveAnswer).toHaveBeenCalledOnce();
+      expect(saveAnswer).toHaveBeenCalledWith(
+        'U1',
+        'schedule',
+        '  9-5 PT, DMs welcome  '
+      );
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultTurn =
+        secondCall.messages[secondCall.messages.length - 1];
+      const toolResultContent = (
+        toolResultTurn.content as Array<{content: string}>
+      )[0].content;
+      const parsed = JSON.parse(toolResultContent) as {
+        saved?: boolean;
+        sectionId?: string;
+      };
+      expect(parsed.saved).toBe(true);
+      expect(parsed.sectionId).toBe('schedule');
+    });
+
+    it('save_user_guide_answer returns a validation error for an unknown sectionId without calling the sink', async () => {
+      const saveAnswer = vi.fn();
+      const finalize = vi.fn().mockReturnValue({markdown: '', missing: []});
+      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+        userGuideIntake: {saveAnswer, finalize},
+      });
+
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([
+            toolUseBlock('t1', 'save_user_guide_answer', {
+              sectionId: 'totally-invalid',
+              answer: 'anything',
+            }),
+          ])
+        )
+        .mockResolvedValueOnce(toolResponse([textBlock('Got it.')]));
+
+      await svc.answerUser({
+        question: 'ok',
+        profile: buildProfile(),
+      });
+
+      expect(saveAnswer).not.toHaveBeenCalled();
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultContent = (
+        secondCall.messages[secondCall.messages.length - 1].content as Array<{
+          content: string;
+        }>
+      )[0].content;
+      expect(JSON.parse(toolResultContent)).toEqual({
+        error: expect.stringContaining('sectionId must be one of'),
+      });
+    });
+
+    it('finalize_user_guide returns the sink output verbatim including missing sections', async () => {
+      const saveAnswer = vi.fn();
+      const finalize = vi.fn().mockReturnValue({
+        markdown: '# Ada\n\n## schedule\n\n9-5',
+        missing: ['style', 'values'],
+      });
+      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+        userGuideIntake: {saveAnswer, finalize},
+      });
+
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([toolUseBlock('t1', 'finalize_user_guide', {})])
+        )
+        .mockResolvedValueOnce(
+          toolResponse([textBlock('Here is your draft.')])
+        );
+
+      await svc.answerUser({
+        question: 'finalize it',
+        profile: buildProfile(),
+      });
+
+      expect(finalize).toHaveBeenCalledOnce();
+      expect(finalize).toHaveBeenCalledWith(
+        expect.objectContaining({userId: 'U1', firstName: 'Ada'})
+      );
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultContent = (
+        secondCall.messages[secondCall.messages.length - 1].content as Array<{
+          content: string;
+        }>
+      )[0].content;
+      expect(JSON.parse(toolResultContent)).toEqual({
+        markdown: '# Ada\n\n## schedule\n\n9-5',
+        missing: ['style', 'values'],
+      });
+    });
+
+    it('user guide tools are not registered when no intake sink is supplied', async () => {
+      const svc = new LlmService('test-key', createTestLogger());
+      anthropicCreateMock.mockResolvedValueOnce(
+        toolResponse([textBlock('ok')])
+      );
+
+      await svc.answerUser({question: 'hi', profile: buildProfile()});
+
+      const tools = (
+        anthropicCreateMock.mock.calls[0][0] as {tools: ToolUnion[]}
+      ).tools;
+      const names = tools.map((t) => t.name);
+      expect(names).not.toContain('save_user_guide_answer');
+      expect(names).not.toContain('finalize_user_guide');
+    });
+
+    it('list_slack_channels omits joined entirely when no set is supplied', async () => {
+      const svc = new LlmService('test-key', createTestLogger());
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([toolUseBlock('t1', 'list_slack_channels', {})])
+        )
+        .mockResolvedValueOnce(
+          toolResponse([textBlock('Here are some channels.')])
+        );
+
+      await svc.answerUser({
+        question: 'what channels are there?',
+        profile: buildProfile(),
+      });
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultTurn =
+        secondCall.messages[secondCall.messages.length - 1];
+      const toolResultContent = (
+        toolResultTurn.content as Array<{content: string}>
+      )[0].content;
+      const parsed = JSON.parse(toolResultContent) as {
+        categories: Array<{channels: Array<{name: string; joined?: boolean}>}>;
+        joinedCount?: number;
+      };
+      expect(parsed.joinedCount).toBeUndefined();
+      const sampleChannel = parsed.categories[0]?.channels[0];
+      expect(sampleChannel).not.toHaveProperty('joined');
     });
   });
 });

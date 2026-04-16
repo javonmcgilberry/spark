@@ -1,4 +1,5 @@
 import type {TeamProfile} from '../onboarding/types.js';
+import type {OnboardingStage} from '../onboarding/weeklyAgenda.js';
 import type {
   ConversationHistoryTurn,
   JourneyReply,
@@ -21,13 +22,19 @@ export type JourneyTextResult =
       title: string;
     };
 
+export interface ResolveJourneyTextOptions {
+  history?: ConversationHistoryTurn[];
+  onboardingStage?: OnboardingStage;
+  joinedSlackChannels?: Set<string>;
+}
+
 const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
 
 export async function resolveJourneyText(
   profile: TeamProfile,
   originalText: string,
   journey: JourneyService,
-  history: ConversationHistoryTurn[] = []
+  options: ResolveJourneyTextOptions = {}
 ): Promise<JourneyTextResult> {
   const jiraKeyMatch = originalText.match(JIRA_KEY_PATTERN);
   if (jiraKeyMatch) {
@@ -44,7 +51,11 @@ export async function resolveJourneyText(
   const {text, suggestedPrompts} = await journey.answerUser(
     profile,
     originalText,
-    {history}
+    {
+      history: options.history,
+      onboardingStage: options.onboardingStage,
+      joinedSlackChannels: options.joinedSlackChannels,
+    }
   );
 
   return {

@@ -68,6 +68,11 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     onboardingPackages,
     {github, jira}
   );
+  llm.setUserGuideIntake({
+    saveAnswer: (userId, sectionId, answer) =>
+      journey.saveUserGuideAnswer(userId, sectionId, answer),
+    finalize: (profile) => journey.finalizeUserGuide(profile),
+  });
 
   return {
     env,

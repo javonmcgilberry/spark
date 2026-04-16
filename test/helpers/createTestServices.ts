@@ -87,6 +87,11 @@ export function createTestServices(
     onboardingPackages,
     {github, jira}
   );
+  llm.setUserGuideIntake({
+    saveAnswer: (userId, sectionId, answer) =>
+      journey.saveUserGuideAnswer(userId, sectionId, answer),
+    finalize: (profile) => journey.finalizeUserGuide(profile),
+  });
   const identityResolver = new TestIdentityResolver(
     env,
     logger,

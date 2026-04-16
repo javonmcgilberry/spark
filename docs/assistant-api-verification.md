@@ -51,13 +51,33 @@ clear the existing suggested-prompt bar, or does it persist until we call
 `setSuggestedPrompts` again?
 
 **Current implementation choice:** Defensively re-set prompts on every
-`userMessage` turn — either the LLM's picks (merged with pinned `Open my
-Home tab`) or `DEFAULT_PROMPTS`. So auto-clear behavior does not matter for
-correctness.
+`userMessage` turn — either the LLM's agentic picks (via the
+`set_suggested_prompts` tool) or live signals from
+`computeLiveSignals(ctx)` computed from current state (joined channels,
+user guide progress, checklist, tool access, PRs, tickets, onboarding
+stage). So auto-clear behavior does not matter for correctness.
 
 **Test:** Send a message, do not wait for the reply, send another message.
 Observe whether the prompt bar updates cleanly or stacks oddly. If there is
 a visible race, add a small debounce before `setSuggestedPrompts`.
+
+## 4. `users.conversations` per-turn lookup + TTL cache
+
+**Question:** Calling `client.users.conversations` once per `userMessage`
+turn to build the "joined channels" set means one Tier 3 call per DM per
+user. Is this safe at scale, and does the 10-minute in-process cache hold
+up under realistic assistant sessions?
+
+**Current implementation choice:** `fetchJoinedChannels` in
+`spark/src/slack/handlers/assistant.ts` paginates `users.conversations`
+(public + private, up to 10 pages) and caches the result per `userId` for
+10 minutes (`JOINED_CHANNEL_TTL_MS`). On API failure we log a warning and
+drop the join-state so the LLM still answers, just without strikethroughs.
+
+**Test:** Send several DMs in quick succession and confirm we hit the
+cache (check the bot logs for only one `users.conversations` call per 10
+minutes per user). Then wait past the TTL and confirm it re-queries.
+Re-verify if Slack ever changes the Tier 3 rate limit (today: ~50+/min).
 
 ## How to verify
 

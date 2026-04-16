@@ -143,6 +143,125 @@ describe('JourneyService.setToolAccessForKeys', () => {
   });
 });
 
+describe('JourneyService user guide intake', () => {
+  it('saves trimmed answers and exposes them via getUserGuideProgress', () => {
+    const {profile, services} = createTestServices();
+
+    services.journey.saveUserGuideAnswer(
+      profile.userId,
+      'schedule',
+      '  9 to 5 PT, DMs welcome anytime  '
+    );
+    services.journey.saveUserGuideAnswer(
+      profile.userId,
+      'values',
+      'Transparency.'
+    );
+
+    const progress = services.journey.getUserGuideProgress(profile.userId);
+
+    expect(progress.answered).toEqual(['schedule', 'values']);
+    expect(progress.remaining).toEqual([
+      'style',
+      'pet-peeves',
+      'communication',
+      'help-me',
+      'feedback',
+      'decisions',
+    ]);
+    expect(progress.completedAt).toBeUndefined();
+  });
+
+  it('rejects unknown section ids and empty answers', () => {
+    const {profile, services} = createTestServices();
+
+    expect(() =>
+      services.journey.saveUserGuideAnswer(
+        profile.userId,
+        // @ts-expect-error intentionally bogus id for runtime validation
+        'bogus',
+        'something'
+      )
+    ).toThrowError(/Unknown user guide section/);
+    expect(() =>
+      services.journey.saveUserGuideAnswer(profile.userId, 'schedule', '   ')
+    ).toThrowError(/cannot be empty/);
+  });
+
+  it('overwriting an answered section clears the completed marker until the next full finalize', () => {
+    const {profile, services} = createTestServices();
+    const allSections = [
+      'schedule',
+      'style',
+      'values',
+      'pet-peeves',
+      'communication',
+      'help-me',
+      'feedback',
+      'decisions',
+    ] as const;
+    for (const id of allSections) {
+      services.journey.saveUserGuideAnswer(
+        profile.userId,
+        id,
+        `answer for ${id}`
+      );
+    }
+
+    const firstFinalize = services.journey.finalizeUserGuide(profile);
+    expect(firstFinalize.missing).toEqual([]);
+    expect(
+      services.journey.getUserGuideProgress(profile.userId).completedAt
+    ).toBeDefined();
+
+    services.journey.saveUserGuideAnswer(
+      profile.userId,
+      'schedule',
+      'updated schedule'
+    );
+    expect(
+      services.journey.getUserGuideProgress(profile.userId).completedAt
+    ).toBeUndefined();
+
+    const secondFinalize = services.journey.finalizeUserGuide(profile);
+    expect(secondFinalize.missing).toEqual([]);
+    expect(secondFinalize.markdown).toContain('updated schedule');
+    expect(
+      services.journey.getUserGuideProgress(profile.userId).completedAt
+    ).toBeDefined();
+  });
+
+  it('finalizeUserGuide on a partial intake returns a preview and lists missing sections without marking completed', () => {
+    const {profile, services} = createTestServices();
+
+    services.journey.saveUserGuideAnswer(profile.userId, 'schedule', '9-5 PT.');
+    services.journey.saveUserGuideAnswer(
+      profile.userId,
+      'feedback',
+      'In writing please.'
+    );
+
+    const result = services.journey.finalizeUserGuide(profile);
+
+    expect(result.missing).toEqual(
+      expect.arrayContaining([
+        'style',
+        'values',
+        'pet-peeves',
+        'communication',
+        'help-me',
+        'decisions',
+      ])
+    );
+    expect(result.missing).not.toContain('schedule');
+    expect(result.missing).not.toContain('feedback');
+    expect(result.markdown).toContain('9-5 PT.');
+    expect(
+      services.journey.getUserGuideProgress(profile.userId).completedAt
+    ).toBeUndefined();
+  });
+});
+
 describe('JourneyService.showJiraTickets', () => {
   it('returns a setup hint when jira is not configured', async () => {
     const journey = buildJourneyService({
