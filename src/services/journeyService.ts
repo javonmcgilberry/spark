@@ -16,10 +16,17 @@ import type {
   OnboardingPackage,
   TeamProfile,
 } from '../onboarding/types.js';
+import {actions, divider, header, section} from '../slack/blockKit.js';
 import {
   type ContributionGuide,
   ContributionGuideService,
 } from './contributionGuideService.js';
+import {
+  inferGithubUsername,
+  type GitHubPullRequest,
+  type GitHubService,
+} from './githubService.js';
+import type {JiraService, JiraIssue} from './jiraService.js';
 import {LlmService} from './llmService.js';
 import {OnboardingPackageService} from './onboardingPackageService.js';
 import {TaskScannerService} from './taskScannerService.js';
@@ -37,15 +44,26 @@ export interface PreparedJourneyData {
 
 const TASK_CACHE_TTL_MS = 10 * 60 * 1000;
 
+export interface AgentToolkit {
+  github?: GitHubService;
+  jira?: JiraService;
+}
+
 export class JourneyService {
   private readonly states = new Map<string, JourneyState>();
+  private readonly github?: GitHubService;
+  private readonly jira?: JiraService;
 
   constructor(
     private readonly taskScanner: TaskScannerService,
     private readonly llmService: LlmService,
     private readonly contributionGuideService: ContributionGuideService,
-    private readonly onboardingPackageService: OnboardingPackageService
-  ) {}
+    private readonly onboardingPackageService: OnboardingPackageService,
+    toolkit: AgentToolkit = {}
+  ) {
+    this.github = toolkit.github;
+    this.jira = toolkit.jira;
+  }
 
   async start(profile: TeamProfile): Promise<JourneyReply> {
     return this.buildStartReply(await this.prepareStart(profile));
@@ -91,6 +109,27 @@ export class JourneyService {
   ): JourneyState {
     const state = this.getOrCreateState(userId);
     state.itemStatuses[itemKey] = status;
+    state.updatedAt = new Date().toISOString();
+    return state;
+  }
+
+  setToolAccessForKeys(
+    userId: string,
+    allKeysInGroup: string[],
+    selectedKeys: Set<string>
+  ): JourneyState {
+    const state = this.getOrCreateState(userId);
+    const nextAccess: Record<string, boolean> = {...state.toolAccess};
+    for (const key of allKeysInGroup) {
+      if (selectedKeys.has(key)) {
+        nextAccess[key] = true;
+      } else {
+        nextAccess[key] = false;
+      }
+    }
+    state.toolAccess = Object.fromEntries(
+      Object.entries(nextAccess).filter(([, value]) => value === true)
+    );
     state.updatedAt = new Date().toISOString();
     return state;
   }
@@ -264,6 +303,139 @@ export class JourneyService {
     });
   }
 
+  async showJiraTickets(
+    profile: TeamProfile,
+    options: {issueKey?: string; query?: string} = {}
+  ): Promise<JourneyReply> {
+    if (!this.jira || !this.jira.isConfigured()) {
+      return {
+        text: 'Jira lookups are not configured yet for Spark.',
+        blocks: [
+          section(
+            "Jira search isn't configured yet. Ask your admin to set `JIRA_BASE_URL`, `JIRA_API_EMAIL`, and `JIRA_API_TOKEN` to enable ticket lookups."
+          ),
+        ],
+      };
+    }
+
+    if (options.issueKey) {
+      const issue = await this.jira.findByKey(options.issueKey);
+      return issue
+        ? {
+            text: `${issue.key}: ${issue.summary}`,
+            blocks: [header('Jira ticket'), ...buildJiraIssueBlocks([issue])],
+          }
+        : {
+            text: `I couldn't find ${options.issueKey}.`,
+            blocks: [
+              section(
+                `I couldn't find \`${options.issueKey}\`. Check the key or try again in a minute.`
+              ),
+            ],
+          };
+    }
+
+    if (options.query && options.query.trim()) {
+      const issues = await this.jira.findForTextQuery(options.query);
+      return {
+        text: `Jira results for "${options.query}"`,
+        blocks: [
+          header(`Jira matches for "${options.query}"`),
+          ...buildJiraIssueBlocks(issues),
+        ],
+      };
+    }
+
+    if (!profile.email) {
+      return {
+        text: 'I need your Webflow email to look up your tickets.',
+        blocks: [
+          section(
+            "I couldn't find your Webflow email, so I can't look up the tickets assigned to you."
+          ),
+        ],
+      };
+    }
+
+    const issues = await this.jira.findAssignedToEmail(profile.email);
+    return {
+      text:
+        issues.length > 0
+          ? `You have ${issues.length} open Jira ticket${issues.length === 1 ? '' : 's'}.`
+          : "You don't have any open Jira tickets assigned right now.",
+      blocks: [
+        header('Your open Jira tickets'),
+        ...buildJiraIssueBlocks(issues),
+      ],
+    };
+  }
+
+  async showGitHubPullRequests(
+    profile: TeamProfile,
+    options: {mode?: 'mine' | 'review' | 'team'} = {}
+  ): Promise<JourneyReply> {
+    if (!this.github || !this.github.isConfigured()) {
+      return {
+        text: 'GitHub lookups are not configured yet for Spark.',
+        blocks: [
+          section(
+            "GitHub search isn't configured yet. Ask your admin to set `GITHUB_TOKEN` to enable pull-request lookups."
+          ),
+        ],
+      };
+    }
+
+    const mode = options.mode ?? 'mine';
+    const username = inferGithubUsername(profile);
+
+    if (mode === 'team' && profile.githubTeamSlug) {
+      const prs = await this.github.findRecentPullRequestsForTeam(
+        profile.githubTeamSlug
+      );
+      return buildPullRequestReply(
+        prs,
+        `PRs awaiting ${profile.teamName} review`,
+        `Team ${profile.githubTeamSlug}`
+      );
+    }
+
+    if (mode === 'review') {
+      if (!username) {
+        return {
+          text: "I don't know your GitHub username yet.",
+          blocks: [
+            section(
+              "I couldn't detect your GitHub username. Tell me your handle and I'll look up review requests for you."
+            ),
+          ],
+        };
+      }
+      const prs = await this.github.findPullRequestsAwaitingReview(username);
+      return buildPullRequestReply(
+        prs,
+        'PRs awaiting your review',
+        `@${username}`
+      );
+    }
+
+    if (!username) {
+      return {
+        text: "I don't know your GitHub username yet.",
+        blocks: [
+          section(
+            "I couldn't detect your GitHub username. Tell me your handle and I'll look up your PRs."
+          ),
+        ],
+      };
+    }
+    const prs = await this.github.findOpenPullRequestsForUser(username);
+    return buildPullRequestReply(
+      prs,
+      'Your open pull requests',
+      `@${username}`
+    );
+  }
+
   private getOrCreateState(userId: string): JourneyState {
     const existing = this.states.get(userId);
     if (existing) {
@@ -276,6 +448,7 @@ export class JourneyService {
       completedSteps: [],
       activeHomeSection: 'welcome',
       itemStatuses: {},
+      toolAccess: {},
       tasks: [],
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -331,5 +504,62 @@ function cloneTask(task: ContributionTask): ContributionTask {
     filePaths: [...task.filePaths],
     previewLines: [...task.previewLines],
     metadata: {...task.metadata},
+  };
+}
+
+function buildJiraIssueBlocks(issues: JiraIssue[]): KnownBlock[] {
+  if (issues.length === 0) {
+    return [
+      section(
+        "Nothing came back from Jira. If that doesn't feel right, try again with a search phrase or an issue key like `ABC-123`."
+      ),
+    ];
+  }
+
+  return issues.flatMap((issue) => [
+    section(
+      `*<${issue.url}|${issue.key}>* — ${issue.summary}\nStatus: *${issue.status}*${
+        issue.priority ? ` · Priority: ${issue.priority}` : ''
+      }${issue.assignee ? ` · Assignee: ${issue.assignee}` : ''}`
+    ),
+  ]);
+}
+
+function buildPullRequestReply(
+  prs: GitHubPullRequest[],
+  title: string,
+  subject: string
+): JourneyReply {
+  const blocks: KnownBlock[] = [header(title)];
+
+  if (prs.length === 0) {
+    blocks.push(
+      section(`No open pull requests found for ${subject} right now.`)
+    );
+  } else {
+    prs.forEach((pr, index) => {
+      if (index > 0) {
+        blocks.push(divider());
+      }
+      blocks.push(
+        section(
+          `*<${pr.url}|#${pr.number} ${pr.title}>*\n${pr.repository} · @${pr.author}${pr.draft ? ' · *draft*' : ''}`
+        )
+      );
+    });
+  }
+
+  blocks.push(
+    actions([
+      {
+        label: 'Refresh',
+        actionId: 'spark_refresh_pr_list',
+      },
+    ])
+  );
+
+  return {
+    text: `${title} for ${subject}`,
+    blocks,
   };
 }

@@ -37,6 +37,8 @@ type JourneyMatcher =
       values: string[];
     };
 
+const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
+
 const JOURNEY_ROUTES: JourneyRoute[] = [
   {
     matchers: [
@@ -56,6 +58,70 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
     title: 'People to meet',
     status: 'Pulling together the people who can help most...',
     resolve: async (profile, journey) => journey.showPeople(profile),
+  },
+  {
+    matchers: [
+      {
+        type: 'includes',
+        values: [
+          'review requested',
+          'awaiting review',
+          'needs my review',
+          'prs to review',
+          'code review',
+        ],
+      },
+    ],
+    syncProgress: false,
+    title: 'PRs to review',
+    status: 'Looking up PRs that need your review...',
+    resolve: (profile, journey) =>
+      journey.showGitHubPullRequests(profile, {mode: 'review'}),
+  },
+  {
+    matchers: [
+      {
+        type: 'includes',
+        values: ['team pr', 'team prs', 'team review', 'squad prs'],
+      },
+    ],
+    syncProgress: false,
+    title: 'Team pull requests',
+    status: 'Looking up PRs for your team...',
+    resolve: (profile, journey) =>
+      journey.showGitHubPullRequests(profile, {mode: 'team'}),
+  },
+  {
+    matchers: [
+      {
+        type: 'includes',
+        values: ['my pr', 'my prs', 'open pr', 'pull request', 'github pr'],
+      },
+    ],
+    syncProgress: false,
+    title: 'Your pull requests',
+    status: 'Looking up your open pull requests...',
+    resolve: (profile, journey) =>
+      journey.showGitHubPullRequests(profile, {mode: 'mine'}),
+  },
+  {
+    matchers: [
+      {
+        type: 'includes',
+        values: [
+          'my ticket',
+          'my tickets',
+          'my jira',
+          'assigned to me',
+          'jira ticket',
+          'open ticket',
+        ],
+      },
+    ],
+    syncProgress: false,
+    title: 'Your Jira tickets',
+    status: 'Looking up your Jira tickets...',
+    resolve: (profile, journey) => journey.showJiraTickets(profile),
   },
   {
     matchers: [
@@ -96,7 +162,7 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
     matchers: [
       {
         type: 'includes',
-        values: ['task', 'contribution', 'first pr', 'pull request'],
+        values: ['task', 'contribution', 'first pr'],
       },
     ],
     syncProgress: true,
@@ -113,6 +179,19 @@ export async function resolveJourneyText(
   journey: JourneyService
 ): Promise<JourneyTextResult> {
   const normalized = originalText.trim().toLowerCase();
+  const jiraKeyMatch = originalText.match(JIRA_KEY_PATTERN);
+  if (jiraKeyMatch) {
+    return {
+      kind: 'reply',
+      reply: await journey.showJiraTickets(profile, {
+        issueKey: jiraKeyMatch[1],
+      }),
+      syncProgress: false,
+      status: `Looking up ${jiraKeyMatch[1]}...`,
+      title: `Jira ${jiraKeyMatch[1]}`,
+    };
+  }
+
   const route = JOURNEY_ROUTES.find((candidate) =>
     matchesJourneyRoute(normalized, candidate)
   );

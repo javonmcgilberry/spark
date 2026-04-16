@@ -92,7 +92,7 @@ describe('createHttpServer test harness', () => {
 
     expect(publishedHome.status).toBe(200);
     const publishedHomeText = collectTextContent(publishedHome.body.blocks);
-    expect(publishedHomeText).toContain('Published');
+    expect(publishedHomeText).toContain('Checklist progress:');
     expect(publishedHomeText).toContain('Manager note:');
     expect(slack.calls.canvasesEdit.length).toBeGreaterThan(0);
   });

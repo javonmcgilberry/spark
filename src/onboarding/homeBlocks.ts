@@ -2,12 +2,12 @@ import type {KnownBlock} from '@slack/types';
 import {HOME_SECTION_TABS} from './catalog.js';
 import {
   countCompletedInSection,
-  formatChannels,
   groupPeopleByWeek,
   linkedChecklistItemsForMilestone,
 } from './display.js';
 import {
   actions,
+  checkboxes,
   divider,
   header,
   richText,
@@ -30,10 +30,16 @@ import {
   type JourneyState,
   type OnboardingPackage,
   type OnboardingPerson,
+  type SlackChannelGuide,
+  type ToolGuide,
 } from './types.js';
 
 export const HOME_CHECKLIST_ACTION_ID = 'spark_item_status';
 export const HOME_NAV_ACTION_ID = 'spark_home_open_section';
+export const HOME_TOOL_ACCESS_ACTION_ID = 'spark_tool_access';
+export const TOOL_CHECKBOX_CHUNK_SIZE = 10;
+
+const WEBFLOW_REPO_URL = 'https://github.com/webflow/webflow';
 
 export function buildHomeView(
   onboardingPackage: OnboardingPackage,
@@ -128,9 +134,7 @@ function buildHomeSummaryBlock(
 ): KnownBlock {
   return richText([
     richTextSection([
-      richTextText('Status: ', {bold: true}),
-      richTextText(capitalize(onboardingPackage.status)),
-      richTextText('  •  Checklist progress: ', {bold: true}),
+      richTextText('Checklist progress: ', {bold: true}),
       richTextText(`${completedCount}/${totalCount}`),
       ...(onboardingPackage.welcomeNote
         ? [
@@ -164,20 +168,12 @@ function renderActiveSection(
       return renderWelcomeSection(onboardingPackage);
     case 'onboarding-checklist':
       return renderChecklistSection(onboardingPackage, state);
-    case '30-60-90-plan':
-      return renderPlanSection(onboardingPackage);
     case 'people-to-meet':
       return renderPeopleSection(onboardingPackage);
-    case 'tools-access-checklist':
-      return renderToolsSection(onboardingPackage);
-    case 'slack':
-      return renderSlackSection(onboardingPackage);
+    case 'resources':
+      return renderResourcesSection(onboardingPackage, state);
     case 'initial-engineering-tasks':
       return renderTasksSection(onboardingPackage);
-    case 'rituals':
-      return renderRitualsSection(onboardingPackage);
-    case 'engineering-resource-library':
-      return renderLibrarySection(onboardingPackage);
   }
 }
 
@@ -190,17 +186,17 @@ function renderWelcomeSection(
 
   return [
     header(welcome.title),
-    paragraph(welcome.intro),
+    section(welcome.intro),
     ...(welcome.personalizedNote
       ? [
           header('A note from your manager', 2),
           richText([richTextQuote(welcome.personalizedNote)]),
         ]
       : []),
-    header('Who to go to first', 2),
+    header('Onboarding POCs', 2),
     ...welcome.onboardingPocs.flatMap((poc) => renderWelcomePoc(poc)),
     divider(),
-    header('What the next few weeks look like', 2),
+    header('Onboarding journey', 2),
     richText([
       richTextList(
         'bullet',
@@ -209,6 +205,8 @@ function renderWelcomeSection(
         )
       ),
     ]),
+    divider(),
+    ...renderPlanSubsection(onboardingPackage),
     ...(onboardingPackage.draftCanvasUrl
       ? [
           section(
@@ -217,6 +215,53 @@ function renderWelcomeSection(
         ]
       : []),
   ];
+}
+
+function renderPlanSubsection(
+  onboardingPackage: OnboardingPackage
+): KnownBlock[] {
+  const plan = onboardingPackage.sections.plan306090;
+  const checklistSections =
+    onboardingPackage.sections.onboardingChecklist.sections;
+  const blocks: KnownBlock[] = [
+    header('30/60/90 plan', 2),
+    paragraph(plan.intro),
+  ];
+
+  plan.items.forEach((item) => {
+    blocks.push(header(item.timeframe, 3));
+    blocks.push(paragraph(item.goalSummary));
+
+    const milestoneItems: RichTextInlineElement[][] = [
+      [
+        richTextText('New hire focus: ', {bold: true}),
+        richTextText(item.keyActivities),
+      ],
+      [
+        richTextText('Manager / buddy support: ', {bold: true}),
+        richTextText(item.supportActions),
+      ],
+    ];
+    const links = linkedChecklistItemsForMilestone(
+      checklistSections,
+      item.timeframe
+    );
+    if (links.length > 0) {
+      milestoneItems.push([
+        richTextText('Helpful links: ', {bold: true}),
+        ...buildInlineLinkElements(
+          links.map((link) => ({
+            url: link.resourceUrl,
+            label: link.resourceLabel ?? link.label,
+          }))
+        ),
+      ]);
+    }
+
+    blocks.push(richText([richTextList('bullet', milestoneItems)]));
+  });
+
+  return blocks;
 }
 
 function renderWelcomePoc(
@@ -279,54 +324,6 @@ function renderChecklistSection(
   return blocks;
 }
 
-function renderPlanSection(onboardingPackage: OnboardingPackage): KnownBlock[] {
-  const checklistSections =
-    onboardingPackage.sections.onboardingChecklist.sections;
-  const blocks: KnownBlock[] = [
-    header(onboardingPackage.sections.plan306090.title),
-    paragraph(onboardingPackage.sections.plan306090.intro),
-  ];
-
-  onboardingPackage.sections.plan306090.items.forEach((item, itemIndex) => {
-    if (itemIndex > 0) {
-      blocks.push(divider());
-    }
-
-    blocks.push(header(item.timeframe, 2));
-    blocks.push(paragraph(item.goalSummary));
-
-    const milestoneItems: RichTextInlineElement[][] = [
-      [
-        richTextText('New hire focus: ', {bold: true}),
-        richTextText(item.keyActivities),
-      ],
-      [
-        richTextText('Manager / buddy support: ', {bold: true}),
-        richTextText(item.supportActions),
-      ],
-    ];
-    const links = linkedChecklistItemsForMilestone(
-      checklistSections,
-      item.timeframe
-    );
-    if (links.length > 0) {
-      milestoneItems.push([
-        richTextText('Helpful links: ', {bold: true}),
-        ...buildInlineLinkElements(
-          links.map((link) => ({
-            url: link.resourceUrl,
-            label: link.resourceLabel ?? link.label,
-          }))
-        ),
-      ]);
-    }
-
-    blocks.push(richText([richTextList('bullet', milestoneItems)]));
-  });
-
-  return blocks;
-}
-
 function renderPeopleSection(
   onboardingPackage: OnboardingPackage
 ): KnownBlock[] {
@@ -360,33 +357,127 @@ function renderPeopleSection(
   return blocks;
 }
 
-function renderToolsSection(
-  onboardingPackage: OnboardingPackage
+function renderResourcesSection(
+  onboardingPackage: OnboardingPackage,
+  state: JourneyState
 ): KnownBlock[] {
   const blocks: KnownBlock[] = [
-    header(onboardingPackage.sections.toolsAccess.title),
-    paragraph(onboardingPackage.sections.toolsAccess.intro),
+    header('Resources'),
+    section(
+      'Everything you need to get set up, connected, and oriented: the tools to request access to, Slack channels to join, team rituals to show up for, and the docs that matter most.'
+    ),
   ];
 
-  groupByCategory(
-    onboardingPackage.sections.toolsAccess.tools,
-    'category'
-  ).forEach(({category, items}, index) => {
-    if (index > 0) {
-      blocks.push(divider());
-    }
+  blocks.push(divider());
+  blocks.push(...renderToolsSubsection(onboardingPackage, state));
 
-    blocks.push(header(category, 2));
+  blocks.push(divider());
+  blocks.push(...renderSlackSubsection(onboardingPackage));
+
+  blocks.push(divider());
+  blocks.push(...renderRitualsSubsection(onboardingPackage));
+
+  blocks.push(divider());
+  blocks.push(...renderLibrarySubsection(onboardingPackage));
+
+  return blocks;
+}
+
+export function slugifyToolCategory(category: string): string {
+  return (
+    category
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'category'
+  );
+}
+
+export function buildToolAccessKey(category: string, toolName: string): string {
+  return `${category.toLowerCase()}::${toolName.toLowerCase()}`;
+}
+
+function buildToolAccessActionId(category: string, chunkIndex: number): string {
+  return `${HOME_TOOL_ACCESS_ACTION_ID}:${slugifyToolCategory(category)}:${chunkIndex}`;
+}
+
+function renderToolsSubsection(
+  onboardingPackage: OnboardingPackage,
+  state: JourneyState
+): KnownBlock[] {
+  const tools = onboardingPackage.sections.toolsAccess.tools;
+  const blocks: KnownBlock[] = [
+    header('Tools access', 2),
+    section(
+      '*Tick each tool off as you gain access.* Most tools live in Okta — ask @Flowbot if anything is missing.'
+    ),
+  ];
+
+  groupByCategory(tools, 'category').forEach(({category, items}) => {
+    blocks.push(header(category, 3));
+    chunkList(items, TOOL_CHECKBOX_CHUNK_SIZE).forEach((chunk, chunkIndex) => {
+      blocks.push(
+        checkboxes(
+          buildToolAccessActionId(category, chunkIndex),
+          chunk.map((tool) => ({
+            label: tool.tool,
+            description: formatToolDescription(tool),
+            value: buildToolAccessKey(category, tool.tool),
+          })),
+          chunk
+            .map((tool) => buildToolAccessKey(category, tool.tool))
+            .filter((key) => state.toolAccess[key] === true)
+        )
+      );
+    });
+  });
+
+  return blocks;
+}
+
+function formatToolDescription(tool: ToolGuide): string {
+  return tool.accessHint
+    ? `${tool.description} _Ask: ${tool.accessHint}_`
+    : tool.description;
+}
+
+function renderSlackSubsection(
+  onboardingPackage: OnboardingPackage
+): KnownBlock[] {
+  const slack = onboardingPackage.sections.slack;
+  const blocks: KnownBlock[] = [
+    header('Slack channels', 2),
+    section(slack.intro),
+  ];
+
+  groupByCategory(slack.channels, 'category').forEach(({category, items}) => {
+    blocks.push(header(category, 3));
+    chunkSlackChannelGuides(items).forEach((chunk) => {
+      blocks.push(section(formatSlackChannelChunk(chunk)));
+    });
+  });
+
+  return blocks;
+}
+
+function renderRitualsSubsection(
+  onboardingPackage: OnboardingPackage
+): KnownBlock[] {
+  const rituals = onboardingPackage.sections.rituals;
+  const blocks: KnownBlock[] = [header('Rituals', 2), paragraph(rituals.intro)];
+
+  groupByCategory(rituals.rituals, 'category').forEach(({category, items}) => {
+    blocks.push(header(category, 3));
     blocks.push(
       richText([
         richTextList(
           'bullet',
-          items.map((tool) => [
-            richTextText(tool.tool, {bold: true}),
-            richTextText(` — ${tool.description}`),
-            ...(tool.accessHint
-              ? [richTextText(` Ask: ${tool.accessHint}`, {italic: true})]
-              : []),
+          items.map((ritual) => [
+            richTextText(ritual.meeting, {bold: true}),
+            richTextText(` — ${ritual.description}`),
+            richTextText(
+              ` (${ritual.cadence}; ${ritual.attendance.toLowerCase()})`,
+              {italic: true}
+            ),
           ])
         ),
       ])
@@ -396,26 +487,90 @@ function renderToolsSection(
   return blocks;
 }
 
-function renderSlackSection(
+function renderLibrarySubsection(
   onboardingPackage: OnboardingPackage
 ): KnownBlock[] {
+  const resources = onboardingPackage.sections.engineeringResourceLibrary;
   const blocks: KnownBlock[] = [
-    header(onboardingPackage.sections.slack.title),
-    paragraph(onboardingPackage.sections.slack.intro),
+    header('Engineering resource library', 2),
+    paragraph(resources.intro),
   ];
 
-  groupByCategory(
-    onboardingPackage.sections.slack.channels,
-    'category'
-  ).forEach(({category, items}, index) => {
-    if (index > 0) {
-      blocks.push(divider());
-    }
+  if (resources.docs.length > 0) {
+    blocks.push(header('Core engineering docs', 3));
+    blocks.push(
+      richText([
+        richTextList(
+          'bullet',
+          resources.docs.map((doc) => [
+            ...(doc.url
+              ? [richTextLink(doc.url, doc.title, {bold: true})]
+              : [richTextText(doc.title, {bold: true})]),
+            richTextText(` — ${doc.description}`),
+          ])
+        ),
+      ])
+    );
+  }
 
-    blocks.push(section(formatChannels(items, category)));
-  });
+  const references = [
+    resources.references.teamPage,
+    resources.references.pillarPage,
+    resources.references.newHireGuide,
+  ].filter((reference): reference is ConfluenceLink => Boolean(reference));
+  if (references.length > 0) {
+    blocks.push(header('Team references', 3));
+    blocks.push(
+      richText([
+        richTextList(
+          'bullet',
+          references.map((reference) => [
+            richTextLink(reference.url, reference.title, {bold: true}),
+            richTextText(` — ${reference.summary}`),
+          ])
+        ),
+      ])
+    );
+  } else {
+    blocks.push(header('Team references', 3));
+    blocks.push(
+      paragraph(
+        "Ask your manager for a link to the team's Confluence space and the pillar overview page."
+      )
+    );
+  }
+
+  blocks.push(header('Codebase', 3));
+  blocks.push(
+    section(
+      `Explore the monorepo at <${WEBFLOW_REPO_URL}|github.com/webflow/webflow>. Your buddy and manager can point you to the areas that matter most for your team.`
+    )
+  );
 
   return blocks;
+}
+
+function chunkSlackChannelGuides(
+  channels: SlackChannelGuide[],
+  size = 8
+): SlackChannelGuide[][] {
+  return chunkList(channels, size);
+}
+
+function chunkList<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function formatSlackChannelChunk(channels: SlackChannelGuide[]): string {
+  return channels
+    .map((channel) => `• *${channel.channel}* — ${channel.description}`)
+    .join('\n');
 }
 
 function renderTasksSection(
@@ -444,110 +599,6 @@ function renderTasksSection(
           ),
         ]),
   ];
-}
-
-function renderRitualsSection(
-  onboardingPackage: OnboardingPackage
-): KnownBlock[] {
-  const blocks: KnownBlock[] = [
-    header(onboardingPackage.sections.rituals.title),
-    paragraph(onboardingPackage.sections.rituals.intro),
-  ];
-
-  groupByCategory(
-    onboardingPackage.sections.rituals.rituals,
-    'category'
-  ).forEach(({category, items}, index) => {
-    if (index > 0) {
-      blocks.push(divider());
-    }
-
-    blocks.push(header(category, 2));
-    blocks.push(
-      richText([
-        richTextList(
-          'bullet',
-          items.map((ritual) => [
-            richTextText(ritual.meeting, {bold: true}),
-            richTextText(` — ${ritual.description}`),
-            richTextText(
-              ` (${ritual.cadence}; ${ritual.attendance.toLowerCase()})`,
-              {italic: true}
-            ),
-          ])
-        ),
-      ])
-    );
-  });
-
-  return blocks;
-}
-
-function renderLibrarySection(
-  onboardingPackage: OnboardingPackage
-): KnownBlock[] {
-  const resources = onboardingPackage.sections.engineeringResourceLibrary;
-  const blocks: KnownBlock[] = [
-    header(resources.title),
-    paragraph(resources.intro),
-  ];
-
-  if (resources.docs.length > 0) {
-    blocks.push(header('Core engineering docs', 2));
-    blocks.push(
-      richText([
-        richTextList(
-          'bullet',
-          resources.docs.map((doc) => [
-            ...(doc.url
-              ? [richTextLink(doc.url, doc.title, {bold: true})]
-              : [richTextText(doc.title, {bold: true})]),
-            richTextText(` — ${doc.description}`),
-          ])
-        ),
-      ])
-    );
-  }
-
-  const references = [
-    resources.references.teamPage,
-    resources.references.pillarPage,
-    resources.references.newHireGuide,
-  ].filter((reference): reference is ConfluenceLink => Boolean(reference));
-  if (references.length > 0) {
-    blocks.push(divider());
-    blocks.push(header('Focused team references', 2));
-    blocks.push(
-      richText([
-        richTextList(
-          'bullet',
-          references.map((reference) => [
-            richTextLink(reference.url, reference.title, {bold: true}),
-            richTextText(` — ${reference.summary}`),
-          ])
-        ),
-      ])
-    );
-  }
-
-  blocks.push(divider());
-  blocks.push(header('Key repo paths', 2));
-  blocks.push(
-    resources.keyPaths.length > 0
-      ? richText([
-          richTextList(
-            'bullet',
-            resources.keyPaths.map((keyPath) => [
-              richTextText(keyPath, {code: true}),
-            ])
-          ),
-        ])
-      : paragraph(
-          "Team-owned paths aren't listed yet. Ask your buddy which code paths matter most in the first month."
-        )
-  );
-
-  return blocks;
 }
 
 function buildMilestoneListItem(
@@ -581,12 +632,15 @@ function formatChecklistItemBlock(
   status: StatusValue
 ): string {
   const statusDot = formatChecklistStatusEmoji(status);
-  const kindBadge = formatChecklistKindEmoji(item.kind);
   const title = item.resourceUrl
-    ? `<${item.resourceUrl}|${item.label}>`
+    ? `*<${item.resourceUrl}|${item.label}>*`
     : `*${item.label}*`;
+  const notesLine = item.notes ? `\n${item.notes}` : '';
+  const typeLine = `\nType: ${formatChecklistKindEmoji(item.kind)} ${formatChecklistKindLabel(
+    item.kind
+  )}`;
 
-  return `${statusDot} ${kindBadge} ${title}\n${item.notes}`;
+  return `${statusDot} ${title}${notesLine}${typeLine}`;
 }
 
 function formatChecklistStatusEmoji(status: StatusValue): string {
@@ -612,6 +666,21 @@ function formatChecklistKindEmoji(kind: ChecklistItem['kind']): string {
       return '📚';
     case 'recording':
       return '🎥';
+  }
+}
+
+function formatChecklistKindLabel(kind: ChecklistItem['kind']): string {
+  switch (kind) {
+    case 'task':
+      return 'Task';
+    case 'live-training':
+      return 'Live Training';
+    case 'workramp':
+      return 'WorkRamp';
+    case 'reading':
+      return 'Reading Material';
+    case 'recording':
+      return 'Recording';
   }
 }
 
@@ -696,8 +765,4 @@ function groupByCategory<T extends {category: string}>(
     category,
     items: groupedItems,
   }));
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }

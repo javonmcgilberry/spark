@@ -140,39 +140,45 @@ export function formatKeyPaths(
 }
 
 export function countCompletedInSection(
-  section: ChecklistSection,
+  checklistSection: ChecklistSection,
   itemStatuses: Record<string, ChecklistItemStatus>
 ): number {
-  return section.items.filter(
+  return checklistSection.items.filter(
     (_, itemIndex) =>
-      itemStatuses[buildChecklistItemStatusKey(section.id, itemIndex)] ===
-      'completed'
+      itemStatuses[
+        buildChecklistItemStatusKey(checklistSection.id, itemIndex)
+      ] === 'completed'
   ).length;
 }
 
 export function formatChecklistItem(item: ChecklistItem): string {
+  const notesSuffix = item.notes ? ` — ${item.notes}` : '';
   if (!hasChecklistResource(item)) {
-    return `• *${item.label}* — ${item.notes}`;
+    return `• *${item.label}*${notesSuffix}`;
   }
   if (!item.resourceLabel || item.resourceLabel === item.label) {
-    return `• ${formatChecklistResourceLink(item)} — ${item.notes}`;
+    return `• ${formatChecklistResourceLink(item)}${notesSuffix}`;
   }
-  return `• *${item.label}* — ${item.notes}\n  ${formatChecklistResourceLink(item)}`;
+  return `• *${item.label}*${notesSuffix}\n  ${formatChecklistResourceLink(item)}`;
 }
 
 export function formatCanvasChecklistItem(item: ChecklistItem): string[] {
   if (!hasChecklistResource(item)) {
-    return [`- [ ] ${item.label}`, `  - ${item.notes}`];
+    return item.notes
+      ? [`- [ ] ${item.label}`, `  - ${item.notes}`]
+      : [`- [ ] ${item.label}`];
   }
   if (!item.resourceLabel || item.resourceLabel === item.label) {
-    return [
-      `- [ ] ${formatCanvasChecklistResourceLink(item)}`,
-      `  - ${item.notes}`,
-    ];
+    return item.notes
+      ? [
+          `- [ ] ${formatCanvasChecklistResourceLink(item)}`,
+          `  - ${item.notes}`,
+        ]
+      : [`- [ ] ${formatCanvasChecklistResourceLink(item)}`];
   }
   return [
     `- [ ] ${item.label}`,
-    `  - ${item.notes}`,
+    ...(item.notes ? [`  - ${item.notes}`] : []),
     `  - ${formatCanvasChecklistResourceLink(item)}`,
   ];
 }

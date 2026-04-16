@@ -22,6 +22,10 @@ const envSchema = z.object({
   confluenceApiToken: z.string().optional(),
   confluenceBaseUrl: z.string().url().optional(),
 
+  jiraBaseUrl: z.string().url().optional(),
+  jiraApiEmail: z.string().optional(),
+  jiraApiToken: z.string().optional(),
+
   webflowMonorepoPath: z.string().default(defaultMonorepoPath),
 });
 
@@ -39,8 +43,13 @@ export function loadEnv(): EnvConfig {
     dxWarehouseDsn: process.env.DX_WAREHOUSE_DSN || undefined,
     confluenceApiToken: process.env.CONFLUENCE_API_TOKEN || undefined,
     confluenceBaseUrl: process.env.CONFLUENCE_BASE_URL || undefined,
+    jiraBaseUrl: process.env.JIRA_BASE_URL || undefined,
+    jiraApiEmail: process.env.JIRA_API_EMAIL || undefined,
+    jiraApiToken: process.env.JIRA_API_TOKEN || undefined,
     webflowMonorepoPath: process.env.WEBFLOW_MONOREPO_PATH || undefined,
   };
+
+  console.log("ENV", raw)
 
   const result = envSchema.safeParse(raw);
 

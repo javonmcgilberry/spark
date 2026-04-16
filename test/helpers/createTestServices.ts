@@ -20,7 +20,9 @@ import {CanvasService} from '../../src/services/canvasService.js';
 import {ConfluenceDocsService} from '../../src/services/confluenceDocsService.js';
 import {ConfluenceSearchService} from '../../src/services/confluenceSearchService.js';
 import {ContributionGuideService} from '../../src/services/contributionGuideService.js';
+import {GitHubService} from '../../src/services/githubService.js';
 import {IdentityResolver} from '../../src/services/identityResolver.js';
+import {JiraService} from '../../src/services/jiraService.js';
 import {JourneyService} from '../../src/services/journeyService.js';
 import {LlmService} from '../../src/services/llmService.js';
 import {OnboardingPackageService} from '../../src/services/onboardingPackageService.js';
@@ -55,7 +57,9 @@ export function createTestServices(
     logger,
     profile
   );
-  const llm = new LlmService(undefined, logger);
+  const github = new GitHubService(env, logger);
+  const jira = new JiraService(env, logger);
+  const llm = new LlmService(undefined, logger, undefined, {github, jira});
   const skillDiscovery = new SkillDiscoveryService();
   const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
   const taskScanner = new FixedTaskScannerService(
@@ -74,7 +78,8 @@ export function createTestServices(
     taskScanner,
     llm,
     contributionGuide,
-    onboardingPackages
+    onboardingPackages,
+    {github, jira}
   );
   const identityResolver = new TestIdentityResolver(
     env,
@@ -94,6 +99,8 @@ export function createTestServices(
     canvas,
     identityResolver,
     llm,
+    github,
+    jira,
     skillDiscovery,
     taskScanner,
     contributionGuide,
@@ -257,10 +264,14 @@ function personIdentifier(person: OnboardingPerson): string {
 function createTestEnv() {
   return {
     anthropicApiKey: undefined,
-    anthropicModel: undefined,
+    anthropicModel: 'claude-3-5-haiku-latest',
     confluenceApiToken: undefined,
     confluenceBaseUrl: 'https://example.atlassian.net/wiki',
     dxWarehouseDsn: undefined,
+    githubToken: undefined,
+    jiraBaseUrl: undefined,
+    jiraApiEmail: undefined,
+    jiraApiToken: undefined,
     port: 31337,
     slackAppToken: 'xapp-test',
     slackBotToken: 'xoxb-test',

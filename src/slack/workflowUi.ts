@@ -1,4 +1,5 @@
 import type {KnownBlock} from '@slack/types';
+import {CHECKLIST_SECTIONS} from '../onboarding/catalog.js';
 import type {OnboardingPackage, TeamProfile} from '../onboarding/types.js';
 import {actions, header, plainText, section} from './blockKit.js';
 
@@ -7,11 +8,43 @@ export const SPARK_CREATE_DRAFT_CALLBACK_ID = 'spark_create_draft_submit';
 export const SPARK_OPEN_DRAFT_EDIT_MODAL_ACTION_ID =
   'spark_open_draft_edit_modal';
 export const SPARK_EDIT_DRAFT_CALLBACK_ID = 'spark_edit_draft_submit';
+export const SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID =
+  'spark_open_add_checklist_item_modal';
+export const SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID =
+  'spark_add_checklist_item_submit';
 export const SPARK_PUBLISH_DRAFT_ACTION_ID = 'spark_publish_draft_package';
 export const SPARK_OPEN_CELEBRATION_SHARE_MODAL_ACTION_ID =
   'spark_open_celebration_share_modal';
 export const SPARK_SHARE_CELEBRATION_CALLBACK_ID =
   'spark_share_celebration_submit';
+
+const CHECKLIST_KIND_OPTIONS = [
+  {
+    text: plainText('✅ Task'),
+    value: 'task',
+  },
+  {
+    text: plainText('🗣️ Live Training'),
+    value: 'live-training',
+  },
+  {
+    text: plainText('🚀 WorkRamp'),
+    value: 'workramp',
+  },
+  {
+    text: plainText('📚 Reading Material'),
+    value: 'reading',
+  },
+  {
+    text: plainText('🎥 Recording'),
+    value: 'recording',
+  },
+] as const;
+
+const CHECKLIST_SECTION_OPTIONS = CHECKLIST_SECTIONS.map((sectionItem) => ({
+  text: plainText(sectionItem.title),
+  value: sectionItem.id,
+}));
 
 export function buildSparkCommandMenuBlocks(): KnownBlock[] {
   return [
@@ -93,6 +126,7 @@ export function buildDraftEditModal(pkg: OnboardingPackage) {
       userId !== pkg.managerUserId &&
       userId !== pkg.buddyUserId
   );
+  const customItemCount = pkg.customChecklistItems?.length ?? 0;
 
   return {
     type: 'modal' as const,
@@ -148,6 +182,90 @@ export function buildDraftEditModal(pkg: OnboardingPackage) {
           placeholder: plainText('Add a note to help them feel welcome'),
         },
       },
+      {
+        type: 'section' as const,
+        text: {
+          type: 'mrkdwn' as const,
+          text:
+            customItemCount > 0
+              ? `Need to tailor the checklist?\n_${customItemCount} custom checklist item${customItemCount === 1 ? '' : 's'} added so far._`
+              : 'Need to tailor the checklist?\n_Add a week-specific checklist item for this new hire._',
+        },
+        accessory: {
+          type: 'button' as const,
+          action_id: SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID,
+          text: plainText('Add checklist item'),
+          value: pkg.userId,
+        },
+      },
+    ],
+  };
+}
+
+export function buildAddChecklistItemModal(userId: string) {
+  return {
+    type: 'modal' as const,
+    callback_id: SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID,
+    private_metadata: userId,
+    title: plainText('Add checklist item'),
+    submit: plainText('Add item'),
+    close: plainText('Cancel'),
+    blocks: [
+      {
+        type: 'input' as const,
+        block_id: 'item_label',
+        label: plainText('Item name'),
+        element: {
+          type: 'plain_text_input' as const,
+          action_id: 'value',
+          placeholder: plainText('Add the checklist item title'),
+        },
+      },
+      {
+        type: 'input' as const,
+        block_id: 'item_kind',
+        label: plainText('Type'),
+        element: {
+          type: 'static_select' as const,
+          action_id: 'selected_kind',
+          placeholder: plainText('Choose a type'),
+          options: CHECKLIST_KIND_OPTIONS,
+        },
+      },
+      {
+        type: 'input' as const,
+        block_id: 'item_section',
+        label: plainText('Week'),
+        element: {
+          type: 'static_select' as const,
+          action_id: 'selected_section',
+          placeholder: plainText('Choose a week'),
+          options: CHECKLIST_SECTION_OPTIONS,
+        },
+      },
+      {
+        type: 'input' as const,
+        block_id: 'item_notes',
+        optional: true,
+        label: plainText('Notes'),
+        element: {
+          type: 'plain_text_input' as const,
+          action_id: 'value',
+          multiline: true,
+          placeholder: plainText('Add context or instructions for this item'),
+        },
+      },
+      {
+        type: 'input' as const,
+        block_id: 'item_resource_url',
+        optional: true,
+        label: plainText('Resource link'),
+        element: {
+          type: 'plain_text_input' as const,
+          action_id: 'value',
+          placeholder: plainText('https://...'),
+        },
+      },
     ],
   };
 }
@@ -159,7 +277,7 @@ export function buildDraftReadyBlocks(
   return [
     header('Draft ready to review'),
     section(
-      `Review the onboarding draft for <@${profile.userId}> here before you publish it. Use the buttons below for structured updates, and use the canvas for shared notes and context.${
+      `Review the onboarding draft for <@${profile.userId}> here before you publish it. Use the buttons below for structured updates, and use the canvas for shared notes and context.\n\nNeed to add custom checklist items? Open *Edit draft details* and use the *Add checklist item* button in that modal.${
         pkg.draftCanvasUrl
           ? `\n\n*Draft canvas:* <${pkg.draftCanvasUrl}|Open canvas>`
           : ''

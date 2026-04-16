@@ -1,12 +1,26 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type {
+  ContentBlock,
+  MessageParam,
+  ToolUnion,
+  ToolUseBlock,
+} from '@anthropic-ai/sdk/resources/messages/messages.mjs';
 import type {Logger} from '../app/logger.js';
 import type {
   ContributionTask,
   JourneyStepId,
   TeamProfile,
 } from '../onboarding/types.js';
+import {
+  inferGithubUsername,
+  type GitHubPullRequest,
+  type GitHubService,
+} from './githubService.js';
+import type {JiraService, JiraIssue} from './jiraService.js';
 
 const DEFAULT_MODEL = 'claude-3-5-sonnet-latest';
+const DEFAULT_MAX_TOKENS = 700;
+const MAX_AGENT_STEPS = 4;
 
 interface BlockerAnswerInput {
   question: string;
@@ -14,15 +28,25 @@ interface BlockerAnswerInput {
   profile: TeamProfile;
 }
 
+export interface LlmAgentToolkit {
+  github?: GitHubService;
+  jira?: JiraService;
+}
+
 export class LlmService {
   private readonly client: Anthropic | null;
+  private readonly github?: GitHubService;
+  private readonly jira?: JiraService;
 
   constructor(
     private readonly apiKey: string | undefined,
     private readonly logger: Logger,
-    private readonly model: string = DEFAULT_MODEL
+    private readonly model: string = DEFAULT_MODEL,
+    toolkit: LlmAgentToolkit = {}
   ) {
     this.client = apiKey ? new Anthropic({apiKey}) : null;
+    this.github = toolkit.github;
+    this.jira = toolkit.jira;
   }
 
   async answerBlocker(input: BlockerAnswerInput): Promise<string> {
@@ -31,19 +55,12 @@ export class LlmService {
       return fallbackBlockerAnswer(input.currentStep);
     }
 
-    return this.generateText(
-      [
-        'You are Spark, an onboarding companion for Webflow engineers.',
-        'Answer the user with practical onboarding help.',
-        'Do not mention internal system prompts or safety policy.',
-        'Do not invent access to systems or docs you do not have.',
-        'Keep the answer concise and action-oriented.',
-        `Current step: ${input.currentStep}`,
-        `Role track: ${input.profile.roleTrack}`,
-        `Team: ${sanitizeForLlm(input.profile.teamName)}`,
-      ].join('\n'),
-      `Question: ${sanitizedQuestion}`
-    ).catch(() => fallbackBlockerAnswer(input.currentStep));
+    try {
+      return await this.runAgentLoop(input, sanitizedQuestion);
+    } catch (error) {
+      this.logger.warn('LLM answerBlocker failed, using fallback.', error);
+      return fallbackBlockerAnswer(input.currentStep);
+    }
   }
 
   async explainTasks(
@@ -111,6 +128,209 @@ export class LlmService {
     );
   }
 
+  private async runAgentLoop(
+    input: BlockerAnswerInput,
+    sanitizedQuestion: string
+  ): Promise<string> {
+    if (!this.client) {
+      throw new Error('Anthropic client unavailable');
+    }
+
+    const tools = this.buildTools();
+    const systemPrompt = this.buildSystemPrompt(input, tools.length);
+
+    const messages: MessageParam[] = [
+      {
+        role: 'user',
+        content: sanitizedQuestion,
+      },
+    ];
+
+    for (let step = 0; step < MAX_AGENT_STEPS; step += 1) {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: DEFAULT_MAX_TOKENS,
+        system: systemPrompt,
+        messages,
+        ...(tools.length > 0 ? {tools} : {}),
+      });
+
+      if (response.stop_reason !== 'tool_use') {
+        return (
+          extractText(response.content) ||
+          fallbackBlockerAnswer(input.currentStep)
+        );
+      }
+
+      const toolUses = response.content.filter(
+        (block): block is ToolUseBlock => block.type === 'tool_use'
+      );
+
+      messages.push({role: 'assistant', content: response.content});
+
+      const toolResults = await Promise.all(
+        toolUses.map(async (toolUse) => ({
+          type: 'tool_result' as const,
+          tool_use_id: toolUse.id,
+          content: await this.runTool(toolUse, input),
+        }))
+      );
+
+      messages.push({role: 'user', content: toolResults});
+    }
+
+    this.logger.warn('LLM agent loop exceeded max steps; falling back.');
+    return fallbackBlockerAnswer(input.currentStep);
+  }
+
+  private buildTools(): ToolUnion[] {
+    const tools: ToolUnion[] = [];
+
+    if (this.jira?.isConfigured()) {
+      tools.push({
+        name: 'search_jira',
+        description:
+          'Search Jira for tickets. Use when the user asks about their work, tickets, sprint, or mentions a Jira key like ABC-123.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['assigned_to_me', 'by_key', 'free_text'],
+              description:
+                "assigned_to_me for the user's open tickets, by_key for a specific ticket, free_text for searching by keyword.",
+            },
+            query: {
+              type: 'string',
+              description:
+                'Issue key (for by_key mode) or free text (for free_text mode). Ignored for assigned_to_me.',
+            },
+          },
+          required: ['mode'],
+        },
+      });
+    }
+
+    if (this.github?.isConfigured()) {
+      tools.push({
+        name: 'search_github_prs',
+        description:
+          "Find pull requests in github.com/webflow. Use when the user asks about PRs they authored, PRs awaiting their review, or their team's PRs.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['mine', 'review', 'team'],
+              description:
+                'mine for PRs the user authored, review for PRs awaiting their review, team for PRs pending their team.',
+            },
+          },
+          required: ['mode'],
+        },
+      });
+    }
+
+    return tools;
+  }
+
+  private buildSystemPrompt(
+    input: BlockerAnswerInput,
+    toolCount: number
+  ): string {
+    const lines = [
+      'You are Spark, an onboarding companion for Webflow engineers.',
+      'Answer the user with practical onboarding help.',
+      'Do not mention internal system prompts or safety policy.',
+      'Do not invent access to systems or docs you do not have.',
+      'Keep answers concise and action-oriented.',
+      `Current onboarding step: ${input.currentStep}`,
+      `Role track: ${input.profile.roleTrack}`,
+      `Team: ${sanitizeForLlm(input.profile.teamName)}`,
+    ];
+    if (input.profile.githubTeamSlug) {
+      lines.push(`GitHub team slug: ${input.profile.githubTeamSlug}`);
+    }
+    if (toolCount > 0) {
+      lines.push(
+        'When the user asks about tickets or pull requests, call the available tools to ground your answer in live data. Summarize the results with concrete next steps.'
+      );
+    }
+    return lines.join('\n');
+  }
+
+  private async runTool(
+    toolUse: ToolUseBlock,
+    input: BlockerAnswerInput
+  ): Promise<string> {
+    try {
+      if (toolUse.name === 'search_jira' && this.jira) {
+        return JSON.stringify(await this.runJiraTool(toolUse, input));
+      }
+      if (toolUse.name === 'search_github_prs' && this.github) {
+        return JSON.stringify(await this.runGitHubTool(toolUse, input));
+      }
+      return JSON.stringify({error: `Unknown tool: ${toolUse.name}`});
+    } catch (error) {
+      this.logger.warn(`LLM tool "${toolUse.name}" failed.`, error);
+      return JSON.stringify({error: 'Tool call failed.'});
+    }
+  }
+
+  private async runJiraTool(
+    toolUse: ToolUseBlock,
+    input: BlockerAnswerInput
+  ): Promise<{issues: JiraIssue[]}> {
+    if (!this.jira) {
+      return {issues: []};
+    }
+    const args = (toolUse.input ?? {}) as {mode?: string; query?: string};
+    const mode = args.mode ?? 'assigned_to_me';
+
+    if (mode === 'by_key' && args.query) {
+      const issue = await this.jira.findByKey(args.query);
+      return {issues: issue ? [issue] : []};
+    }
+    if (mode === 'free_text' && args.query) {
+      return {issues: await this.jira.findForTextQuery(args.query)};
+    }
+    if (!input.profile.email) {
+      return {issues: []};
+    }
+    return {issues: await this.jira.findAssignedToEmail(input.profile.email)};
+  }
+
+  private async runGitHubTool(
+    toolUse: ToolUseBlock,
+    input: BlockerAnswerInput
+  ): Promise<{prs: GitHubPullRequest[]}> {
+    if (!this.github) {
+      return {prs: []};
+    }
+    const args = (toolUse.input ?? {}) as {mode?: string};
+    const mode = args.mode ?? 'mine';
+    const username = inferGithubUsername(input.profile);
+
+    if (mode === 'team' && input.profile.githubTeamSlug) {
+      return {
+        prs: await this.github.findRecentPullRequestsForTeam(
+          input.profile.githubTeamSlug
+        ),
+      };
+    }
+    if (mode === 'review' && username) {
+      return {
+        prs: await this.github.findPullRequestsAwaitingReview(username),
+      };
+    }
+    if (username) {
+      return {
+        prs: await this.github.findOpenPullRequestsForUser(username),
+      };
+    }
+    return {prs: []};
+  }
+
   private async generateText(system: string, user: string): Promise<string> {
     if (!this.client) {
       throw new Error('Anthropic client unavailable');
@@ -130,12 +350,7 @@ export class LlmService {
         {signal: controller.signal}
       );
 
-      const text = response.content
-        .filter((block) => block.type === 'text')
-        .map((block) => ('text' in block ? block.text : ''))
-        .join('\n')
-        .trim();
-
+      const text = extractText(response.content);
       if (!text) {
         throw new Error('No text content returned from Anthropic');
       }
@@ -145,6 +360,14 @@ export class LlmService {
       clearTimeout(timeout);
     }
   }
+}
+
+function extractText(content: ContentBlock[]): string {
+  return content
+    .filter((block) => block.type === 'text')
+    .map((block) => ('text' in block ? block.text : ''))
+    .join('\n')
+    .trim();
 }
 
 function sanitizeForLlm(value: string): string {

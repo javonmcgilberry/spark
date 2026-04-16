@@ -3,13 +3,9 @@ export type RoleTrack = 'frontend' | 'backend' | 'infrastructure' | 'general';
 export const HOME_SECTION_IDS = [
   'welcome',
   'onboarding-checklist',
-  '30-60-90-plan',
   'people-to-meet',
-  'tools-access-checklist',
-  'slack',
+  'resources',
   'initial-engineering-tasks',
-  'rituals',
-  'engineering-resource-library',
 ] as const;
 
 export type HomeSectionId = (typeof HOME_SECTION_IDS)[number];
@@ -47,6 +43,7 @@ export interface ChecklistItem {
   notes: string;
   resourceLabel?: string;
   resourceUrl?: string;
+  sectionId?: string;
 }
 
 export interface ChecklistSection {
@@ -256,6 +253,7 @@ export interface OnboardingPackage {
   draftCanvasUrl?: string;
   publishedAt?: string;
   publishedByUserId?: string;
+  customChecklistItems?: ChecklistItem[];
   createdAt: string;
   updatedAt: string;
   sections: {
@@ -277,6 +275,7 @@ export interface JourneyState {
   completedSteps: JourneyStepId[];
   activeHomeSection: HomeSectionId;
   itemStatuses: Record<string, ChecklistItemStatus>;
+  toolAccess: Record<string, boolean>;
   tasks: ContributionTask[];
   taskExplanation?: string;
   tasksUpdatedAt?: string;

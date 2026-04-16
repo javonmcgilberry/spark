@@ -2,9 +2,13 @@ import type {App} from '@slack/bolt';
 import type {Services} from '../../app/services.js';
 import {
   buildHomeView,
+  buildToolAccessKey,
   HOME_CHECKLIST_ACTION_ID,
   HOME_NAV_ACTION_ID,
+  HOME_TOOL_ACCESS_ACTION_ID,
   parseChecklistItemActionId,
+  slugifyToolCategory,
+  TOOL_CHECKBOX_CHUNK_SIZE,
 } from '../../onboarding/homeBlocks.js';
 import {
   buildChecklistItemStatusKey,
@@ -121,6 +125,87 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
       await syncSharedOnboardingWorkspace(app, services, body.user.id, client);
     }
   );
+
+  app.action(
+    new RegExp(`^${HOME_TOOL_ACCESS_ACTION_ID}:`),
+    async ({ack, body, client, action}) => {
+      await ack();
+
+      if (
+        action.type !== 'checkboxes' ||
+        !Array.isArray(action.selected_options)
+      ) {
+        return;
+      }
+
+      const prepared = await loadPublishedPreparedOrRepublish(
+        app,
+        services,
+        client,
+        body.user.id
+      );
+      if (!prepared?.onboardingPackage) {
+        return;
+      }
+
+      const selectedValues = new Set(
+        action.selected_options
+          .map((option) =>
+            typeof option?.value === 'string' ? option.value : undefined
+          )
+          .filter((value): value is string => Boolean(value))
+      );
+
+      const allCategoryValues = collectToolAccessValuesForAction(
+        prepared.onboardingPackage,
+        typeof action.action_id === 'string' ? action.action_id : ''
+      );
+
+      const state = services.journey.setToolAccessForKeys(
+        body.user.id,
+        allCategoryValues,
+        selectedValues
+      );
+
+      await publishHomeView(
+        services,
+        client,
+        body.user.id,
+        buildHomeView(prepared.onboardingPackage, state)
+      );
+    }
+  );
+}
+
+function collectToolAccessValuesForAction(
+  onboardingPackage: PreparedJourneyData['onboardingPackage'],
+  actionId: string
+): string[] {
+  if (!onboardingPackage) {
+    return [];
+  }
+
+  const parts = actionId.split(':');
+  if (parts.length < 3) {
+    return [];
+  }
+
+  const categorySlug = parts[1];
+  const chunkIndex = Number(parts[2]);
+  if (!categorySlug || Number.isNaN(chunkIndex)) {
+    return [];
+  }
+
+  const tools = onboardingPackage.sections.toolsAccess.tools.filter(
+    (tool) => slugifyToolCategory(tool.category) === categorySlug
+  );
+  if (tools.length === 0) {
+    return [];
+  }
+
+  const chunkStart = chunkIndex * TOOL_CHECKBOX_CHUNK_SIZE;
+  const chunk = tools.slice(chunkStart, chunkStart + TOOL_CHECKBOX_CHUNK_SIZE);
+  return chunk.map((tool) => buildToolAccessKey(tool.category, tool.tool));
 }
 
 async function loadPublishedPreparedOrRepublish(

@@ -229,3 +229,47 @@ export function statusSelect(actionId: string, currentStatus: StatusValue) {
       STATUS_OPTIONS[0],
   };
 }
+
+export interface CheckboxOption {
+  label: string;
+  description?: string;
+  value: string;
+}
+
+export function checkboxes(
+  actionId: string,
+  options: CheckboxOption[],
+  selectedValues: string[] = []
+): KnownBlock {
+  const blockOptions = options.map((option) => ({
+    text: {
+      type: 'mrkdwn' as const,
+      text: `*${option.label}*`,
+    },
+    ...(option.description
+      ? {
+          description: {
+            type: 'mrkdwn' as const,
+            text: option.description,
+          },
+        }
+      : {}),
+    value: option.value,
+  }));
+
+  const initialOptions = blockOptions.filter((option) =>
+    selectedValues.includes(option.value)
+  );
+
+  return {
+    type: 'actions',
+    elements: [
+      {
+        type: 'checkboxes',
+        action_id: actionId,
+        options: blockOptions,
+        ...(initialOptions.length > 0 ? {initial_options: initialOptions} : {}),
+      },
+    ],
+  } as KnownBlock;
+}

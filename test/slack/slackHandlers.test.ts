@@ -4,15 +4,18 @@ import {describe, expect, it, vi} from 'vitest';
 import {
   HOME_CHECKLIST_ACTION_ID,
   HOME_NAV_ACTION_ID,
+  HOME_TOOL_ACCESS_ACTION_ID,
 } from '../../src/onboarding/homeBlocks.js';
 import {HOME_SECTION_IDS} from '../../src/onboarding/types.js';
 import {registerActionHandlers} from '../../src/slack/handlers/actions.js';
 import {registerCommandHandlers} from '../../src/slack/handlers/commands.js';
 import {registerHomeTabHandlers} from '../../src/slack/handlers/homeTab.js';
 import {
+  SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID,
   SPARK_CREATE_DRAFT_CALLBACK_ID,
   SPARK_EDIT_DRAFT_CALLBACK_ID,
   SPARK_OPEN_CELEBRATION_SHARE_MODAL_ACTION_ID,
+  SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID,
   SPARK_OPEN_DRAFT_EDIT_MODAL_ACTION_ID,
   SPARK_PUBLISH_DRAFT_ACTION_ID,
   SPARK_SHARE_CELEBRATION_CALLBACK_ID,
@@ -271,6 +274,104 @@ describe('Slack handlers', () => {
     ).toBe(true);
   });
 
+  it('adds custom checklist items through the draft modal flow', async () => {
+    const {profile, services} = createTestServices();
+    const slack = createFakeSlackClient();
+    const app = createFakeBoltApp(slack.client);
+    registerActionHandlers(app.app, services);
+    registerHomeTabHandlers(app.app, services);
+    const managerUserId = profile.manager.slackUserId!;
+
+    await services.onboardingPackages.createDraftPackage({
+      profile,
+      createdByUserId: managerUserId,
+      slackClient: slack.client,
+    });
+
+    await app.invokeAction(SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID, {
+      ack: vi.fn(async () => undefined),
+      body: {trigger_id: 'TRIGGER_ADD'},
+      client: slack.client,
+      action: {
+        type: 'button',
+        value: profile.userId,
+      },
+    });
+
+    expect(slack.calls.viewsPush.at(-1)?.view).toMatchObject({
+      callback_id: SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID,
+      private_metadata: profile.userId,
+    });
+
+    await app.invokeView(SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID, {
+      ack: vi.fn(async () => undefined),
+      body: {user: {id: managerUserId}},
+      view: {
+        private_metadata: profile.userId,
+        state: {
+          values: {
+            item_label: {
+              value: {value: 'Review launch checklist'},
+            },
+            item_kind: {
+              selected_kind: {
+                selected_option: {value: 'reading'},
+              },
+            },
+            item_section: {
+              selected_section: {
+                selected_option: {value: 'week2-workflows'},
+              },
+            },
+            item_notes: {
+              value: {value: 'Skim the launch docs before sprint planning.'},
+            },
+            item_resource_url: {
+              value: {value: 'docs.webflow.com/launch-checklist'},
+            },
+          },
+        },
+      },
+      client: slack.client,
+    });
+
+    const pkg = services.onboardingPackages.getPackageForUser(profile.userId);
+    expect(pkg?.customChecklistItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: 'Review launch checklist',
+          kind: 'reading',
+          sectionId: 'week2-workflows',
+          resourceUrl: 'https://docs.webflow.com/launch-checklist',
+        }),
+      ])
+    );
+
+    services.onboardingPackages.publishPackage(profile.userId, managerUserId);
+
+    await app.invokeEvent('app_home_opened', {
+      event: {
+        tab: 'home',
+        user: profile.userId,
+      },
+      client: slack.client,
+    });
+
+    await app.invokeAction(`${HOME_NAV_ACTION_ID}:onboarding-checklist`, {
+      ack: vi.fn(async () => undefined),
+      body: {user: {id: profile.userId}},
+      client: slack.client,
+      action: {
+        type: 'button',
+        value: 'onboarding-checklist',
+      },
+    });
+
+    expect(collectViewText(slack.calls.viewsPublish.at(-1))).toContain(
+      'Review launch checklist'
+    );
+  });
+
   it('opens the celebration share modal and reports private-channel posting errors', async () => {
     const {profile, services} = createTestServices();
     const slack = createFakeSlackClient();
@@ -432,9 +533,21 @@ describe('Slack handlers', () => {
       ).toBeLessThan(100);
     }
 
-    expect(collectViewText(slack.calls.viewsPublish.at(-1))).toContain(
-      'Key repo paths'
-    );
+    await app.invokeAction(`${HOME_NAV_ACTION_ID}:resources`, {
+      ack: vi.fn(async () => undefined),
+      body: {user: {id: profile.userId}},
+      client: slack.client,
+      action: {
+        type: 'button',
+        value: 'resources',
+      },
+    });
+    const resourcesText = collectViewText(slack.calls.viewsPublish.at(-1));
+    expect(resourcesText).toContain('Tools access');
+    expect(resourcesText).toContain('Slack channels');
+    expect(resourcesText).toContain('Rituals');
+    expect(resourcesText).toContain('Engineering resource library');
+    expect(resourcesText).toContain('github.com/webflow/webflow');
 
     const firstChecklistSection = services.onboardingPackages.getPackageForUser(
       profile.userId
@@ -480,6 +593,53 @@ describe('Slack handlers', () => {
       )
     ).toBe('completed');
     expect(slack.calls.canvasesEdit.length).toBeGreaterThan(0);
+  });
+
+  it('persists tool-access checkboxes when toggled on the Resources tab', async () => {
+    const {profile, services} = createTestServices();
+    const slack = createFakeSlackClient();
+    const app = createFakeBoltApp(slack.client);
+    registerHomeTabHandlers(app.app, services);
+    const managerUserId = profile.manager.slackUserId!;
+
+    await services.onboardingPackages.createDraftPackage({
+      profile,
+      createdByUserId: managerUserId,
+      slackClient: slack.client,
+    });
+    services.onboardingPackages.publishPackage(profile.userId, managerUserId);
+
+    await app.invokeEvent('app_home_opened', {
+      event: {tab: 'home', user: profile.userId},
+      client: slack.client,
+    });
+
+    await app.invokeAction(`${HOME_NAV_ACTION_ID}:resources`, {
+      ack: vi.fn(async () => undefined),
+      body: {user: {id: profile.userId}},
+      client: slack.client,
+      action: {type: 'button', value: 'resources'},
+    });
+
+    const generalChunkActionId = `${HOME_TOOL_ACCESS_ACTION_ID}:general:0`;
+    await app.invokeAction(generalChunkActionId, {
+      ack: vi.fn(async () => undefined),
+      body: {user: {id: profile.userId}},
+      client: slack.client,
+      action: {
+        type: 'checkboxes',
+        action_id: generalChunkActionId,
+        selected_options: [{value: 'general::okta'}, {value: 'general::slack'}],
+      },
+    });
+
+    const selected = getCheckboxInitialValues(
+      slack.calls.viewsPublish.at(-1),
+      generalChunkActionId
+    );
+    expect(selected).toEqual(
+      expect.arrayContaining(['general::okta', 'general::slack'])
+    );
   });
 
   it('routes welcome actions into guided step and people replies', async () => {
@@ -716,6 +876,34 @@ function getSectionAccessoryInitialValue(
   return typeof initialOption?.value === 'string'
     ? initialOption.value
     : undefined;
+}
+
+function getCheckboxInitialValues(
+  publishCall: Record<string, unknown> | undefined,
+  actionId: string
+): string[] {
+  for (const block of collectViewBlocks(publishCall)) {
+    const elements = Array.isArray(block.elements) ? block.elements : [];
+    for (const element of elements) {
+      if (!isRecord(element)) {
+        continue;
+      }
+      if (element.action_id !== actionId || element.type !== 'checkboxes') {
+        continue;
+      }
+      const initial = Array.isArray(element.initial_options)
+        ? element.initial_options
+        : [];
+      return initial
+        .map((option) =>
+          isRecord(option) && typeof option.value === 'string'
+            ? option.value
+            : undefined
+        )
+        .filter((value): value is string => Boolean(value));
+    }
+  }
+  return [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

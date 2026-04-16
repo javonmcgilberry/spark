@@ -1,7 +1,13 @@
 import type {App, BlockAction} from '@slack/bolt';
 import type {KnownBlock} from '@slack/types';
 import type {Services} from '../../app/services.js';
-import {isJourneyStepId, type TeamProfile} from '../../onboarding/types.js';
+import {buildChecklistForProfile} from '../../onboarding/catalog.js';
+import {
+  isJourneyStepId,
+  type ChecklistItem,
+  type ChecklistItemKind,
+  type TeamProfile,
+} from '../../onboarding/types.js';
 import {
   publishPreparedHome,
   syncSharedOnboardingWorkspace,
@@ -10,12 +16,15 @@ import {formatSlackError, hasSlackErrorCode} from '../platformError.js';
 import {
   buildCelebrationShareBlocks,
   buildCelebrationShareModal,
+  buildAddChecklistItemModal,
   buildDraftEditModal,
   buildDraftReadyBlocks,
   buildDraftSetupModal,
+  SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID,
   SPARK_CREATE_DRAFT_CALLBACK_ID,
   SPARK_EDIT_DRAFT_CALLBACK_ID,
   SPARK_OPEN_CELEBRATION_SHARE_MODAL_ACTION_ID,
+  SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID,
   SPARK_OPEN_DRAFT_EDIT_MODAL_ACTION_ID,
   SPARK_OPEN_DRAFT_MODAL_ACTION_ID,
   SPARK_PUBLISH_DRAFT_ACTION_ID,
@@ -53,6 +62,26 @@ export function registerActionHandlers(app: App, services: Services): void {
       await client.views.open({
         trigger_id: body.trigger_id,
         view: buildDraftEditModal(pkg),
+      });
+    }
+  );
+
+  app.action<BlockAction>(
+    SPARK_OPEN_ADD_CHECKLIST_ITEM_MODAL_ACTION_ID,
+    async ({ack, body, client, action}) => {
+      await ack();
+      if (action.type !== 'button' || !action.value || !body.trigger_id) {
+        return;
+      }
+
+      const pkg = onboardingPackages.getPackageForUser(action.value);
+      if (!pkg || pkg.status !== 'draft') {
+        return;
+      }
+
+      await client.views.push({
+        trigger_id: body.trigger_id,
+        view: buildAddChecklistItemModal(action.value),
       });
     }
   );
@@ -148,6 +177,81 @@ export function registerActionHandlers(app: App, services: Services): void {
       text: `Your draft for ${profile.displayName} has been updated.`,
     });
   });
+
+  app.view(
+    SPARK_ADD_CHECKLIST_ITEM_CALLBACK_ID,
+    async ({ack, body, view, client}) => {
+      await ack();
+      const newHireId = view.private_metadata;
+      if (!newHireId) {
+        return;
+      }
+
+      const pkg = onboardingPackages.getPackageForUser(newHireId);
+      if (!pkg || pkg.status !== 'draft') {
+        return;
+      }
+
+      const state = view.state.values;
+      const label = state.item_label?.value?.value?.trim();
+      const kindValue = state.item_kind?.selected_kind?.selected_option?.value;
+      const sectionId =
+        state.item_section?.selected_section?.selected_option?.value;
+      if (
+        !label ||
+        !isChecklistItemKind(kindValue) ||
+        !sectionId ||
+        !pkg.sections.onboardingChecklist.sections.some(
+          (section) => section.id === sectionId
+        )
+      ) {
+        return;
+      }
+
+      const notes = state.item_notes?.value?.value?.trim() ?? '';
+      const resourceUrl = normalizeResourceUrl(
+        state.item_resource_url?.value?.value?.trim()
+      );
+      const profile = await identityResolver.resolveFromSlack(app, newHireId);
+      const customItem: ChecklistItem = {
+        label,
+        kind: kindValue,
+        notes,
+        sectionId,
+        ...(resourceUrl ? {resourceUrl} : {}),
+      };
+
+      pkg.customChecklistItems = [
+        ...(pkg.customChecklistItems ?? []),
+        customItem,
+      ];
+      pkg.sections.onboardingChecklist.sections = buildChecklistForProfile(
+        profile,
+        pkg.customChecklistItems
+      );
+      pkg.updatedAt = new Date().toISOString();
+
+      await canvas.syncDraftWorkspace(client, pkg, profile);
+
+      const sectionTitle =
+        pkg.sections.onboardingChecklist.sections.find(
+          (section) => section.id === sectionId
+        )?.title ?? 'the checklist';
+      const confirmationText = `Added checklist item "${label}" to ${sectionTitle}.`;
+
+      if (pkg.draftChannelId) {
+        await client.chat.postMessage({
+          channel: pkg.draftChannelId,
+          text: confirmationText,
+        });
+      }
+
+      await client.chat.postMessage({
+        channel: body.user.id,
+        text: confirmationText,
+      });
+    }
+  );
 
   app.action(
     SPARK_PUBLISH_DRAFT_ACTION_ID,
@@ -419,6 +523,30 @@ async function postThreadMessage(
     blocks,
     ...(threadTs ? {thread_ts: threadTs} : {}),
   });
+}
+
+function isChecklistItemKind(
+  value: string | undefined
+): value is ChecklistItemKind {
+  return (
+    value === 'task' ||
+    value === 'live-training' ||
+    value === 'workramp' ||
+    value === 'reading' ||
+    value === 'recording'
+  );
+}
+
+function normalizeResourceUrl(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (/^[a-z]+:\/\//i.test(value) || value.startsWith('mailto:')) {
+    return value;
+  }
+
+  return `https://${value}`;
 }
 
 const TEST_CHANNEL_NAME = 'spark-test';

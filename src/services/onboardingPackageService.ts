@@ -2,6 +2,7 @@ import type {App} from '@slack/bolt';
 import type {Logger} from '../app/logger.js';
 import {buildOnboardingPackageSections} from '../onboarding/catalog.js';
 import type {
+  ChecklistItem,
   OnboardingPackage,
   OnboardingPerson,
   OnboardingPersonKind,
@@ -219,6 +220,9 @@ export class OnboardingPackageService {
       ...stakeholderUserIds,
       ...(preserveExistingReviewers ? (existing?.reviewerUserIds ?? []) : []),
     ]);
+    const customChecklistItems = (existing?.customChecklistItems ?? []).map(
+      cloneChecklistItem
+    );
 
     return {
       userId: profile.userId,
@@ -237,6 +241,7 @@ export class OnboardingPackageService {
       draftCanvasUrl: existing?.draftCanvasUrl,
       publishedAt: existing?.publishedAt,
       publishedByUserId: existing?.publishedByUserId,
+      customChecklistItems,
       createdAt,
       updatedAt: new Date().toISOString(),
       sections: buildOnboardingPackageSections({
@@ -248,6 +253,7 @@ export class OnboardingPackageService {
         people: peopleWithGuides,
         tasks: existing?.sections.initialEngineeringTasks.tasks ?? [],
         welcomeNote: resolvedWelcomeNote,
+        customChecklistItems,
       }),
     };
   }
@@ -296,6 +302,10 @@ function dedupePeople(people: OnboardingPerson[]): OnboardingPerson[] {
     result.push(person);
   }
   return result;
+}
+
+function cloneChecklistItem(item: ChecklistItem): ChecklistItem {
+  return {...item};
 }
 
 function dedupeUserIds(values: Array<string | undefined>): string[] {

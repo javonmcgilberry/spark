@@ -33,6 +33,12 @@ interface ConfluenceSearchResult {
 interface ConfluenceQuery {
   phrases: string[];
   summary: string;
+  /**
+   * Lowercased title prefixes to skip when scoring results. Useful for
+   * avoiding tech specs, RFCs, and post-mortems when we really want a
+   * canonical team or pillar home page.
+   */
+  excludeTitlePrefixes?: string[];
 }
 
 export class ConfluenceSearchService {
@@ -62,10 +68,13 @@ export class ConfluenceSearchService {
       this.searchFirst(
         {
           phrases: [
-            `${profile.teamName} team`,
-            `${profile.teamName} onboarding`,
+            `${profile.teamName} team home`,
+            `${profile.teamName} home`,
+            `${profile.teamName} team overview`,
+            `${profile.teamName} team page`,
           ],
-          summary: `Canonical team page for ${profile.teamName}.`,
+          summary: `Canonical team home for ${profile.teamName}.`,
+          excludeTitlePrefixes: ['tech spec', 'rfc', 'pia', 'post-mortem'],
         },
         email
       ),
@@ -73,10 +82,12 @@ export class ConfluenceSearchService {
         ? this.searchFirst(
             {
               phrases: [
-                `${profile.pillarName} engineering`,
-                `${profile.pillarName} pillar`,
+                `${profile.pillarName} pillar home`,
+                `${profile.pillarName} pillar overview`,
+                `${profile.pillarName} pillar page`,
               ],
-              summary: `Canonical pillar page for ${profile.pillarName}.`,
+              summary: `Canonical pillar home for ${profile.pillarName}.`,
+              excludeTitlePrefixes: ['tech spec', 'rfc', 'pia', 'post-mortem'],
             },
             email
           )
@@ -144,11 +155,12 @@ export class ConfluenceSearchService {
     query: ConfluenceQuery,
     email: string
   ): Promise<ConfluenceLink | undefined> {
+    const exclude = query.excludeTitlePrefixes ?? [];
     for (const phrase of query.phrases) {
       const cacheKey = `${email}|${phrase}`.toLowerCase();
       const cached = this.cache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
-        if (cached.value) {
+        if (cached.value && !isExcludedByTitle(cached.value, exclude)) {
           return cached.value;
         }
         continue;
@@ -159,7 +171,7 @@ export class ConfluenceSearchService {
         value: match,
         expiresAt: Date.now() + CONFLUENCE_CACHE_TTL_MS,
       });
-      if (match) {
+      if (match && !isExcludedByTitle(match, exclude)) {
         return match;
       }
     }
@@ -271,4 +283,17 @@ function stripHtml(value?: string): string {
 
 function personKey(person: OnboardingPerson): string {
   return (person.slackUserId || person.email || person.name).toLowerCase();
+}
+
+function isExcludedByTitle(
+  link: ConfluenceLink,
+  excludePrefixes: string[]
+): boolean {
+  if (excludePrefixes.length === 0) {
+    return false;
+  }
+  const normalized = link.title.toLowerCase();
+  return excludePrefixes.some((prefix) =>
+    normalized.startsWith(prefix.toLowerCase())
+  );
 }

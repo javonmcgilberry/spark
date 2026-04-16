@@ -5,7 +5,9 @@ import {CanvasService} from '../services/canvasService.js';
 import {ConfluenceDocsService} from '../services/confluenceDocsService.js';
 import {ConfluenceSearchService} from '../services/confluenceSearchService.js';
 import {ContributionGuideService} from '../services/contributionGuideService.js';
+import {GitHubService} from '../services/githubService.js';
 import {IdentityResolver} from '../services/identityResolver.js';
+import {JiraService} from '../services/jiraService.js';
 import {JourneyService} from '../services/journeyService.js';
 import {LlmService} from '../services/llmService.js';
 import {OnboardingPackageService} from '../services/onboardingPackageService.js';
@@ -24,6 +26,8 @@ export interface Services {
   canvas: CanvasService;
   identityResolver: IdentityResolver;
   llm: LlmService;
+  github: GitHubService;
+  jira: JiraService;
   skillDiscovery: SkillDiscoveryService;
   taskScanner: TaskScannerService;
   contributionGuide: ContributionGuideService;
@@ -37,7 +41,12 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
   const docs = new ConfluenceDocsService(env);
   const confluenceSearch = new ConfluenceSearchService(env, logger);
   const canvas = new CanvasService(logger);
-  const llm = new LlmService(env.anthropicApiKey, logger, env.anthropicModel);
+  const github = new GitHubService(env, logger);
+  const jira = new JiraService(env, logger);
+  const llm = new LlmService(env.anthropicApiKey, logger, env.anthropicModel, {
+    github,
+    jira,
+  });
   const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
   const skillDiscovery = new SkillDiscoveryService();
   const taskScanner = new TaskScannerService(skillDiscovery, statsig, codebase);
@@ -52,7 +61,8 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     taskScanner,
     llm,
     contributionGuide,
-    onboardingPackages
+    onboardingPackages,
+    {github, jira}
   );
 
   return {
@@ -65,6 +75,8 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     canvas,
     identityResolver,
     llm,
+    github,
+    jira,
     skillDiscovery,
     taskScanner,
     contributionGuide,

@@ -1,4 +1,5 @@
 import type {
+  ChecklistItem,
   ChecklistSection,
   ContributionTask,
   DocLink,
@@ -30,39 +31,35 @@ export const HOME_SECTION_TABS: Array<{
 }> = [
   {id: 'welcome', label: 'Welcome'},
   {id: 'onboarding-checklist', label: 'Checklist'},
-  {id: '30-60-90-plan', label: '30/60/90'},
   {id: 'people-to-meet', label: 'People'},
-  {id: 'tools-access-checklist', label: 'Tools'},
-  {id: 'slack', label: 'Slack'},
+  {id: 'resources', label: 'Resources'},
   {id: 'initial-engineering-tasks', label: 'Tasks'},
-  {id: 'rituals', label: 'Rituals'},
-  {id: 'engineering-resource-library', label: 'Library'},
 ];
 
 const WELCOME_JOURNEY_MILESTONES: WelcomeJourneyMilestone[] = [
   {
-    label: 'Week 1',
-    goal: 'Meet the team, complete HR tasks, set up tools, and build foundational product knowledge.',
+    label: 'Week 1: Meet the Team & Setup',
+    goal: 'Meet the team, complete HR tasks, set up tools, and build foundational knowledge.',
   },
   {
-    label: 'Week 2',
-    goal: 'Learn core engineering workflows, development expectations, and career-growth context.',
+    label: 'Week 2: Intro to Eng Workflows',
+    goal: 'Learn about core engineering workflows and engineering career growth.',
   },
   {
-    label: 'Week 3',
-    goal: 'Apply technical knowledge by making a first contribution and learning how your team owns software.',
+    label: 'Week 3: First Contribution & Scaling Up',
+    goal: 'Apply technical knowledge by contributing code and dive into role-specific training and onboarding.',
   },
   {
-    label: 'Week 4',
-    goal: 'Operate more independently, contribute meaningfully, and start engineering citizenship habits.',
+    label: 'Week 4: Project Onboarding & Eng Citizenship',
+    goal: 'Operate independently, contribute meaningfully, and start career development discussions.',
   },
   {
     label: '60 Days',
-    goal: 'Ship meaningful code, follow team workflows confidently, and grow operational confidence.',
+    goal: 'Ship meaningful code, understand engineering workflows, participate in team processes, and develop operational confidence.',
   },
   {
     label: '90 Days',
-    goal: 'Own complex work, collaborate cross-functionally, and suggest process improvements.',
+    goal: 'Own and deliver complex tasks, collaborate cross-functionally, and contribute to process improvements.',
   },
 ];
 
@@ -76,60 +73,59 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         label: 'Complete HR & Workday tasks',
         kind: 'task',
         notes:
-          'Handle the first-day Workday tasks immediately, then keep checking for the next wave as onboarding continues.',
+          "You'll have Workday tasks assigned to you. Some will be timely to complete on the first day and others will continue to be assigned as you complete tasks. Workday is accessed via Okta.",
       },
       {
         label: 'Participate in your onboarding cohort',
         kind: 'live-training',
         notes:
-          'These cohort sessions take priority while you are onboarding. Keep the calendar invites visible and ask questions live.',
+          "A company-wide cohort of new joiners will go through the onboarding process together. You should have invites to your sessions already in Google Calendar. While you're onboarding these sessions take priority over other meetings.",
       },
       {
         label: 'Begin required e-learning trainings',
         kind: 'workramp',
         notes:
-          'WorkRamp is part of the standard onboarding path. Start early so it does not pile up beside technical ramp-up.',
+          'As part of onboarding, your cohort will be instructed to complete trainings in our training platform, WorkRamp. Feel free to get started - it can be accessed via Okta.',
       },
       {
         label: 'Meet with your engineering manager',
         kind: 'task',
         notes:
-          'Your manager should schedule time on day one. Use it to align on expectations, support, and the first few weeks.',
+          'Your engineering manager will schedule time with you on your first day. Please be sure to prioritize this meeting!',
       },
       {
         label: 'Complete Webflow 101',
-        kind: 'workramp',
+        kind: 'task',
         resourceUrl: 'https://university.webflow.com/courses/webflow-101',
         notes:
-          'Finish the Webflow University course by the end of week one so the product vocabulary feels familiar in engineering conversations.',
+          "You may have already finished this as part of your e-learning trainings, but if not make sure you've finished this Webflow University course by the end of week 1!",
       },
       {
         label: 'Start Secure Code Warrior training',
-        kind: 'workramp',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/SEC/pages/1224933772/Secure+Code+Warrior+Training+-+New+Hire+FAQ',
         notes:
-          'You have 30 days to complete it, but starting now keeps it from becoming lingering background debt.',
+          'You have 30 days to complete this training. Find Secure Code Warrior in your Okta Dashboard or via an invite sent to your email. Once done, mark the task as done in Workday.',
       },
       {
         label: 'Meet with your onboarding buddy',
         kind: 'task',
         notes:
-          'Use this meeting for the day-to-day questions that do not belong in a formal doc.',
+          "Set up time with your onboarding buddy to hear more about life at Webflow. They're a great resource for questions about the day-to-day as a Webflower.",
       },
       {
         label: 'Meet with your engineering teammates',
         kind: 'task',
         notes:
-          'Grab 15-30 minute intros with teammates so names, ownership, and current work stop feeling abstract.',
+          "Grab 15-30 minutes with your engineering teammates for casual introductions now that you've arrived!",
       },
       {
         label: 'Add the engineering calendar to your Google calendar',
         kind: 'task',
         resourceUrl:
           'https://calendar.google.com/calendar/u/0?cid=d2ViZmxvdy5jb21fOGdmdnIzcGMwOXJtOWtpZ2I3cTA3cGVrdHNAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ',
-        notes:
-          'Subscribe early so company, engineering, and team rituals show up in one place.',
+        notes: 'Press the link and follow the steps.',
       },
       {
         label: 'Request access to tools & systems',
@@ -138,29 +134,28 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/134087310/Supporting+Software+Setup',
         notes:
-          'Most tools come through Okta. For missing permissions, ask @Flowbot in Slack for the specific tool you need.',
+          'You should have access to most tools within Okta. For additional access, you can request in @Flowbot for new permissions. There is a bot which will help you; just ask "Can I have access to {tool}?" and instructions will follow.\n\nDon\'t stress about getting access to all of these tools by the end of week 1. Aiming to get most access by week 3 is great!',
       },
       {
         label: 'Read through systems diagrams',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/623280258/System+Diagrams',
         notes:
-          'Focus on the interactions between services, databases, caching, and infrastructure before you start tracing code.',
+          'Understand service interactions, database design, caching, and infrastructure.',
       },
       {
         label: 'Orient yourself with the engineering org chart',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/1071448164/Engineering+Org+Charts+by+Team+Pillar',
-        notes:
-          'Use the org chart to understand how pillars and teams map to product ownership.',
+        notes: 'You can explore our org charts pillar by pillar on this page.',
       },
       {
         label: 'Explore and join 3 relevant Slack channels',
         kind: 'task',
         notes:
-          'Join broad channels like #engineering, then add the team and specialty channels that matter for your role.',
+          'Explore your Slack setup and join a few new channels like #engineering, #epd, and #released.',
       },
     ],
   },
@@ -171,11 +166,11 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
     items: [
       {
         label: 'Continue Secure Code Warrior training',
-        kind: 'workramp',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/SEC/pages/1224933772/Secure+Code+Warrior+Training+-+New+Hire+FAQ',
         notes:
-          'Keep it moving so the 30-day completion window does not sneak up on you.',
+          'You have 30 days to complete this training. Find Secure Code Warrior in your Okta Dashboard. Once finished, mark the task as done in Workday.',
       },
       {
         label: 'Continue regular meetings with your manager & onboarding buddy',
@@ -189,21 +184,21 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         resourceLabel: 'Okta dashboard',
         resourceUrl: 'https://webflow.okta.com/app/UserHome',
         notes:
-          'If you hit missing access during setup, keep using @Flowbot and close the gaps before contribution work starts.',
+          'You should have access to most tools within Okta. For additional access, you can request in @Flowbot for new permissions. There is a bot which will help you; just ask "Can I have access to {tool}?" and instructions will follow.',
       },
       {
         label: 'Schedule meetings with additional team members',
         kind: 'task',
         notes:
-          'Use week two to learn who owns what and where your likely focus area intersects their work.',
+          'Continue to get to know your partners and start learning about your focus area.',
       },
       {
-        label: 'Explore the feature & service team mapping structure',
-        kind: 'reading',
+        label: 'Explore and learn our feature & service team mapping structure',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/440697869/Feature+Service+Team+Mapping',
         notes:
-          'Understand how Webflow organizes EPDI pillars, feature teams, and service ownership before you get assigned scoped work.',
+          "Our EPDI (Engineering, Product, Design, and Insight) teams are organized into pillars based on product surface areas. These pillars own different parts of our product, which you'll see in the table in the linked wiki.",
       },
       {
         label: 'Read the Webflow Codex and engineering best practices',
@@ -214,12 +209,12 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
           'This is the architectural and workflow baseline that keeps engineers on the development golden path.',
       },
       {
-        label: 'Read and follow the Webflow platform overview',
-        kind: 'reading',
+        label: 'Read and follow the steps in our Webflow platform overview',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/140051185/Webflow+Platform+Overview',
         notes:
-          'Use the platform overview to start building a mental model for how the product and monorepo fit together.',
+          'Following the steps in the platform overview will help you build a mental model of Webflow.',
       },
       {
         label: 'Set up your local development environment',
@@ -227,62 +222,59 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/139985579/Local+Development+Setup',
         notes:
-          'Complete local setup now and use the troubleshooting guide or #triage-build-loop if anything feels cursed.',
+          'Set up your local development environment. For questions, reference the troubleshooting guide or ask questions in #triage-build-loop.',
       },
       {
         label: 'Profile Webflow server & renderer performance locally',
-        kind: 'recording',
+        kind: 'reading',
         resourceUrl:
           'https://www.loom.com/share/b5798b46089647ffa800cbad626baac0',
         notes:
-          'Even if you do not run a performance investigation yet, the local profiling workflow is worth learning early.',
+          "Step-by-step instructions to locally profile Webflow's server and renderer processes using Chrome DevTools. This guide helps you identify and analyze CPU hotspots, enabling performance investigations without needing Datadog access or special permissions.",
       },
       {
-        label: 'Get started with Cursor & Augment',
+        label: 'Get started with Cursor & Augment, our AI codegen tools',
         kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/DP/pages/1056212669/Cursor+and+Augment+Code+AI+Codegen+tools+Getting+Started',
-        notes:
-          'Ask @Flowbot for access, then get comfortable with the AI-assisted development workflow the team already uses.',
+        notes: 'Ask @Flowbot in Slack for an invite to both Cursor & Augment.',
       },
       {
-        label: 'Learn how to write code in the monorepo',
-        kind: 'reading',
+        label: 'Learn how to write code and read about our monorepo',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/608109081/How+to+write+code+at+Webflow',
         notes:
-          'Use the monorepo guide as your high-level entry point for standards, paths, and common development flows.',
+          'This document aims to provide context and guidance in all aspects of coding within a single high-level entrypoint for new developers to onboard.',
       },
       {
-        label: 'Read the intro to Webflow Design Language (WFDL)',
+        label: 'Read our intro to Webflow Design Language (WFDL)',
         kind: 'reading',
         resourceUrl: 'https://webflow.com/blog/webflow-design-language',
         notes:
-          'This is foundational context for how Webflow models the product and visual authoring experience.',
+          'Webflow Design Language (WFDL) is an extensible, integrated language powering no-code software with a visual-first authoring experience.',
       },
       {
-        label: 'Review additional WFDL resources',
-        kind: 'reading',
+        label: 'Here are more WFDL resources you can peruse',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/596803922/Webflow+Design+Language+WFDL',
-        notes:
-          'Use the extra reading when your team or onboarding buddy points you toward relevant rendering or editor areas.',
+        notes: 'Additional WFDL resources to get you started.',
       },
       {
         label: 'Learn how to contribute code in GitHub',
         kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/140149407/Github+Development+Processes+i.e.+How+to+contribute+code',
-        notes:
-          'Review draft PRs, review routing, stacked work, and the repo’s contribution expectations before you pick a task.',
+        notes: 'Learn about our GitHub development processes.',
       },
       {
         label: 'Understand the build & deploy process',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/40140883/Build+Deploy+Process',
         notes:
-          'Familiarize yourself with CI/CD, deployment workflows, and where to look when a build breaks.',
+          'Familiarize yourself with our CI/CD pipeline and deployment workflows.',
       },
       {
         label: 'Learn how to debug unit & integration tests',
@@ -302,7 +294,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         label: 'Participate in team standups & sprint planning',
         kind: 'task',
         notes:
-          'Use ceremonies to understand current sprint goals, backlog shape, and how the team talks about work.',
+          "Engage in team processes and ceremonies. Learn about the team's current sprint goals and backlog.",
       },
     ],
   },
@@ -313,17 +305,16 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
     items: [
       {
         label: 'Read the onboarding resources for your track',
-        kind: 'reading',
-        notes:
-          'Pick the frontend, backend, or infrastructure startup materials that match your current role and go deeper there.',
+        kind: 'task',
+        notes: 'A startup guide and additional resources for your track.',
       },
       {
         label: 'Explore engineering career growth paths and promo processes',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/folder/1058799996',
         notes:
-          'Use this context to shape better growth conversations with your manager as onboarding continues.',
+          'Plan your career goals with your manager to help structure growth discussions in week 4.',
       },
       {
         label: 'Schedule meetings with remaining key team members',
@@ -336,20 +327,19 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/140149407/Github+Development+Processes+i.e.+How+to+contribute+code',
-        notes:
-          'Re-read it right before your first PR so the review and merge mechanics are fresh.',
+        notes: 'Learn about our GitHub development processes.',
       },
       {
         label: 'Reference the build & deploy process again',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/40140883/Build+Deploy+Process',
         notes:
-          'Your first contribution will land more smoothly if the CI and deploy path already feel familiar.',
+          'Familiarize yourself with our CI/CD pipeline and deployment workflows.',
       },
       {
         label: 'Re-read debugging guidance for unit & integration tests',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/DP/pages/744816814/Guide+run+watch+and+debug+Unit+and+Integration+tests',
         notes:
@@ -359,11 +349,11 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         label: 'Make your first contribution from a small Jira ticket',
         kind: 'task',
         notes:
-          'Start with a scoped bug fix or enhancement that teaches repo flow, review expectations, and collaboration patterns without overwhelming you.',
+          'Fix a small bug or contribute to a minor enhancement. Your engineering manager will assign this task. Follow our feature development lifecycle (code, test, deploy). Collaborate with your onboarding buddy to work through the process.',
       },
       {
         label: 'Learn the feature development process',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/700613064/Feature+Development+Rituals',
         notes:
@@ -371,23 +361,23 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Review the EPDI OKRs',
-        kind: 'reading',
+        kind: 'task',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/1140457967/FY26+Q1+OKR+Updates',
         notes:
-          'This is how your work ladders up to pillar and company priorities.',
+          'Each pillar has a swimlane on the linked Jira board. Read more about company-wide OKR progress here.',
       },
       {
         label: 'Participate in a sprint retro',
         kind: 'task',
         notes:
-          'Share onboarding feedback while your first few weeks are still fresh and specific.',
+          'Share onboarding feedback about your experience during a team retro. Discuss what worked well and what could be improved.',
       },
       {
         label: 'Document and improve an engineering process',
         kind: 'task',
         notes:
-          'New hires notice onboarding and workflow gaps faster than anyone else. Write down one improvement while you still have fresh eyes.',
+          'Update internal docs based on your onboarding experience. New hires often have the freshest perspective on gaps in onboarding documentation.',
       },
     ],
   },
@@ -402,39 +392,39 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/798425098/Pull+Requests+Code+Reviews',
         notes:
-          'Focus on how reviewers talk about maintainability, security, performance, and scope.',
+          'Focus on maintainability, security, and performance improvements.',
       },
       {
         label: 'Shadow an on-call engineer',
         kind: 'task',
         notes:
-          'Use this to learn how the team handles incidents and operational pressure in real time.',
+          'Expand your understanding of incident response by shadowing an on-call engineer and learning how we handle real-time issues.',
       },
       {
         label: 'Attend Spring Bootcamp if required for your role',
-        kind: 'live-training',
+        kind: 'task',
         resourceLabel: 'Email Emily Hornberger',
         resourceUrl: 'mailto:emily.hornberger@webflow.com',
         notes:
-          'Frontend and fullstack engineers should attend the Spring training cohort once they are added to it.',
+          'Spring is our internal design system and is owned by the Spring Design System team on the Developer Productivity pillar. This mandatory 75-minute training teaches engineers to independently use Spring.\n\nEmily Hornberger will add you to this training around the 30-day mark.',
       },
       {
         label: 'Begin active work on your first project and workstreams',
         kind: 'task',
         notes:
-          'Transition from pure onboarding into active delivery work that contributes meaningfully to team goals.',
+          "Transition from onboarding to active project work by taking on engineering tasks that contribute meaningfully to the team's goals.",
       },
       {
         label: 'Have an onboarding milestone conversation with your manager',
         kind: 'task',
         notes:
-          'Use the milestone conversation to talk about what is going well, what is still fuzzy, and what should happen next.',
+          'Check in with your manager on how things are going in your onboarding process.',
       },
       {
         label: 'Reflect back on onboarding materials with new context',
-        kind: 'reading',
+        kind: 'task',
         notes:
-          'Return to the docs and notes that felt abstract in week one. They usually click differently after a few weeks of real work.',
+          'Take a look back at any notes or areas you marked to revisit. Additional context can make documentation take on new meaning.',
       },
     ],
   },
@@ -632,113 +622,334 @@ export const CHANNEL_GUIDES: SlackChannelGuide[] = [
   {
     category: 'Webflow',
     channel: '#webflow-announcements',
-    description: 'Where important company-wide announcements happen.',
+    description: 'Where important announcements happen.',
   },
   {
     category: 'Webflow',
     channel: '#webflow-culture',
-    description: 'Culture-related conversation relevant to the whole company.',
+    description:
+      'Culture-related content relevant to all Webflow team members.',
   },
   {
     category: 'Webflow',
     channel: '#webflow-company-events',
-    description: 'Follow and comment during company meetings and events.',
+    description: 'Channel to follow and comment during our Webflow meetings.',
   },
   {
     category: 'Webflow',
     channel: '#announce-usa',
-    description: 'US-focused official communications.',
+    description:
+      'A channel to reach out to all US-based employees, usually reserved for official comms.',
   },
   {
-    category: 'Culture',
+    category: 'Webflow',
     channel: '#props',
-    description: 'Public appreciation and thank-yous.',
+    description: 'Say thank you to someone.',
   },
   {
-    category: 'Culture',
+    category: 'Webflow',
     channel: '#webflow-celebrations',
-    description: 'Introductions, milestones, and life updates.',
+    description:
+      'Where new folks get introduced and updates on team members are shared.',
   },
   {
-    category: 'Culture',
-    channel: '#random',
-    description: 'A random channel for truly random things.',
-  },
-  {
-    category: 'Culture',
-    channel: '#remote-life',
-    description: 'Remote-work conversation, solidarity, and practical advice.',
-  },
-  {
-    category: 'Business',
+    category: 'Webflow',
     channel: '#sales-wins',
     description:
-      'Follow the customers, expansions, and enterprise momentum shaping demand.',
+      'A place where the Sales org shares the new customers joining or upgrading to Webflow Enterprise.',
   },
   {
-    category: 'Business',
+    category: 'Webflow',
     channel: '#mentions',
     description: 'Mentions of Webflow from around the web.',
   },
   {
-    category: 'Business',
+    category: 'Webflow',
     channel: '#made-in-webflow',
-    description: 'Sites and projects built in Webflow.',
+    description: 'Sites made in Webflow.',
   },
   {
-    category: 'Support',
+    category: 'Webflow',
+    channel: '#it-announcements',
+    description: 'All IT-related comms are shared here.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#random',
+    description: 'A random channel for random things.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#remote-life',
+    description:
+      'Talk about all the things that have to do with working remotely at Webflow, even if it is just venting.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#marketing',
+    description: 'Blog, landing pages, and general marketing topics.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#community',
+    description: 'Discussion of general community business or topics.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#education',
+    description: 'Public education team channel.',
+  },
+  {
+    category: 'Webflow',
     channel: '#support',
     description:
-      'Get help from the customer support team when you need product or account context.',
+      'A space for teams inside Webflow to get help from the Customer Support team.',
   },
   {
-    category: 'Support',
+    category: 'Webflow',
     channel: '#support-team-update',
-    description: 'Support-facing updates on changes, PRs, and process updates.',
+    description:
+      'A place to update the Support team about changes, PRs, processes, and other items.',
   },
   {
-    category: 'Internal Help',
+    category: 'Webflow',
+    channel: '#open-roles-announcements',
+    description:
+      'This channel is used to keep track of roles that are now open both internally and externally.',
+  },
+  {
+    category: 'Webflow',
+    channel: '#learning',
+    description:
+      'This channel is used to share Webflow learning resources, tools, and activities.',
+  },
+  {
+    category: 'Assistance',
     channel: '#help',
-    description: 'General questions when you are not sure where else to ask.',
+    description: 'For misc questions when you are not sure where else to ask.',
   },
   {
-    category: 'Internal Help',
+    category: 'Assistance',
     channel: '@Flowbot',
     description:
-      'Fastest way to request tool access, IT help, and common internal workflows.',
+      'The fastest way to reach out to IT. You can ask for access to tools here and Flowbot will automatically help you out.',
   },
   {
-    category: 'Internal Help',
+    category: 'Assistance',
     channel: '#benefits_q_and_a',
-    description: 'Questions about benefits and related employee support.',
+    description: 'Questions about your benefits? Ask here.',
+  },
+  {
+    category: 'Assistance',
+    channel: '#payroll_q_and_a',
+    description: 'Questions about payroll? Ask here.',
+  },
+  {
+    category: 'Assistance',
+    channel: '#finance_q_and_a',
+    description: 'Questions about finance? Ask here.',
+  },
+  {
+    category: 'Assistance',
+    channel: '#security',
+    description:
+      'Something weird with your equipment or a strange email from the CEO asking for help? This is the place to check things are alright.',
   },
   {
     category: 'Engineering',
     channel: '#engineering',
-    description: 'Broad engineering announcements and shared context.',
+    description: 'All things engineering.',
   },
   {
     category: 'Engineering',
-    channel: '#triage-build-loop',
-    description: 'Get help when the build or local environment gets weird.',
+    channel: '#engineering-announcements',
+    description: 'Engineering announcements.',
   },
   {
     category: 'Engineering',
-    channel: '#proj-agentflow',
+    channel: '#production-events',
     description:
-      'AI-native engineering workflows, automation, and agent discussion.',
+      'Channel for production coordination. If dev or merges are ever locked, this channel gets notified.',
   },
   {
-    category: 'Learning',
-    channel: '#open-roles-announcements',
+    category: 'Engineering',
+    channel: '#merge-queue-events',
     description:
-      'Follow internal and external role openings across the company.',
+      'Stay updated with all additions, removals, and essential notifications related to our merge queue.',
   },
   {
-    category: 'Learning',
-    channel: '#learning',
+    category: 'Engineering',
+    channel: '#secure-code-warriors',
     description:
-      'Share and discover learning resources, tools, and ongoing growth opportunities.',
+      'Ask questions and get answers about Secure Code Warrior training.',
+  },
+  {
+    category: 'Engineering',
+    channel: '#frontend',
+    description: 'Quick questions about our frontend code and patterns.',
+  },
+  {
+    category: 'Engineering',
+    channel: '#backend',
+    description: 'The place for backend discussions.',
+  },
+  {
+    category: 'Engineering',
+    channel: '#tech-specs',
+    description:
+      'Share your tech spec for engineering-wide visibility and collaboration.',
+  },
+  {
+    category: 'Engineering',
+    channel: '#tech-noodles',
+    description:
+      'Brainstorm on technical questions, concepts, and more with engineering.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#epd',
+    description: 'Engineering, Product, and Design announcements.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#released',
+    description:
+      'For all customer-facing feature launches. Check the bookmarks in-channel for how to use this space.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#small-wins',
+    description:
+      'Small win - massive impact. Share your small wins here. If it is a customer-facing feature, post it to #released.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#product-ideas',
+    description: 'A place to share product ideas for Webflow.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#ux-paper-cuts',
+    description: 'Submissions of small polish bugs.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#ok2-build-beta',
+    description: 'Channel for OK2 build and beta recaps and feedback.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#ok2-deprecate',
+    description: 'Channel for OK2 deprecate recaps.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#ok2-ga',
+    description: 'Channel for OK2 GA recaps and feedback.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#help-tier4',
+    description: 'Channel for questions on tier 4 launches.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#data',
+    description: 'All things data science and metrics.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#insights',
+    description:
+      'General discussion and coordination around research initiatives. If you need user research help, you can submit a ticket here: https://webflow.atlassian.net/browse/UR-1',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#accessibility',
+    description: 'Discuss anything related to accessibility at Webflow.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#design-system',
+    description:
+      'A place to discuss and ask questions about our internal design system, Spring.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#design',
+    description:
+      'A public channel to talk about design, share news, or cool stuff with the rest of the company.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#design-system-updates',
+    description: 'Updates from the Design System team.',
+  },
+  {
+    category: 'EPDI (Engineering, Product, Design)',
+    channel: '#user-research',
+    description:
+      'Reach out to our user researchers or join the latest conversations around user research at Webflow.',
+  },
+  {
+    category: 'Fun',
+    channel: '#good-morning',
+    description: 'A fun way to start the day.',
+  },
+  {
+    category: 'Fun',
+    channel: '#because-i-deserve-it',
+    description: 'Treat-yourself moments.',
+  },
+  {
+    category: 'Fun',
+    channel: '#trash-pandas',
+    description: 'Junk food enthusiasts.',
+  },
+  {
+    category: 'Fun',
+    channel: '#emoji',
+    description: 'New Slack emojis.',
+  },
+  {
+    category: 'Fun',
+    channel: '#books',
+    description: 'Discuss your latest reads.',
+  },
+  {
+    category: 'Fun',
+    channel: '#sci-fi-fantasy',
+    description: 'For sci-fi lovers.',
+  },
+  {
+    category: 'Fun',
+    channel: '#food',
+    description: 'Share your latest culinary accomplishments.',
+  },
+  {
+    category: 'Fun',
+    channel: '#dogs',
+    description: 'Dog photos and dog appreciation.',
+  },
+  {
+    category: 'Fun',
+    channel: '#cats',
+    description: 'Cat photos and cat appreciation.',
+  },
+  {
+    category: 'Fun',
+    channel: '#running',
+    description: 'Running chat and motivation.',
+  },
+  {
+    category: 'Fun',
+    channel: '#skiing',
+    description: 'Skiing chat.',
+  },
+  {
+    category: 'Fun',
+    channel: '#photography',
+    description: 'Photography chat.',
   },
 ];
 
@@ -893,7 +1104,10 @@ export function buildChecklist(): ChecklistSection[] {
   }));
 }
 
-function buildChecklistForProfile(profile: TeamProfile): ChecklistSection[] {
+export function buildChecklistForProfile(
+  profile: TeamProfile,
+  customChecklistItems: ChecklistItem[] = []
+): ChecklistSection[] {
   const checklist = buildChecklist();
   const trackDocId = TRACK_DOC_ID_BY_ROLE[profile.roleTrack];
   const trackDoc = trackDocId
@@ -908,6 +1122,24 @@ function buildChecklistForProfile(profile: TeamProfile): ChecklistSection[] {
     trackChecklistItem.resourceLabel = trackDoc.title;
     trackChecklistItem.resourceUrl = trackDoc.url;
   }
+
+  if (customChecklistItems.length > 0) {
+    for (const item of customChecklistItems) {
+      if (!item.sectionId) {
+        continue;
+      }
+
+      const targetSection = checklist.find(
+        (section) => section.id === item.sectionId
+      );
+      if (!targetSection) {
+        continue;
+      }
+
+      targetSection.items.push({...item});
+    }
+  }
+
   return checklist;
 }
 
@@ -984,6 +1216,7 @@ export function buildOnboardingPackageSections(params: {
   tasks?: ContributionTask[];
   people?: OnboardingPerson[];
   welcomeNote?: string;
+  customChecklistItems?: ChecklistItem[];
 }): OnboardingPackage['sections'] {
   const {
     profile,
@@ -991,8 +1224,9 @@ export function buildOnboardingPackageSections(params: {
     tasks = [],
     people = [profile.manager, profile.buddy, ...profile.teammates],
     welcomeNote,
+    customChecklistItems = [],
   } = params;
-  const checklist = buildChecklistForProfile(profile);
+  const checklist = buildChecklistForProfile(profile, customChecklistItems);
 
   return {
     welcome: {
@@ -1004,13 +1238,13 @@ export function buildOnboardingPackageSections(params: {
           label: 'Engineering Manager',
           owner: profile.manager,
           summary:
-            'Provides clear structure, support, milestone conversations, and guidance throughout onboarding.',
+            "I'm here to provide clear structure, support, and guidance throughout the onboarding process.\n\nWe'll stay closely synced during your first few weeks.",
         },
         {
           label: 'Onboarding Buddy',
           owner: profile.buddy,
           summary:
-            'Helps with day-to-day questions, codebase navigation, and practical team norms.',
+            "I'm here to help you develop, learn, and build understanding. I'll provide answers, guidance, and support as you join our team.\n\nWe'll also stay closely connected during your first few weeks.",
         },
       ],
       journeyMilestones: WELCOME_JOURNEY_MILESTONES.map((milestone) => ({
@@ -1044,7 +1278,7 @@ export function buildOnboardingPackageSections(params: {
     slack: {
       title: 'Slack',
       intro:
-        'Slack is where a lot of day-to-day context lives at Webflow. Start with the core channels, then add the team and specialty channels that matter most for your ramp.',
+        "In a remote-first culture, Slack is our lifeline when it comes to communication. Have a look around some common company and EPDI-specific Slack channels below. You will also have pillar- and team-specific channels to join so you can communicate with key stakeholders for the projects you'll work on.\n\nDo not hesitate to reach out to your manager, onboarding buddy, or your new-hire cohort Slack channel as you begin to ramp up in your new role. Check out some Slack guidance from our CTO, Allan Leinwand.",
       channels: profile.recommendedChannels.map((channel) => ({...channel})),
     },
     initialEngineeringTasks: {
@@ -1081,7 +1315,7 @@ function buildWelcomeIntro(profile: TeamProfile): string {
     ? `the ${profile.teamName} team within ${profile.pillarName}`
     : `the ${profile.teamName} team`;
 
-  return `You're joining ${teamContext}. Spark pulls together the people, docs, and week-by-week milestones that matter first, so your ramp feels guided, personal, and a lot less pieced together.`;
+  return `*Hi ${profile.firstName},*\n\nI want to extend a warm welcome to the team. I am thrilled to have you join the Engineering org and ${teamContext}. Your skills and experience will greatly benefit both you and the team in this new role.\n\nThis guide and the associated resources are meant to help you through your first few weeks. As your manager, please consider me your official guide. I am here for any and all questions you may have. We'll stay in close sync during your first few weeks and then settle into a regular weekly cadence. You are also joining a team of wonderful humans whose virtual doors are open for your questions.\n\nPlease be sure to take care of yourself through this process. Learning a new role is hard and takes a lot of brain power. We have access to Modern Health for coaching and support, as well as your Health & Productivity stipends. Do what you need to do to access the support you need throughout this process.\n\nI am so looking forward to working with you.\n\n- ${profile.manager.name}`;
 }
 
 function normalizeLabel(value: string): string {

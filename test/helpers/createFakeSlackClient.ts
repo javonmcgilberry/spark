@@ -32,6 +32,7 @@ export interface FakeSlackClientController {
     reactionsAdd: Array<Record<string, unknown>>;
     usersInfo: Array<Record<string, unknown>>;
     viewsOpen: Array<Record<string, unknown>>;
+    viewsPush: Array<Record<string, unknown>>;
     viewsPublish: Array<Record<string, unknown>>;
   };
   setChatPostMessageError(channelId: string, error: unknown): void;
@@ -65,6 +66,7 @@ export function createFakeSlackClient(
     reactionsAdd: [],
     usersInfo: [],
     viewsOpen: [],
+    viewsPush: [],
     viewsPublish: [],
   };
   const channels = new Map<
@@ -232,6 +234,13 @@ export function createFakeSlackClient(
         return {
           ok: true,
           view: {id: `V${String(calls.viewsOpen.length).padStart(6, '0')}`},
+        };
+      },
+      push: async (args: Record<string, unknown>) => {
+        calls.viewsPush.push(args);
+        return {
+          ok: true,
+          view: {id: `V${String(calls.viewsPush.length).padStart(6, '0')}`},
         };
       },
       publish: async (args: Record<string, unknown>) => {
