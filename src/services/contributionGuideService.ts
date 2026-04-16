@@ -22,11 +22,11 @@ export class ContributionGuideService {
     const prBodyDraft = await this.llmService.draftPullRequestBody(task);
 
     const steps = [
-      `*1. Make sure you have the repo cloned and the local environment running.*\nFollow the setup guide in the <https://webflow.atlassian.net/wiki/spaces/ENG/pages/39914077|Developer Onboarding> doc. The <https://webflow.atlassian.net/wiki/spaces/ENG/pages/2682421264|CDE Sandbox Quick-Start> is the fastest path if you haven't done local setup yet.`,
-      `*2. Create a Jira ticket for this work.*\nTicket title: \`${jiraTitle}\`\nDescription: ${jiraDescription}\nAsk your manager or buddy which board to create it on.`,
-      `*3. Create your branch* (use your ticket number once you have it):\n\`\`\`\ngit checkout -b <your-name>/<ticket-number>\n\`\`\`\nExample: \`git checkout -b ${branchName}\``,
-      `*4. Run the AgentFlow skill in Claude Code or Cursor:*\n\`\`\`\n${task.skillCommand}\n\`\`\`\nThe skill will walk you through the changes. Review the diff before committing.`,
-      `*5. Open a draft PR.* Here's a draft PR description to get you started:\n_Copy this into the PR body when you're ready._`,
+      `*1. Make sure the repo is cloned and your local environment is running.*\nFollow the setup guide in the <https://webflow.atlassian.net/wiki/spaces/ENG/pages/39914077|Developer Onboarding> doc. If you have not finished local setup yet, the <https://webflow.atlassian.net/wiki/spaces/ENG/pages/2682421264|CDE Sandbox Quick-Start> is the fastest way to get moving.`,
+      `*2. Create a Jira ticket for this work.*\nSuggested title: \`${jiraTitle}\`\nDescription: ${jiraDescription}\nIf you are not sure which board to use, your manager or buddy can point you in the right direction.`,
+      `*3. Create your branch.* Use your ticket number once you have it:\n\`\`\`\ngit checkout -b <your-name>/<ticket-number>\n\`\`\`\nExample: \`git checkout -b ${branchName}\``,
+      `*4. Run the AgentFlow skill in Claude Code or Cursor.*\n\`\`\`\n${task.skillCommand}\n\`\`\`\nThe skill will walk you through the change. Give the diff a quick review before you commit.`,
+      `*5. Open a draft PR.* Here's a draft PR description to help you get started:\n_Copy this into the PR body when you're ready._`,
     ];
 
     return {branchName, jiraTitle, jiraDescription, steps, prBodyDraft};

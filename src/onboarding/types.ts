@@ -26,7 +26,20 @@ export const JOURNEY_STEP_IDS = [
 
 export type JourneyStepId = (typeof JOURNEY_STEP_IDS)[number];
 
-export type ChecklistItemKind = 'task' | 'training' | 'resource';
+export type ChecklistItemKind =
+  | 'task'
+  | 'live-training'
+  | 'workramp'
+  | 'reading'
+  | 'recording';
+
+export const CHECKLIST_ITEM_STATUSES = [
+  'not-started',
+  'in-progress',
+  'completed',
+] as const;
+
+export type ChecklistItemStatus = 'not-started' | 'in-progress' | 'completed';
 
 export interface ChecklistItem {
   label: string;
@@ -263,7 +276,7 @@ export interface JourneyState {
   currentStep: JourneyStepId;
   completedSteps: JourneyStepId[];
   activeHomeSection: HomeSectionId;
-  completedChecklist: string[];
+  itemStatuses: Record<string, ChecklistItemStatus>;
   tasks: ContributionTask[];
   taskExplanation?: string;
   tasksUpdatedAt?: string;
@@ -285,4 +298,17 @@ export function isHomeSectionId(value: string): value is HomeSectionId {
 
 export function isJourneyStepId(value: string): value is JourneyStepId {
   return JOURNEY_STEP_IDS.some((step) => step === value);
+}
+
+export function buildChecklistItemStatusKey(
+  sectionId: string,
+  itemIndex: number
+): string {
+  return `${sectionId}:${itemIndex}`;
+}
+
+export function isChecklistItemStatus(
+  value: string
+): value is ChecklistItemStatus {
+  return CHECKLIST_ITEM_STATUSES.some((status) => status === value);
 }

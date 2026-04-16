@@ -4,6 +4,7 @@ import type {EnvConfig} from '../config/env.js';
 import type {Services} from '../app/services.js';
 import {buildHomePendingView, buildHomeView} from '../onboarding/homeBlocks.js';
 import {isJourneyStepId} from '../onboarding/types.js';
+import {publishHomeView} from '../slack/publishHome.js';
 
 export function createHttpServer(
   env: EnvConfig,
@@ -82,6 +83,35 @@ function registerTestHarness(
     );
   });
 
+  app.get('/test/home/publish', async (req, res) => {
+    const email = requiredQuery(req, 'email');
+    if (!email) {
+      respondMissingQuery(res, 'email');
+      return;
+    }
+    if (!slackClient) {
+      res.status(503).json({error: 'Slack client not available'});
+      return;
+    }
+
+    const profile = await identityResolver.resolveFromEmail(email, slackClient);
+    const prepared = await journey.prepareDashboard(profile);
+    const view =
+      prepared.onboardingPackage &&
+      prepared.onboardingPackage.status === 'published'
+        ? buildHomeView(prepared.onboardingPackage, prepared.state)
+        : buildHomePendingView(
+            onboardingPackages.getDraftsForReviewer(profile.userId)
+          );
+
+    await publishHomeView(services, slackClient, profile.userId, view);
+    res.json({
+      published: true,
+      userId: profile.userId,
+      blocks: view.blocks.length,
+    });
+  });
+
   app.get('/test/confluence', async (req, res) => {
     const email = requiredQuery(req, 'email');
     if (!email) {
@@ -105,10 +135,7 @@ function registerTestHarness(
     const createdByUserId =
       requiredQuery(req, 'createdByUserId') ?? profile.userId;
     const buddyUserId = requiredQuery(req, 'buddyUserId');
-    const stakeholderUserIds = requiredQuery(req, 'stakeholderUserIds')
-      ?.split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const stakeholderUserIds = listQuery(req, 'stakeholderUserIds');
     const welcomeNote = requiredQuery(req, 'welcomeNote');
 
     const pkg = await onboardingPackages.createDraftPackage({
@@ -119,6 +146,36 @@ function registerTestHarness(
       stakeholderUserIds,
       slackClient,
     });
+
+    res.json(pkg);
+  });
+
+  app.get('/test/draft/update', async (req, res) => {
+    const email = requiredQuery(req, 'email');
+    if (!email) {
+      respondMissingQuery(res, 'email');
+      return;
+    }
+
+    const profile = await identityResolver.resolveFromEmail(email, slackClient);
+    const createdByUserId =
+      requiredQuery(req, 'createdByUserId') ?? profile.userId;
+    const buddyUserId = requiredQuery(req, 'buddyUserId');
+    const stakeholderUserIds = listQuery(req, 'stakeholderUserIds');
+    const welcomeNote = requiredQuery(req, 'welcomeNote');
+    const pkg = await onboardingPackages.updateDraftPackage({
+      profile,
+      createdByUserId,
+      welcomeNote,
+      buddyUserId,
+      stakeholderUserIds,
+      slackClient,
+    });
+
+    if (!pkg) {
+      res.status(404).json({error: 'draft not found'});
+      return;
+    }
 
     res.json(pkg);
   });
@@ -201,11 +258,57 @@ function registerTestHarness(
     const answer = await journey.answerQuestion(profile, question);
     res.json({answer});
   });
+
+  app.get('/test/journey/task/select', async (req, res) => {
+    const email = requiredQuery(req, 'email');
+    const taskId = requiredQuery(req, 'taskId');
+    if (!email || !taskId) {
+      respondMissingQuery(res, 'email and taskId');
+      return;
+    }
+
+    const profile = await identityResolver.resolveFromEmail(email, slackClient);
+    const reply = journey.selectTask(profile, taskId);
+    res.json(reply);
+  });
+
+  app.get('/test/journey/task/confirm', async (req, res) => {
+    const email = requiredQuery(req, 'email');
+    if (!email) {
+      respondMissingQuery(res, 'email');
+      return;
+    }
+
+    const profile = await identityResolver.resolveFromEmail(email, slackClient);
+    const reply = await journey.confirmTask(profile);
+    if (slackClient) {
+      const prepared = await journey.prepareDashboard(profile);
+      if (
+        prepared.onboardingPackage &&
+        prepared.onboardingPackage.status === 'published'
+      ) {
+        await canvas.syncSharedProgress(
+          slackClient,
+          prepared.onboardingPackage,
+          prepared.state
+        );
+      }
+    }
+    res.json(reply);
+  });
 }
 
 function requiredQuery(req: express.Request, key: string): string | undefined {
   const value = req.query[key];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function listQuery(req: express.Request, key: string): string[] | undefined {
+  const value = requiredQuery(req, key);
+  return value
+    ?.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function respondMissingQuery(

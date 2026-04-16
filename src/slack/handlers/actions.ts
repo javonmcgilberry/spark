@@ -73,16 +73,25 @@ export function registerActionHandlers(app: App, services: Services): void {
       const stakeholderUserIds =
         state.stakeholders?.selected_users?.selected_users ?? [];
       const profile = await identityResolver.resolveFromSlack(app, newHireId);
+      const isSelfOnboarding = newHireId === body.user.id;
       const pkg = await onboardingPackages.createDraftPackage({
         profile,
         createdByUserId: body.user.id,
         welcomeNote,
         buddyUserId,
         stakeholderUserIds,
-        slackClient: client,
+        slackClient: isSelfOnboarding ? undefined : client,
       });
 
-      const reviewText = `Spark created a draft onboarding package for ${profile.displayName}.`;
+      if (isSelfOnboarding && !pkg.draftChannelId) {
+        const testChannel = await findTestChannel(client);
+        if (testChannel) {
+          pkg.draftChannelId = testChannel.id;
+          pkg.draftChannelName = testChannel.name;
+        }
+      }
+
+      const reviewText = `Your draft for ${profile.displayName} is ready to review.`;
       const reviewBlocks = buildDraftReadyBlocks(profile, pkg);
 
       if (pkg.draftChannelId) {
@@ -129,14 +138,14 @@ export function registerActionHandlers(app: App, services: Services): void {
     if (pkg.draftChannelId) {
       await client.chat.postMessage({
         channel: pkg.draftChannelId,
-        text: `Spark updated the draft onboarding package for ${profile.displayName}.`,
+        text: `Spark refreshed the draft for ${profile.displayName}.`,
         blocks: buildDraftReadyBlocks(profile, pkg),
       });
     }
 
     await client.chat.postMessage({
       channel: body.user.id,
-      text: `Updated the draft onboarding package for ${profile.displayName}.`,
+      text: `Your draft for ${profile.displayName} has been updated.`,
     });
   });
 
@@ -157,8 +166,8 @@ export function registerActionHandlers(app: App, services: Services): void {
           channel: body.user.id,
           text:
             publishResult.reason === 'not_manager'
-              ? 'Only the new hire’s manager can publish this onboarding package.'
-              : 'Spark could not find that onboarding draft anymore.',
+              ? "Only the new hire's manager can publish this onboarding plan."
+              : "Spark couldn't find that onboarding draft anymore.",
         });
         return;
       }
@@ -193,7 +202,7 @@ export function registerActionHandlers(app: App, services: Services): void {
       if (body.channel?.id) {
         await client.chat.postMessage({
           channel: body.channel.id,
-          text: `Published Spark onboarding for <@${action.value}>.`,
+          text: `Spark onboarding is live for <@${action.value}>.`,
         });
       }
     }
@@ -251,8 +260,8 @@ export function registerActionHandlers(app: App, services: Services): void {
           text:
             hasSlackErrorCode(error, 'not_in_channel') ||
             hasSlackErrorCode(error, 'channel_not_found')
-              ? 'Spark could not post in that channel yet. If it is a private channel, invite Spark first and try again.'
-              : `Spark could not share that milestone yet. ${formatSlackError(error)}`,
+              ? "Spark couldn't post there yet. If it's a private channel, invite Spark first and then try again."
+              : `Spark couldn't share that milestone yet. ${formatSlackError(error)}`,
         });
       }
     }
@@ -394,7 +403,7 @@ async function sendCelebrationDrafts(
 }
 
 function buildCelebrationShareCopy(profile: TeamProfile): string {
-  return `${profile.displayName} just opened their first contribution at Webflow! Shoutout to ${profile.buddy.name} for the buddy support.`;
+  return `${profile.displayName} just opened their first contribution at Webflow. Shoutout to ${profile.buddy.name} for the support along the way.`;
 }
 
 async function postThreadMessage(
@@ -410,4 +419,32 @@ async function postThreadMessage(
     blocks,
     ...(threadTs ? {thread_ts: threadTs} : {}),
   });
+}
+
+const TEST_CHANNEL_NAME = 'spark-test';
+
+async function findTestChannel(
+  client: App['client']
+): Promise<{id: string; name: string} | undefined> {
+  try {
+    let cursor: string | undefined;
+    do {
+      const result = await client.conversations.list({
+        types: 'public_channel,private_channel',
+        exclude_archived: true,
+        limit: 1000,
+        cursor,
+      });
+      const match = result.channels?.find(
+        (ch) => ch.name === TEST_CHANNEL_NAME
+      );
+      if (match?.id && match.name) {
+        return {id: match.id, name: match.name};
+      }
+      cursor = result.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+  } catch {
+    // fall through
+  }
+  return undefined;
 }

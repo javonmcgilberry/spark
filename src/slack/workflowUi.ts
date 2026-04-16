@@ -17,11 +17,11 @@ export function buildSparkCommandMenuBlocks(): KnownBlock[] {
   return [
     header('Spark'),
     section(
-      'Create a new onboarding draft here, then review active drafts from Spark Home or the draft channel before publishing.'
+      'Create a draft here, then review it in Spark Home or the draft channel before you publish it.'
     ),
     actions([
       {
-        label: 'Create onboarding draft',
+        label: 'Create draft',
         actionId: SPARK_OPEN_DRAFT_MODAL_ACTION_ID,
         style: 'primary',
       },
@@ -79,9 +79,7 @@ export function buildDraftSetupModal(initialNewHireId?: string) {
           type: 'plain_text_input' as const,
           action_id: 'value',
           multiline: true,
-          placeholder: plainText(
-            'Optional note from the manager to the new hire'
-          ),
+          placeholder: plainText('Add a note to help them feel welcome'),
         },
       },
     ],
@@ -108,7 +106,7 @@ export function buildDraftEditModal(pkg: OnboardingPackage) {
         type: 'section' as const,
         text: {
           type: 'mrkdwn' as const,
-          text: `Update the structured onboarding details for <@${pkg.userId}> here. Use the canvas for long-form team notes and context.`,
+          text: `Update the onboarding details for <@${pkg.userId}> here. Use the canvas for any team notes or context you want to keep close by.`,
         },
       },
       {
@@ -147,9 +145,7 @@ export function buildDraftEditModal(pkg: OnboardingPackage) {
           action_id: 'value',
           multiline: true,
           initial_value: pkg.welcomeNote ?? '',
-          placeholder: plainText(
-            'Optional note from the manager to the new hire'
-          ),
+          placeholder: plainText('Add a note to help them feel welcome'),
         },
       },
     ],
@@ -161,9 +157,9 @@ export function buildDraftReadyBlocks(
   pkg: Pick<OnboardingPackage, 'draftCanvasUrl' | 'draftChannelName' | 'userId'>
 ): KnownBlock[] {
   return [
-    header('Draft ready for review'),
+    header('Draft ready to review'),
     section(
-      `Review the onboarding draft for <@${profile.userId}> here before publishing. Use the buttons below for structured updates, and use the canvas for shared long-form notes.${
+      `Review the onboarding draft for <@${profile.userId}> here before you publish it. Use the buttons below for structured updates, and use the canvas for shared notes and context.${
         pkg.draftCanvasUrl
           ? `\n\n*Draft canvas:* <${pkg.draftCanvasUrl}|Open canvas>`
           : ''
@@ -176,7 +172,7 @@ export function buildDraftReadyBlocks(
         value: pkg.userId,
       },
       {
-        label: 'Publish to new hire',
+        label: 'Publish draft',
         actionId: SPARK_PUBLISH_DRAFT_ACTION_ID,
         value: pkg.userId,
         style: 'primary',
@@ -192,7 +188,7 @@ export function buildCelebrationShareBlocks(
   return [
     header('Ready to share'),
     section(
-      `Share this milestone in a public channel or in a private channel where Spark is already present.\n\n*Preview*\n>${previewText}`
+      `Share this milestone in a public channel, or in a private channel where Spark is already there.\n\n*Preview*\n>${previewText}`
     ),
     actions([
       {

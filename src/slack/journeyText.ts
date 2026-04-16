@@ -44,8 +44,8 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
       {type: 'includes', values: ['onboarding']},
     ],
     syncProgress: false,
-    title: 'Spark onboarding',
-    status: 'Refreshing your onboarding guide...',
+    title: 'Your onboarding plan',
+    status: 'Refreshing your onboarding plan...',
     resolve: (profile, journey) => journey.start(profile),
   },
   {
@@ -54,7 +54,7 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
     ],
     syncProgress: false,
     title: 'People to meet',
-    status: 'Pulling together the right people to meet...',
+    status: 'Pulling together the people who can help most...',
     resolve: async (profile, journey) => journey.showPeople(profile),
   },
   {
@@ -66,7 +66,7 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
     ],
     syncProgress: true,
     title: 'Tools and access',
-    status: 'Gathering your setup guide...',
+    status: 'Getting your setup guide ready...',
     resolve: (profile, journey) => journey.advance(profile, 'day2-3-follow-up'),
   },
   {
@@ -88,7 +88,7 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
     ],
     syncProgress: true,
     title: 'Plan and resources',
-    status: 'Collecting your plan and resources...',
+    status: 'Pulling together your plan and resources...',
     resolve: (profile, journey) =>
       journey.advance(profile, 'day4-5-orientation'),
   },
@@ -100,8 +100,8 @@ const JOURNEY_ROUTES: JourneyRoute[] = [
       },
     ],
     syncProgress: true,
-    title: 'First contribution',
-    status: 'Scanning for good first contributions...',
+    title: 'Starter task',
+    status: 'Looking for a good first contribution...',
     resolve: (profile, journey) =>
       journey.advance(profile, 'contribution-milestone'),
   },
@@ -129,7 +129,7 @@ export async function resolveJourneyText(
   return {
     kind: 'answer',
     answer: await journey.answerQuestion(profile, originalText),
-    status: 'Thinking through your blocker...',
+    status: 'Thinking through the best next step...',
     title: 'Onboarding help',
   };
 }

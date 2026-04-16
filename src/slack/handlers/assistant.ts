@@ -7,23 +7,23 @@ import {
 } from '../publishHome.js';
 
 const DEFAULT_PROMPTS = {
-  title: 'Try one of these',
+  title: 'Try one of these next',
   prompts: [
     {
-      title: 'Start onboarding',
-      message: 'Start my onboarding',
+      title: 'See my plan',
+      message: 'Show me my onboarding plan',
     },
     {
       title: 'People to meet',
       message: 'Who should I meet first?',
     },
     {
-      title: 'Week 1 context',
+      title: 'Docs and channels',
       message: 'Show me my docs and channels',
     },
     {
-      title: 'First contribution',
-      message: 'Find my first contribution task',
+      title: 'Starter task',
+      message: 'Find me a starter task',
     },
   ],
 };
@@ -45,10 +45,10 @@ export function registerAssistantHandlers(app: App, services: Services): void {
         logger.info(`Assistant thread started for ${userId}`);
 
         await setStatus({
-          status: 'Loading your onboarding guide...',
+          status: 'Getting your onboarding plan ready...',
           loading_messages: [
             'Looking up your team',
-            'Pulling together your onboarding plan',
+            'Pulling together your plan',
             'Getting Spark ready',
           ],
         });
@@ -108,7 +108,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
           loading_messages: [
             'Thinking through your question',
             'Grounding the answer in your onboarding step',
-            'Putting together the clearest next step',
+            'Putting together a clear next step',
           ],
         });
 
@@ -125,7 +125,7 @@ export function registerAssistantHandlers(app: App, services: Services): void {
 function chunkMarkdown(text: string): string[] {
   const normalized = text.trim();
   if (!normalized) {
-    return ['I hit an empty response. Try asking that one more time.'];
+    return ["I didn't get a response that time. Try asking again."];
   }
 
   const paragraphs = normalized

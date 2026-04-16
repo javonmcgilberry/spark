@@ -103,3 +103,16 @@ Once the app is installed:
 10. Complete the first contribution milestone and confirm the manager and onboarding buddy each receive a DM with a `Choose channel` action.
 11. Use the share modal to post the celebration into a public channel and a private channel where Spark is already present.
 12. Start a new assistant thread and confirm Spark shows suggested prompts and a loading status before replying.
+
+## 9. Sandbox smoke checklist
+
+Keep the real-workspace pass intentionally thin. The automated harness and mocked Slack tests should prove most of the logic already.
+
+Use this smoke pass to validate the Slack-only surface area:
+
+1. Start Spark in Socket Mode and confirm the app connects cleanly.
+2. Run `/spark` for a test new hire and confirm the draft modal opens.
+3. Create a draft and confirm Spark creates the private draft channel and seeded canvas.
+4. Publish the draft as the manager and confirm the new hire gets a DM plus a populated Home tab.
+5. Click one Home checklist item and confirm the shared canvas progress section updates.
+6. Complete the first contribution milestone and confirm celebration sharing works in one public channel and one private channel where Spark is already present.

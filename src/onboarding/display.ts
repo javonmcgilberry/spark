@@ -2,6 +2,7 @@ import type {KnownBlock} from '@slack/types';
 import type {
   ChecklistItem,
   ChecklistSection,
+  ChecklistItemStatus,
   ConfluenceLink,
   DocLink,
   EngineeringResourceLibrarySection,
@@ -11,6 +12,7 @@ import type {
   SlackChannelGuide,
   ToolGuide,
 } from './types.js';
+import {buildChecklistItemStatusKey} from './types.js';
 import {section} from '../slack/blockKit.js';
 
 export function buildPeopleSections(people: OnboardingPerson[]): KnownBlock[] {
@@ -138,11 +140,14 @@ export function formatKeyPaths(
 }
 
 export function countCompletedInSection(
-  itemLabels: string[],
-  completedChecklist: string[]
+  section: ChecklistSection,
+  itemStatuses: Record<string, ChecklistItemStatus>
 ): number {
-  return itemLabels.filter((label) => completedChecklist.includes(label))
-    .length;
+  return section.items.filter(
+    (_, itemIndex) =>
+      itemStatuses[buildChecklistItemStatusKey(section.id, itemIndex)] ===
+      'completed'
+  ).length;
 }
 
 export function formatChecklistItem(item: ChecklistItem): string {

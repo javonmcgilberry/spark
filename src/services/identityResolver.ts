@@ -36,6 +36,7 @@ interface DxLookupResult {
 interface ProfileSeed {
   userId: string;
   displayName: string;
+  firstName?: string;
   email?: string;
   teamName?: string;
   pillarName?: string;
@@ -122,7 +123,12 @@ export class IdentityResolver {
     seed: ProfileSeed,
     slackClient?: App['client']
   ): Promise<TeamProfile> {
-    const firstName = seed.displayName.split(/\s+/)[0] || 'there';
+    const resolvedFirstName =
+      firstNonEmpty(
+        seed.firstName,
+        firstNameFromValue(seed.displayName),
+        'there'
+      ) ?? 'there';
     const teamName = seed.teamName ?? 'Engineering';
     const roleTrack = inferRoleTrack(teamName);
     const githubTeamSlug =
@@ -140,7 +146,7 @@ export class IdentityResolver {
 
     return {
       userId: seed.userId,
-      firstName,
+      firstName: resolvedFirstName,
       displayName: seed.displayName,
       email: seed.email,
       teamName,
@@ -215,6 +221,7 @@ export class IdentityResolver {
   ): ProfileSeed {
     return {
       userId,
+      firstName: slackSeed?.firstName ?? firstNameFromValue(dx?.displayName),
       displayName:
         slackSeed?.displayName ?? dx?.displayName ?? fallbackDisplayName,
       email: slackSeed?.email ?? dx?.email ?? email,
@@ -522,8 +529,8 @@ function personalizePerson(
 ): OnboardingPerson {
   if (person.role === 'Engineering Manager') {
     const label = teamName.toLowerCase().includes('engineering')
-      ? 'Your Engineering Manager'
-      : `Your ${teamName} Engineering Manager`;
+      ? 'Your engineering manager'
+      : `Your ${teamName} engineering manager`;
     return {...person, name: label};
   }
 
@@ -539,11 +546,8 @@ function buildSlackSeed(
 
   return {
     userId,
-    displayName:
-      user?.real_name ||
-      profile?.real_name ||
-      profile?.display_name ||
-      'New hire',
+    firstName: slackFirstName(user),
+    displayName: slackDisplayName(user) ?? 'New hire',
     email: profile?.email,
     teamName: slackFieldText(customFields.team),
     pillarName: slackFieldText(customFields.division),
@@ -560,17 +564,34 @@ function mergeSlackUserProfile(
 
   return {
     ...person,
-    name:
-      user?.real_name ||
-      profile?.real_name ||
-      profile?.display_name ||
-      'Slack user',
+    name: slackDisplayName(user) ?? 'Slack user',
     role: title || person.role,
     title,
     email: profile?.email,
     slackUserId: user?.id,
     avatarUrl: profile?.image_192 ?? profile?.image_72,
   };
+}
+
+function slackDisplayName(
+  user: SlackUserRecord | undefined
+): string | undefined {
+  const profile = user?.profile;
+  return firstNonEmpty(
+    profile?.display_name,
+    profile?.real_name,
+    user?.real_name
+  );
+}
+
+function slackFirstName(user: SlackUserRecord | undefined): string | undefined {
+  const profile = user?.profile;
+  return firstNonEmpty(
+    profile?.first_name,
+    firstNameFromValue(profile?.display_name),
+    firstNameFromValue(profile?.real_name),
+    firstNameFromValue(user?.real_name)
+  );
 }
 
 function readSlackField(
@@ -596,7 +617,7 @@ function buildManagerPerson(
     kind: 'manager',
     editableBy: 'manager',
     discussionPoints:
-      'Role expectations, day-to-day support, performance goals, and the team roadmap.',
+      'Role expectations, day-to-day support, performance goals, and how the team roadmap connects to your first few weeks.',
     weekBucket: 'week1-2',
     slackUserId: parseSlackUserId(managerField?.value),
   };
@@ -614,6 +635,26 @@ function parseSlackUserId(value?: string): string | undefined {
   return cleaned && /^U[A-Z0-9]+$/.test(cleaned) ? cleaned : undefined;
 }
 
+function firstNonEmpty(
+  ...values: Array<string | undefined | null>
+): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function firstNameFromValue(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.split(/\s+/)[0] || undefined;
+}
+
 function buildFallbackTeammate(
   teamName: string,
   template: OnboardingPerson
@@ -621,7 +662,7 @@ function buildFallbackTeammate(
   return {
     ...template,
     name: `${teamName} teammate`,
-    discussionPoints: `Ask about the parts of ${teamName} that are most important during the first month, the code paths they touch most often, and the best next person to meet after this conversation.`,
+    discussionPoints: `Ask about the parts of ${teamName} that matter most in the first month, the code paths they touch most often, and who would be most helpful to meet next.`,
   };
 }
 
@@ -633,5 +674,5 @@ function scheduleTeammates(teammates: OnboardingPerson[]): OnboardingPerson[] {
 }
 
 function firstName(value: string): string {
-  return value.split(/\s+/)[0] || value;
+  return firstNameFromValue(value) ?? value;
 }

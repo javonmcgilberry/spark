@@ -128,7 +128,10 @@ export class OnboardingPackageService {
     if (!pkg) {
       return {ok: false, reason: 'not_found'};
     }
-    if (pkg.managerUserId && pkg.managerUserId !== publishedByUserId) {
+    const isManager =
+      !pkg.managerUserId || pkg.managerUserId === publishedByUserId;
+    const isCreator = pkg.createdByUserId === publishedByUserId;
+    if (!isManager && !isCreator) {
       return {ok: false, reason: 'not_manager'};
     }
 
@@ -354,18 +357,18 @@ function discussionPointsForKind(
   const firstName = name.split(/\s+/)[0] || name;
   switch (kind) {
     case 'manager':
-      return 'Role expectations, day-to-day support, performance goals, and the team roadmap.';
+      return 'Role expectations, day-to-day support, performance goals, and how the team roadmap connects to the first few weeks.';
     case 'buddy':
       return 'Day-to-day help, codebase guidance, debugging habits, and the team norms that rarely make it into docs.';
     case 'pm':
-      return `Ask ${firstName} about roadmap context, priority tradeoffs, and how engineering work maps to customer value.`;
+      return `Ask ${firstName} about roadmap context, priority tradeoffs, and how engineering work connects to customer value.`;
     case 'designer':
-      return `Ask ${firstName} how design intent is communicated, reviewed, and handed off in your area.`;
+      return `Ask ${firstName} how design intent is shared, reviewed, and handed off in your area.`;
     case 'director':
       return `Ask ${firstName} how your team fits into the broader pillar strategy and where the group is headed next.`;
     case 'people-partner':
-      return `Ask ${firstName} about growth support, milestone conversations, and people programs that become relevant after the first month.`;
+      return `Ask ${firstName} about growth support, milestone conversations, and people programs that become more relevant after the first month.`;
     default:
-      return `Ask ${firstName} what they own, which systems they touch most often, and what they wish they had known during their first month at Webflow.`;
+      return `Ask ${firstName} what they own, which systems they touch most often, and what they wish they had known in their first month at Webflow.`;
   }
 }

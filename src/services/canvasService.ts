@@ -15,6 +15,7 @@ import type {
   OnboardingPerson,
   TeamProfile,
 } from '../onboarding/types.js';
+import {buildChecklistItemStatusKey} from '../onboarding/types.js';
 import {
   formatCanvasChecklistItem,
   formatCanvasChecklistResourceLink,
@@ -448,7 +449,7 @@ function buildTeamSetupNotesMarkdown(): string {
     '## Team setup notes',
     '',
     '- Use the draft review buttons in Slack to update the welcome note, onboarding buddy, reviewers, and publish status.',
-    '- Use this canvas for team-specific notes, links, and long-form context that should stay visible after publish.',
+    '- Use this canvas for team-specific notes, links, and longer context you want everyone to keep close after publish.',
   ].join('\n');
 }
 
@@ -542,13 +543,10 @@ function buildInitialTasksCanvasMarkdown(pkg: OnboardingPackage): string {
           '',
           ...tasks.flatMap((task) => [
             `- **${task.title}** — ${task.description}`,
-            `  - Why it is a good ramp task: ${task.rationale}`,
+            `  - Why it works well for ramp-up: ${task.rationale}`,
           ]),
         ]
-      : [
-          '',
-          '- Add or confirm the first scoped Jira tickets before publishing.',
-        ]),
+      : ['', '- Add or confirm a few scoped Jira tickets before publishing.']),
   ].join('\n');
 }
 
@@ -625,8 +623,8 @@ function buildDraftWorkspaceStatusMarkdown(): string {
     '## Workspace status',
     '',
     'This canvas starts as the team onboarding workspace before it is shared with the new hire.',
-    '- Review the package in Slack before publishing it to the new hire.',
-    '- Keep team-specific notes, links, and long-form context in the sections below.',
+    '- Review the package in Slack before you publish it.',
+    '- Keep team-specific notes, links, and longer context in the sections below.',
     '- After publish, the progress sync section stays current for the manager, onboarding buddy, and new hire.',
   ].join('\n');
 }
@@ -635,11 +633,11 @@ function buildDraftProgressMarkdown(): string {
   return [
     '## Progress sync',
     '',
-    'This section updates automatically after publish so the manager, onboarding buddy, and new hire stay aligned in one place.',
+    'This section updates automatically after publish, so the manager, onboarding buddy, and new hire can stay aligned in one place.',
     '- Status: Draft review',
     '- Checklist progress: Not started yet',
     '- 30-60-90 plan: Starts after publish',
-    '- Current ramp task: Confirm a starter task before publish',
+    '- Current ramp task: Confirm a starter task before you publish',
   ].join('\n');
 }
 
@@ -673,11 +671,20 @@ function buildSharedProgressMarkdown(
   const done: string[] = [];
 
   for (const section of checklistSections) {
-    const completedCount = section.items.filter((item) =>
-      state.completedChecklist.includes(item.label)
+    const sectionStatuses = section.items.map(
+      (_, itemIndex) =>
+        state.itemStatuses[
+          buildChecklistItemStatusKey(section.id, itemIndex)
+        ] ?? 'not-started'
+    );
+    const completedCount = sectionStatuses.filter(
+      (status) => status === 'completed'
     ).length;
     const line = `- ${section.title} (${completedCount}/${section.items.length})`;
-    if (completedCount === 0) {
+    if (
+      completedCount === 0 &&
+      sectionStatuses.every((status) => status === 'not-started')
+    ) {
       notStarted.push(line);
       continue;
     }
@@ -690,6 +697,17 @@ function buildSharedProgressMarkdown(
 
   const totalChecklistItems = checklistSections.reduce(
     (sum, section) => sum + section.items.length,
+    0
+  );
+  const completedChecklistItems = checklistSections.reduce(
+    (sum, section) =>
+      sum +
+      section.items.filter(
+        (_, itemIndex) =>
+          state.itemStatuses[
+            buildChecklistItemStatusKey(section.id, itemIndex)
+          ] === 'completed'
+      ).length,
     0
   );
   const tasks = pkg.sections.initialEngineeringTasks.tasks;
@@ -705,7 +723,7 @@ function buildSharedProgressMarkdown(
     '',
     'This section updates automatically from Home activity and guided onboarding progress.',
     `- Current guided step: ${JOURNEY_LABELS[state.currentStep] ?? state.currentStep}`,
-    `- Checklist progress: ${state.completedChecklist.length}/${totalChecklistItems}`,
+    `- Checklist progress: ${completedChecklistItems}/${totalChecklistItems}`,
     `- Last synced: ${formatTimestamp(state.updatedAt)}`,
     ...(pkg.publishedByUserId
       ? [

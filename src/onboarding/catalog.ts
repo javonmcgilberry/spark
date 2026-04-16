@@ -69,7 +69,7 @@ const WELCOME_JOURNEY_MILESTONES: WelcomeJourneyMilestone[] = [
 export const CHECKLIST_SECTIONS: ChecklistSection[] = [
   {
     id: 'week1-setup',
-    title: 'Week 1: Meet the Team and Setup',
+    title: 'Week 1: meet the team and get set up',
     goal: 'Meet your new teammates, complete HR tasks, set up tools, and build foundational knowledge.',
     items: [
       {
@@ -80,13 +80,13 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Participate in your onboarding cohort',
-        kind: 'training',
+        kind: 'live-training',
         notes:
           'These cohort sessions take priority while you are onboarding. Keep the calendar invites visible and ask questions live.',
       },
       {
         label: 'Begin required e-learning trainings',
-        kind: 'training',
+        kind: 'workramp',
         notes:
           'WorkRamp is part of the standard onboarding path. Start early so it does not pile up beside technical ramp-up.',
       },
@@ -98,14 +98,14 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Complete Webflow 101',
-        kind: 'training',
+        kind: 'workramp',
         resourceUrl: 'https://university.webflow.com/courses/webflow-101',
         notes:
           'Finish the Webflow University course by the end of week one so the product vocabulary feels familiar in engineering conversations.',
       },
       {
         label: 'Start Secure Code Warrior training',
-        kind: 'training',
+        kind: 'workramp',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/SEC/pages/1224933772/Secure+Code+Warrior+Training+-+New+Hire+FAQ',
         notes:
@@ -142,7 +142,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Read through systems diagrams',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/623280258/System+Diagrams',
         notes:
@@ -150,7 +150,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Orient yourself with the engineering org chart',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/1071448164/Engineering+Org+Charts+by+Team+Pillar',
         notes:
@@ -166,12 +166,12 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
   },
   {
     id: 'week2-workflows',
-    title: 'Week 2: Engineering Workflows',
+    title: 'Week 2: engineering workflows',
     goal: 'Learn the engineering workflows, development environment, and architecture context you need before a first contribution.',
     items: [
       {
         label: 'Continue Secure Code Warrior training',
-        kind: 'training',
+        kind: 'workramp',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/SEC/pages/1224933772/Secure+Code+Warrior+Training+-+New+Hire+FAQ',
         notes:
@@ -199,7 +199,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Explore the feature & service team mapping structure',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/440697869/Feature+Service+Team+Mapping',
         notes:
@@ -207,7 +207,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Read the Webflow Codex and engineering best practices',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/1018331179/The+Webflow+Codex+v0.1',
         notes:
@@ -215,7 +215,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Read and follow the Webflow platform overview',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/140051185/Webflow+Platform+Overview',
         notes:
@@ -231,7 +231,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Profile Webflow server & renderer performance locally',
-        kind: 'resource',
+        kind: 'recording',
         resourceUrl:
           'https://www.loom.com/share/b5798b46089647ffa800cbad626baac0',
         notes:
@@ -247,7 +247,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Learn how to write code in the monorepo',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/608109081/How+to+write+code+at+Webflow',
         notes:
@@ -255,14 +255,14 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Read the intro to Webflow Design Language (WFDL)',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl: 'https://webflow.com/blog/webflow-design-language',
         notes:
           'This is foundational context for how Webflow models the product and visual authoring experience.',
       },
       {
         label: 'Review additional WFDL resources',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/596803922/Webflow+Design+Language+WFDL',
         notes:
@@ -278,7 +278,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Understand the build & deploy process',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/40140883/Build+Deploy+Process',
         notes:
@@ -308,18 +308,18 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
   },
   {
     id: 'week3-contribution',
-    title: 'Week 3: First Contribution & Scaling Up',
+    title: 'Week 3: first contribution and scaling up',
     goal: 'Apply technical knowledge by contributing code and connecting your first scoped task to the bigger system.',
     items: [
       {
         label: 'Read the onboarding resources for your track',
-        kind: 'resource',
+        kind: 'reading',
         notes:
           'Pick the frontend, backend, or infrastructure startup materials that match your current role and go deeper there.',
       },
       {
         label: 'Explore engineering career growth paths and promo processes',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/folder/1058799996',
         notes:
@@ -341,7 +341,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Reference the build & deploy process again',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/ENG/pages/40140883/Build+Deploy+Process',
         notes:
@@ -349,7 +349,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Re-read debugging guidance for unit & integration tests',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/DP/pages/744816814/Guide+run+watch+and+debug+Unit+and+Integration+tests',
         notes:
@@ -363,7 +363,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Learn the feature development process',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/700613064/Feature+Development+Rituals',
         notes:
@@ -371,7 +371,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Review the EPDI OKRs',
-        kind: 'resource',
+        kind: 'reading',
         resourceUrl:
           'https://webflow.atlassian.net/wiki/spaces/EPD/pages/1140457967/FY26+Q1+OKR+Updates',
         notes:
@@ -393,7 +393,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
   },
   {
     id: 'week4-citizenship',
-    title: 'Week 4: Projects & Engineering Citizenship',
+    title: 'Week 4: projects and engineering citizenship',
     goal: 'Operate more independently, participate in the surrounding engineering system, and start the milestone conversations that shape your long-term ramp.',
     items: [
       {
@@ -412,7 +412,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Attend Spring Bootcamp if required for your role',
-        kind: 'training',
+        kind: 'live-training',
         resourceLabel: 'Email Emily Hornberger',
         resourceUrl: 'mailto:emily.hornberger@webflow.com',
         notes:
@@ -432,7 +432,7 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
       },
       {
         label: 'Reflect back on onboarding materials with new context',
-        kind: 'resource',
+        kind: 'reading',
         notes:
           'Return to the docs and notes that felt abstract in week one. They usually click differently after a few weeks of real work.',
       },
@@ -930,7 +930,7 @@ export function buildDefaultRituals(): RitualGuide[] {
 const PLAN_ITEMS: MilestonePlanItem[] = [
   {
     timeframe: 'Week 1',
-    goalSummary: 'Setup & Foundations',
+    goalSummary: 'Set up and foundations',
     keyActivities:
       'Complete HR and work tools, review Webflow 101, and meet your team and mentor.',
     supportActions:
@@ -938,7 +938,7 @@ const PLAN_ITEMS: MilestonePlanItem[] = [
   },
   {
     timeframe: 'Week 2',
-    goalSummary: 'Intro to Engineering Workflows',
+    goalSummary: 'Intro to engineering workflows',
     keyActivities:
       'Review The Codex, learn the PR and code-review process, and get hands-on with debugging and local development.',
     supportActions:
@@ -946,7 +946,7 @@ const PLAN_ITEMS: MilestonePlanItem[] = [
   },
   {
     timeframe: 'Week 3',
-    goalSummary: 'First Contribution & Scaling',
+    goalSummary: 'First contribution and scaling',
     keyActivities:
       'Submit a first PR, learn your team or system architecture, and attend retrospectives.',
     supportActions:
@@ -954,7 +954,7 @@ const PLAN_ITEMS: MilestonePlanItem[] = [
   },
   {
     timeframe: 'Week 4',
-    goalSummary: 'Project Onboarding & Engineering Citizenship',
+    goalSummary: 'Project onboarding and engineering citizenship',
     keyActivities:
       'Contribute meaningfully to a project, understand incident response, and take on early ownership.',
     supportActions:
@@ -962,7 +962,7 @@ const PLAN_ITEMS: MilestonePlanItem[] = [
   },
   {
     timeframe: '60 Days',
-    goalSummary: 'Operate with Confidence',
+    goalSummary: 'Operate with confidence',
     keyActivities:
       'Ship meaningful code, follow team workflows smoothly, and develop operational confidence.',
     supportActions:
@@ -970,7 +970,7 @@ const PLAN_ITEMS: MilestonePlanItem[] = [
   },
   {
     timeframe: '90 Days',
-    goalSummary: 'Full Ownership & Autonomy',
+    goalSummary: 'Full ownership and autonomy',
     keyActivities:
       'Lead more complex work, collaborate cross-functionally, and suggest process improvements.',
     supportActions:
@@ -997,9 +997,7 @@ export function buildOnboardingPackageSections(params: {
   return {
     welcome: {
       title: 'Welcome',
-      intro: `You’re joining *${profile.teamName}*${
-        profile.pillarName ? ` in *${profile.pillarName}*.` : '.'
-      } Spark is organizing the real onboarding flow from the engineering workbook so your first few weeks feel more like a guided ramp than a scavenger hunt.`,
+      intro: buildWelcomeIntro(profile),
       personalizedNote: welcomeNote,
       onboardingPocs: [
         {
@@ -1020,41 +1018,41 @@ export function buildOnboardingPackageSections(params: {
       })),
     },
     onboardingChecklist: {
-      title: 'Onboarding Checklist',
+      title: 'Onboarding checklist',
       intro:
-        'Use this as the concrete week-by-week checklist. It mirrors the onboarding workbook instead of collapsing everything into a generic Spark task dump.',
+        'Use this week-by-week checklist to keep your ramp clear and manageable. It mirrors the onboarding workbook, so you can focus on what matters now without piecing everything together yourself.',
       sections: checklist,
     },
     plan306090: {
-      title: '30-60-90 Plan',
+      title: '30-60-90 plan',
       intro:
-        'This is the milestone view of the same ramp: what the new hire should be doing and what support the manager or buddy should be providing.',
+        'This is the milestone view of the same ramp: what the new hire should focus on, and how the manager or buddy can support them along the way.',
       items: PLAN_ITEMS.map((item) => ({...item})),
     },
     peopleToMeet: {
-      title: 'People to Meet',
+      title: 'People to meet',
       intro:
-        'These are the people most worth spending time with early. Start with the teammates and stakeholders most relevant to your role and team.',
+        'These are the people most likely to help you get grounded early. Start with the teammates and partners closest to your role and team.',
       people: people.map((person) => ({...person})),
     },
     toolsAccess: {
-      title: 'Tools Access Checklist',
+      title: 'Tools access checklist',
       intro:
-        'Do not try to set everything up in the first week. Use this as a working checklist and ask @Flowbot whenever you hit missing access.',
+        'You do not need to set everything up in week one. Use this as a working checklist, and ask @Flowbot whenever something is missing.',
       tools: profile.tools.map((tool) => ({...tool})),
     },
     slack: {
       title: 'Slack',
       intro:
-        'Slack is the company’s communication lifeline. Join the core channels first, then add the team and specialty channels that matter for your ramp.',
+        'Slack is where a lot of day-to-day context lives at Webflow. Start with the core channels, then add the team and specialty channels that matter most for your ramp.',
       channels: profile.recommendedChannels.map((channel) => ({...channel})),
     },
     initialEngineeringTasks: {
-      title: 'Initial Engineering Tasks',
+      title: 'Initial engineering tasks',
       intro:
-        'Use this section to track the first scoped engineering work the new hire should take on with support from the manager and onboarding buddy.',
+        'Use this section to track the first scoped engineering work the new hire can take on with support from the manager and onboarding buddy.',
       managerPrompt:
-        'Managers should add or confirm the first scoped Jira tickets before publishing the package to the new hire.',
+        'Managers should add or confirm a few scoped Jira tickets before sharing the plan with the new hire.',
       tasks: tasks.map((task) => ({
         ...task,
         filePaths: [...task.filePaths],
@@ -1065,7 +1063,7 @@ export function buildOnboardingPackageSections(params: {
     rituals: {
       title: 'Rituals',
       intro:
-        'These are the recurring engineering, EPD, and company rituals that shape how information moves at Webflow.',
+        'These are the recurring engineering, EPD, and company rituals that help work stay connected across Webflow.',
       rituals: profile.rituals.map((ritual) => ({...ritual})),
     },
     engineeringResourceLibrary: buildResourceLibrarySection(
@@ -1075,14 +1073,29 @@ export function buildOnboardingPackageSections(params: {
   };
 }
 
+function buildWelcomeIntro(profile: TeamProfile): string {
+  const hasDistinctPillar =
+    typeof profile.pillarName === 'string' &&
+    normalizeLabel(profile.pillarName) !== normalizeLabel(profile.teamName);
+  const teamContext = hasDistinctPillar
+    ? `the ${profile.teamName} team within ${profile.pillarName}`
+    : `the ${profile.teamName} team`;
+
+  return `You're joining ${teamContext}. Spark pulls together the people, docs, and week-by-week milestones that matter first, so your ramp feels guided, personal, and a lot less pieced together.`;
+}
+
+function normalizeLabel(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function buildResourceLibrarySection(
   profile: TeamProfile,
   references: OnboardingReferences
 ): EngineeringResourceLibrarySection {
   return {
-    title: 'Engineering Resource Library',
+    title: 'Engineering resource library',
     intro:
-      'This is the central hub for the docs, workflows, and codebase entry points most relevant during ramp-up. It focuses on the canonical engineering docs plus your team and pillar context.',
+      'This is the central hub for the docs, workflows, and codebase entry points that matter most during ramp-up. It focuses on the core engineering docs, plus the team and pillar context that will help things click faster.',
     docs: profile.docs.map((doc) => ({...doc})),
     references: {
       ...references,

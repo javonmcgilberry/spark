@@ -4,9 +4,13 @@ import {
   buildHomeView,
   HOME_CHECKLIST_ACTION_ID,
   HOME_NAV_ACTION_ID,
-  parseChecklistSectionId,
+  parseChecklistItemActionId,
 } from '../../onboarding/homeBlocks.js';
-import {isHomeSectionId} from '../../onboarding/types.js';
+import {
+  buildChecklistItemStatusKey,
+  isHomeSectionId,
+  isChecklistItemStatus,
+} from '../../onboarding/types.js';
 import type {PreparedJourneyData} from '../../services/journeyService.js';
 import {
   publishHomeDashboard,
@@ -25,78 +29,98 @@ export function registerHomeTabHandlers(app: App, services: Services): void {
     await publishHomeDashboard(app, services, event.user, client);
   });
 
-  app.action(HOME_NAV_ACTION_ID, async ({ack, body, client, action}) => {
-    await ack();
+  app.action(
+    new RegExp(`^${HOME_NAV_ACTION_ID}:`),
+    async ({ack, body, client, action}) => {
+      await ack();
 
-    if (
-      action.type !== 'button' ||
-      !action.value ||
-      !isHomeSectionId(action.value)
-    ) {
-      return;
+      if (
+        action.type !== 'button' ||
+        !action.value ||
+        !isHomeSectionId(action.value)
+      ) {
+        return;
+      }
+
+      const prepared = await loadPublishedPreparedOrRepublish(
+        app,
+        services,
+        client,
+        body.user.id
+      );
+      if (!prepared?.onboardingPackage) {
+        return;
+      }
+
+      const state = services.journey.setActiveHomeSection(
+        body.user.id,
+        action.value
+      );
+      await publishHomeView(
+        services,
+        client,
+        body.user.id,
+        buildHomeView(prepared.onboardingPackage, state)
+      );
     }
+  );
 
-    const prepared = await loadPublishedPreparedOrRepublish(
-      app,
-      services,
-      client,
-      body.user.id
-    );
-    if (!prepared?.onboardingPackage) {
-      return;
+  app.action(
+    new RegExp(`^${HOME_CHECKLIST_ACTION_ID}:`),
+    async ({ack, body, client, action}) => {
+      await ack();
+
+      if (
+        action.type !== 'static_select' ||
+        typeof action.action_id !== 'string' ||
+        !action.selected_option?.value ||
+        !isChecklistItemStatus(action.selected_option.value)
+      ) {
+        return;
+      }
+
+      const parsed = parseChecklistItemActionId(action.action_id);
+      if (!parsed) {
+        return;
+      }
+
+      const prepared = await loadPublishedPreparedOrRepublish(
+        app,
+        services,
+        client,
+        body.user.id
+      );
+      if (!prepared?.onboardingPackage) {
+        return;
+      }
+
+      const checklistSection =
+        prepared.onboardingPackage.sections.onboardingChecklist.sections.find(
+          (section) => section.id === parsed.sectionId
+        );
+      if (!checklistSection || !checklistSection.items[parsed.itemIndex]) {
+        return;
+      }
+
+      logger.info(
+        `Home checklist updated for ${body.user.id} (${parsed.sectionId}:${parsed.itemIndex})`
+      );
+
+      const state = services.journey.setItemStatus(
+        body.user.id,
+        buildChecklistItemStatusKey(parsed.sectionId, parsed.itemIndex),
+        action.selected_option.value
+      );
+
+      await publishHomeView(
+        services,
+        client,
+        body.user.id,
+        buildHomeView(prepared.onboardingPackage, state)
+      );
+      await syncSharedOnboardingWorkspace(app, services, body.user.id, client);
     }
-
-    const state = services.journey.setActiveHomeSection(
-      body.user.id,
-      action.value
-    );
-    await publishHomeView(
-      services,
-      client,
-      body.user.id,
-      buildHomeView(prepared.onboardingPackage, state)
-    );
-  });
-
-  app.action(HOME_CHECKLIST_ACTION_ID, async ({ack, body, client, action}) => {
-    await ack();
-
-    if (action.type !== 'checkboxes') {
-      return;
-    }
-
-    const sectionId = parseChecklistSectionId(action.block_id);
-    if (!sectionId) {
-      return;
-    }
-
-    logger.info(`Home checklist updated for ${body.user.id} (${sectionId})`);
-
-    const prepared = await loadPublishedPreparedOrRepublish(
-      app,
-      services,
-      client,
-      body.user.id
-    );
-    if (!prepared?.onboardingPackage) {
-      return;
-    }
-    const state = services.journey.setCompletedChecklistForSection(
-      prepared.onboardingPackage,
-      sectionId,
-      action.selected_options
-        .filter(hasOptionValue)
-        .map((option) => option.value)
-    );
-
-    await publishHomeView(
-      services,
-      client,
-      body.user.id,
-      buildHomeView(prepared.onboardingPackage, state)
-    );
-    await syncSharedOnboardingWorkspace(app, services, body.user.id, client);
-  });
+  );
 }
 
 async function loadPublishedPreparedOrRepublish(
@@ -116,10 +140,4 @@ async function loadPublishedPreparedOrRepublish(
   }
 
   return prepared;
-}
-
-function hasOptionValue<T extends {value?: string}>(
-  option: T
-): option is T & {value: string} {
-  return typeof option.value === 'string';
 }

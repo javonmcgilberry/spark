@@ -10,6 +10,7 @@ import {
   buildWelcomeBlocks,
 } from '../onboarding/blocks.js';
 import type {
+  ChecklistItemStatus,
   ContributionTask,
   JourneyState,
   OnboardingPackage,
@@ -62,7 +63,7 @@ export class JourneyService {
   buildStartReply(prepared: PreparedJourneyData): JourneyReply {
     if (!prepared.onboardingPackage) {
       return {
-        text: 'Spark is waiting for your manager or onboarding team to publish your onboarding package.',
+        text: 'Your manager or onboarding team is still getting your onboarding plan ready. Spark will open it as soon as it is published.',
         blocks: buildDraftPendingBlocks(),
       };
     }
@@ -71,7 +72,7 @@ export class JourneyService {
     }
 
     return {
-      text: `Welcome to Webflow, ${prepared.profile.firstName}! Here's your Day 1 guide.`,
+      text: `Welcome to Webflow, ${prepared.profile.firstName}. Here's your day 1 guide.`,
       blocks: buildWelcomeBlocks(prepared.onboardingPackage, prepared.state),
     };
   }
@@ -83,29 +84,13 @@ export class JourneyService {
     );
   }
 
-  setCompletedChecklistForSection(
-    onboardingPackage: OnboardingPackage,
-    sectionId: string,
-    selectedValues: string[]
+  setItemStatus(
+    userId: string,
+    itemKey: string,
+    status: ChecklistItemStatus
   ): JourneyState {
-    const state = this.getOrCreateState(onboardingPackage.userId);
-    const targetSection =
-      onboardingPackage.sections.onboardingChecklist.sections.find(
-        (section) => section.id === sectionId
-      );
-    if (!targetSection) {
-      return state;
-    }
-
-    const nextCompleted = new Set(state.completedChecklist);
-    for (const item of targetSection.items) {
-      nextCompleted.delete(item.label);
-    }
-    for (const value of selectedValues) {
-      nextCompleted.add(value);
-    }
-
-    state.completedChecklist = Array.from(nextCompleted);
+    const state = this.getOrCreateState(userId);
+    state.itemStatuses[itemKey] = status;
     state.updatedAt = new Date().toISOString();
     return state;
   }
@@ -140,14 +125,14 @@ export class JourneyService {
 
     if (stepId === 'day2-3-follow-up') {
       return {
-        text: "Here's your Day 2-3 guide — tools, access, and people to meet.",
+        text: "Here's your day 2-3 guide for tools, access, and people to meet.",
         blocks: buildFollowUpBlocks(onboardingPackage, state),
       };
     }
 
     if (stepId === 'day4-5-orientation') {
       return {
-        text: "Here's your orientation plan — docs, channels, and codebase context.",
+        text: "Here's your day 4-5 guide for docs, channels, and codebase context.",
         blocks: buildOrientationBlocks(onboardingPackage, state),
       };
     }
@@ -155,10 +140,10 @@ export class JourneyService {
     if (stepId === 'contribution-milestone') {
       if (hasFreshTasks(state)) {
         return {
-          text: "You're ready to make your first contribution.",
+          text: "You're ready for a first contribution.",
           blocks: buildContributionBlocks(
             onboardingPackage,
-            state.taskExplanation ?? "Here's the current list.",
+            state.taskExplanation ?? "Here's the latest list.",
             state.tasks,
             state
           ),
@@ -174,7 +159,7 @@ export class JourneyService {
         tasks.map(cloneTask);
       onboardingPackage.updatedAt = new Date().toISOString();
       return {
-        text: "You're ready to make your first contribution.",
+        text: "You're ready for a first contribution.",
         blocks: buildContributionBlocks(
           onboardingPackage,
           explanation,
@@ -185,7 +170,7 @@ export class JourneyService {
     }
 
     return {
-      text: 'Back to your onboarding guide.',
+      text: 'Back to your onboarding plan.',
 
       blocks: buildWelcomeBlocks(onboardingPackage, state),
     };
@@ -200,7 +185,7 @@ export class JourneyService {
     }
 
     return {
-      text: 'Here are the people worth connecting with during your first few weeks.',
+      text: 'Here are the people who can help most in your first few weeks.',
       blocks: buildPeopleBlocks(onboardingPackage),
     };
   }
@@ -216,10 +201,10 @@ export class JourneyService {
     const task = state.tasks.find((entry) => entry.id === taskId);
     if (!task) {
       return {
-        text: "That task isn't available anymore. Here's the updated list.",
+        text: "That task isn't available anymore. Here's the latest list.",
         blocks: buildContributionBlocks(
           onboardingPackage,
-          "Here's the current list.",
+          "Here's the latest list.",
           state.tasks,
           state
         ),
@@ -246,10 +231,10 @@ export class JourneyService {
     const task = state.tasks.find((entry) => entry.id === state.selectedTaskId);
     if (!task) {
       return {
-        text: "Pick a task first and I'll get it ready for you.",
+        text: "Pick a task first and I'll help you get started.",
         blocks: buildContributionBlocks(
           onboardingPackage,
-          "Choose a task below and I'll prepare it.",
+          "Choose a task below and I'll help you get moving.",
           state.tasks,
           state
         ),
@@ -265,7 +250,7 @@ export class JourneyService {
     state.updatedAt = new Date().toISOString();
 
     return {
-      text: 'Here are your steps to get this done.',
+      text: "Here's a clear path to get this done.",
       blocks: buildCelebrationBlocks(buildGuideSummary(task, guide), state),
     };
   }
@@ -290,7 +275,7 @@ export class JourneyService {
       currentStep: 'day1-welcome',
       completedSteps: [],
       activeHomeSection: 'welcome',
-      completedChecklist: [],
+      itemStatuses: {},
       tasks: [],
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -328,14 +313,14 @@ function buildGuideSummary(
     '',
     ...guide.steps,
     '',
-    '*PR description draft:*',
+    '*Draft PR description:*',
     guide.prBodyDraft,
   ];
 }
 
 function draftPendingReply(): JourneyReply {
   return {
-    text: 'Your onboarding package is still being reviewed.',
+    text: 'Your onboarding plan is still in review.',
     blocks: buildDraftPendingBlocks(),
   };
 }

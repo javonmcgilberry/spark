@@ -46,12 +46,12 @@ export function buildWelcomeBlocks(
     ...(welcome.personalizedNote
       ? [section(`*Manager note*\n${welcome.personalizedNote}`)]
       : []),
-    section(`*Onboarding POCs*\n${pocs}`),
-    section(`*Onboarding journey*\n${milestones}`),
+    section(`*Key people*\n${pocs}`),
+    section(`*Your onboarding path*\n${milestones}`),
     ...(onboardingPackage.draftCanvasUrl
       ? [
           section(
-            `*Shared onboarding workspace*\nOpen <${onboardingPackage.draftCanvasUrl}|the onboarding canvas> if you want the shared long-form workspace for your onboarding package.`
+            `*Shared onboarding workspace*\nOpen <${onboardingPackage.draftCanvasUrl}|the onboarding canvas> if you want one shared place for notes, links, and progress.`
           ),
         ]
       : []),
@@ -184,7 +184,7 @@ export function buildContributionBlocks(
       ? [section(taskText)]
       : [
           section(
-            'No starter task is ready yet. Ask your manager to add one or try the task scan again after more onboarding context is in place.'
+            'A starter task is not ready yet. Ask your manager to add one, or try the task scan again once a little more onboarding context is in place.'
           ),
         ]),
     ...(options.length > 0
@@ -197,7 +197,7 @@ export function buildContributionBlocks(
                 action_id: 'spark_select_task',
                 placeholder: {
                   type: 'plain_text' as const,
-                  text: 'Choose a contribution task',
+                  text: 'Choose a starter task',
                   emoji: false,
                 },
                 options,
@@ -225,7 +225,7 @@ export function buildTaskPreviewBlocks(
     ),
     section(`*Preview*\n${preview}`),
     section(
-      `*How to do it*\nIn Claude Code or Cursor, run:\n\`\`\`\n${task.skillCommand}\n\`\`\`\n\nThis uses the *${task.skillName}* AgentFlow skill — it handles the mechanical parts and walks you through any decisions.`
+      `*How to get started*\nIn Claude Code or Cursor, run:\n\`\`\`\n${task.skillCommand}\n\`\`\`\n\nThis uses the *${task.skillName}* AgentFlow skill. It handles the mechanical steps and walks you through any decisions along the way.`
     ),
     actions([
       {
@@ -248,7 +248,7 @@ export function buildCelebrationBlocks(
   guideSummary: string[],
   state: JourneyState
 ): KnownBlock[] {
-  const blocks: KnownBlock[] = [header('Nice work!')];
+  const blocks: KnownBlock[] = [header('Nice work')];
 
   // Split on blank lines so each step renders as its own Slack section block.
   const chunks: string[] = [];
@@ -277,9 +277,9 @@ export function buildCelebrationBlocks(
 
 export function buildDraftPendingBlocks(): KnownBlock[] {
   return [
-    header('Onboarding draft in progress'),
+    header('Your onboarding plan is on the way'),
     section(
-      'Your manager or onboarding team is still reviewing the draft onboarding package. Once they publish it, Spark will show the full Home experience and DM you the cleaned-up version.'
+      'Your manager or onboarding team is still getting your onboarding plan ready. As soon as they publish it, Spark will open the full Home experience and send you the latest version in DM.'
     ),
   ];
 }

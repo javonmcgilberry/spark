@@ -47,8 +47,8 @@ export function registerOnboardingHandlers(app: App, services: Services): void {
 
     await say({
       text: hasPublishedPackage
-        ? `Hey <@${event.user}>! I sent you a DM with your onboarding guide. Open Spark in the sidebar any time if you want to keep going there.`
-        : `Hey <@${event.user}>! I sent you a DM with your current onboarding status. Spark will unlock once your manager or onboarding team publishes your package.`,
+        ? `Hi <@${event.user}>. I sent your onboarding guide in a DM, and Spark is ready in the sidebar whenever you want to keep going there.`
+        : `Hi <@${event.user}>. I sent an update in DM. Spark will be ready once your manager or onboarding team publishes your plan.`,
 
       thread_ts: event.ts,
     });
