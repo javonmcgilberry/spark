@@ -45,12 +45,36 @@ interface CacheContainer {
   inFlight: Promise<SlackUserHit[]> | null;
 }
 
+/**
+ * Directory cache lives on `globalThis` so it survives across
+ * HandlerCtx instances within the same Worker isolate. Cold starts
+ * repopulate; warm starts read from memory instantly. Without this,
+ * every picker keystroke re-paginated `users.list` (Tier 2,
+ * 20 req/min) and got rate-limited on any workspace bigger than a few
+ * hundred people.
+ *
+ * The cache is still request-scoped via ctx.scratch as a fallback in
+ * test environments where globalThis is fine to mutate but each test
+ * wants an isolated cache. `primeDirectoryForTests` writes to both.
+ */
+const DIRECTORY_SYMBOL = Symbol.for('spark.slackDirectory');
+function getIsolateCache(): CacheContainer {
+  const host = globalThis as unknown as Record<symbol, CacheContainer>;
+  if (!host[DIRECTORY_SYMBOL]) {
+    host[DIRECTORY_SYMBOL] = {current: null, inFlight: null};
+  }
+  return host[DIRECTORY_SYMBOL];
+}
+
 function getCache(ctx: HandlerCtx): CacheContainer {
   const existing = ctx.scratch.slackDirectory as CacheContainer | undefined;
   if (existing) return existing;
-  const created: CacheContainer = {current: null, inFlight: null};
-  ctx.scratch.slackDirectory = created;
-  return created;
+  // Share the isolate-scoped cache so repeat requests within the same
+  // Worker instance reuse the populated directory instead of
+  // re-paginating on every keystroke.
+  const shared = getIsolateCache();
+  ctx.scratch.slackDirectory = shared;
+  return shared;
 }
 
 export async function searchUsers(
@@ -250,10 +274,17 @@ export function primeDirectoryForTests(
   ctx: HandlerCtx,
   users: SlackUserHit[]
 ): void {
-  const cache = getCache(ctx);
-  cache.current = {
-    users,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-    partial: false,
+  // Tests get their own isolated cache on ctx.scratch so the
+  // globalThis singleton doesn't leak across cases. The real picker
+  // path reads whichever cache ctx.scratch.slackDirectory points at,
+  // so either way works.
+  const fresh: CacheContainer = {
+    current: {
+      users,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      partial: false,
+    },
+    inFlight: null,
   };
+  ctx.scratch.slackDirectory = fresh;
 }

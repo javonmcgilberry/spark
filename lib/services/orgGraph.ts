@@ -22,6 +22,7 @@ import {
   queryCrossFunctional,
   queryManagerChain,
   queryPersonByEmail,
+  querySearchByName,
   queryTeammates,
   type SqlTag,
   type WarehouseRow,
@@ -68,13 +69,42 @@ export interface OrgGraphClient {
     pillarName?: string
   ): Promise<CrossFunctionalResult>;
   lookupManagerChain(email: string, depth?: number): Promise<OrgPerson[]>;
+  /**
+   * Search the directory by name or email substring. Powers the web
+   * picker with a single SQL round-trip — massively faster than
+   * paginating Slack's users.list.
+   */
+  searchByName(query: string, limit?: number): Promise<OrgPerson[]>;
 }
 
 export interface OrgGraphEnv {
   DX_WAREHOUSE_DSN?: string;
 }
 
-const QUERY_TIMEOUT_SECONDS = 3;
+const QUERY_TIMEOUT_SECONDS = 1.5;
+/**
+ * Circuit-breaker window. When the warehouse throws (TCP timeout, DNS
+ * failure, anything non-transient from postgres.js), skip the next N ms
+ * of warehouse calls and route straight to the Slack fallback. Without
+ * this, every picker keystroke and every create-draft pays another
+ * full timeout before degrading — catastrophic for local dev and for
+ * any prod window when the DX warehouse is unreachable.
+ *
+ * Module-scoped `globalThis` binding so the breaker survives across
+ * request-scoped HandlerCtx instances within the same Worker isolate.
+ */
+const BREAKER_COOLDOWN_MS = 60_000;
+const BREAKER_SYMBOL = Symbol.for('spark.orgGraph.breaker');
+interface BreakerState {
+  openUntil: number;
+}
+function getBreaker(): BreakerState {
+  const host = globalThis as unknown as Record<symbol, BreakerState>;
+  if (!host[BREAKER_SYMBOL]) {
+    host[BREAKER_SYMBOL] = {openUntil: 0};
+  }
+  return host[BREAKER_SYMBOL];
+}
 
 /**
  * Title patterns per role. Kept conservative so a misspelled or highly
@@ -126,6 +156,9 @@ export function makeOrgGraphClient(
       return {};
     },
     async lookupManagerChain() {
+      return [];
+    },
+    async searchByName() {
       return [];
     },
   };
@@ -181,10 +214,22 @@ export function makeOrgGraphClient(
     work: (sql: SqlTag) => Promise<T>,
     fallback: T
   ): Promise<T> => {
+    const breaker = getBreaker();
+    const now = Date.now();
+    if (breaker.openUntil > now) {
+      // Breaker is open — skip the warehouse entirely, let the caller
+      // fall back. Keeps picker latency at ~Slack-only instead of
+      // ~Slack-plus-warehouse-timeout on every request.
+      return fallback;
+    }
     try {
       return await withClient(work);
     } catch (error) {
-      logger.warn(`DX warehouse ${label} failed.`, error);
+      breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
+      logger.warn(
+        `DX warehouse ${label} failed; breaker open for ${BREAKER_COOLDOWN_MS / 1000}s.`,
+        error
+      );
       return fallback;
     }
   };
@@ -261,6 +306,19 @@ export function makeOrgGraphClient(
         []
       );
     },
+    async searchByName(query, limit = 10) {
+      if (!query.trim()) return [];
+      return runSafely(
+        `searchByName(${query})`,
+        async (sql) => {
+          const rows = await querySearchByName(sql, query, limit);
+          return rows
+            .map((row) => toOrgPerson(row, 'teammate'))
+            .filter((person): person is OrgPerson => Boolean(person));
+        },
+        []
+      );
+    },
   };
 }
 
@@ -284,6 +342,11 @@ export interface OrgGraphStubOverrides {
   teammates?: Record<string, OrgPerson[]>;
   crossFunctional?: Record<string, CrossFunctionalResult>;
   managerChain?: Record<string, OrgPerson[]>;
+  /**
+   * Pool of people for searchByName stubbing. When set, searchByName
+   * filters this list by substring against name and email.
+   */
+  searchPool?: OrgPerson[];
 }
 
 /**
@@ -340,6 +403,18 @@ export function makeStubOrgGraph(
     async lookupManagerChain(email, depth = 4) {
       const chain = managerChain[normalize(email)] ?? [];
       return chain.slice(0, depth);
+    },
+    async searchByName(query, limit = 10) {
+      const needle = normalize(query);
+      if (!needle) return [];
+      const pool = overrides.searchPool ?? [];
+      return pool
+        .filter(
+          (person) =>
+            normalize(person.name).includes(needle) ||
+            normalize(person.email).includes(needle)
+        )
+        .slice(0, limit);
     },
   };
 }

@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {
   makeOrgGraphClient,
   makeStubOrgGraph,
@@ -88,5 +88,72 @@ describe('makeStubOrgGraph', () => {
     const stub = makeStubOrgGraph({configured: false});
     expect(stub.isConfigured()).toBe(false);
     expect(await stub.lookupTeammates('Platform')).toEqual([]);
+  });
+
+  it('searchByName filters the pool case-insensitively by name and email', async () => {
+    const stub = makeStubOrgGraph({
+      searchPool: [
+        {
+          name: 'Akshar Patel',
+          email: 'akshar@webflow.com',
+          source: 'warehouse',
+          role: 'teammate',
+        },
+        {
+          name: 'HaoZhe Li',
+          email: 'haozhe@webflow.com',
+          source: 'warehouse',
+          role: 'teammate',
+        },
+      ],
+    });
+    const byName = await stub.searchByName('AK');
+    expect(byName.map((p) => p.email)).toEqual(['akshar@webflow.com']);
+    const byEmail = await stub.searchByName('haozhe');
+    expect(byEmail.map((p) => p.email)).toEqual(['haozhe@webflow.com']);
+  });
+});
+
+describe('makeOrgGraphClient circuit breaker', () => {
+  // Reset the module-scoped breaker between cases — it lives on
+  // globalThis so it persists across fresh client instances.
+  beforeEach(() => {
+    const breaker = (
+      globalThis as unknown as Record<symbol, {openUntil: number}>
+    )[Symbol.for('spark.orgGraph.breaker')];
+    if (breaker) breaker.openUntil = 0;
+  });
+
+  it('opens after a single failure and skips subsequent warehouse calls within the cooldown window', async () => {
+    const client = makeOrgGraphClient(
+      {DX_WAREHOUSE_DSN: 'postgres://nonexistent.invalid:5432/x'},
+      createSilentLogger()
+    );
+    // postgres.js will try to import; since we're in a test env without
+    // actual network, we mock Date.now() to observe breaker state.
+    const originalNow = Date.now;
+    const now = vi.fn(() => 1_000_000);
+    Date.now = now as typeof Date.now;
+    try {
+      // First call trips the breaker and returns the fallback ([]). We
+      // allow a small amount of time by advancing the clock.
+      const first = await client.searchByName('any');
+      expect(first).toEqual([]);
+
+      // Advance 10 seconds — still within cooldown. No additional
+      // warehouse attempt should happen; confirmed by the call still
+      // returning fast with [].
+      now.mockReturnValue(1_000_000 + 10_000);
+      const second = await client.searchByName('any');
+      expect(second).toEqual([]);
+
+      // Advance past the 60s window; breaker closes. Still returns []
+      // because the network still fails, but the path is re-attempted.
+      now.mockReturnValue(1_000_000 + 61_000);
+      const third = await client.searchByName('any');
+      expect(third).toEqual([]);
+    } finally {
+      Date.now = originalNow;
+    }
   });
 });

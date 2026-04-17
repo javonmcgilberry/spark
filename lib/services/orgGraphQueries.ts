@@ -203,6 +203,51 @@ export async function queryCrossFunctional(
 }
 
 /**
+ * Name / email prefix search. Drives the web picker on a single round
+ * trip — warehouse can answer "find anyone in the org whose name or
+ * email starts with these characters" in milliseconds, whereas Slack's
+ * users.list forces a full-workspace paginated crawl at 20 req/min.
+ *
+ * Matches are ranked so prefix hits beat contains hits, and short
+ * names win ties (so a two-char query doesn't drown you in long-name
+ * matches).
+ */
+export async function querySearchByName(
+  sql: SqlTag,
+  query: string,
+  limit: number
+): Promise<WarehouseRow[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const prefix = `${trimmed.toLowerCase()}%`;
+  const contains = `%${trimmed.toLowerCase()}%`;
+  return sql`
+    SELECT
+      u.name AS name,
+      u.email AS email,
+      u.title AS title,
+      NULL::text AS team_name,
+      NULL::text AS pillar_name,
+      NULL::text AS manager_email
+    FROM public.dx_users u
+    WHERE u.deleted_at IS NULL
+      AND (
+        LOWER(u.name) LIKE ${contains}
+        OR LOWER(u.email) LIKE ${contains}
+      )
+    ORDER BY
+      CASE
+        WHEN LOWER(u.name) LIKE ${prefix} THEN 0
+        WHEN LOWER(u.email) LIKE ${prefix} THEN 1
+        ELSE 2
+      END,
+      LENGTH(u.name),
+      u.name
+    LIMIT ${limit}
+  `;
+}
+
+/**
  * Walk the manager edge upward from a starting email until we hit a row
  * with no manager_email or we exhaust `depth`. Used to find the first
  * director-level person above the hire for the people-to-meet roster.
