@@ -2,7 +2,18 @@ import {notFound} from 'next/navigation';
 import type {CSSProperties} from 'react';
 import {requireManagerContext} from '../../../lib/session';
 import {getDraft, SparkApiError} from '../../../lib/sparkApi';
-import {DraftWorkspace} from '../../../components/DraftWorkspace';
+import {DraftProvider} from '../../../components/DraftProvider';
+import {
+  DraftWorkspaceHeader,
+  DraftWorkspaceBody,
+  DraftWorkspaceWelcomeNote,
+  DraftWorkspaceChecklist,
+  DraftWorkspacePreview,
+  DraftWorkspaceSidebar,
+  DraftWorkspaceAgentTimeline,
+  DraftWorkspaceCritiquePanel,
+  DraftWorkspaceSendToSlack,
+} from '../../../components/DraftWorkspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,27 +39,27 @@ export default async function DraftPage({
   }
 
   return (
-    <DraftWorkspace.Root
+    <DraftProvider
       initialPackage={initialPackage}
       newHireId={newHireId}
       managerSlackId={ctx.managerSlackId}
     >
       <div style={outerStyle}>
-        <DraftWorkspace.Header />
+        <DraftWorkspaceHeader />
         <div style={layoutGrid}>
-          <DraftWorkspace.Body>
-            <DraftWorkspace.WelcomeNote />
-            <DraftWorkspace.Checklist />
-            <DraftWorkspace.Preview />
-          </DraftWorkspace.Body>
-          <DraftWorkspace.Sidebar>
-            <DraftWorkspace.AgentTimeline />
-            <DraftWorkspace.CritiquePanel />
-            <DraftWorkspace.SendToSlack />
-          </DraftWorkspace.Sidebar>
+          <DraftWorkspaceBody>
+            <DraftWorkspaceWelcomeNote />
+            <DraftWorkspaceChecklist />
+            <DraftWorkspacePreview />
+          </DraftWorkspaceBody>
+          <DraftWorkspaceSidebar>
+            <DraftWorkspaceAgentTimeline />
+            <DraftWorkspaceCritiquePanel />
+            <DraftWorkspaceSendToSlack />
+          </DraftWorkspaceSidebar>
         </div>
       </div>
-    </DraftWorkspace.Root>
+    </DraftProvider>
   );
 }
 

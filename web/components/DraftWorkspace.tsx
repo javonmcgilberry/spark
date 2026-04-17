@@ -12,7 +12,7 @@ import {CritiquePanel} from './CritiquePanel';
 import {SendToSlackButton} from './SendToSlackButton';
 import {SaveIndicator} from './SaveIndicator';
 
-function DraftWorkspaceHeader() {
+export function DraftWorkspaceHeader() {
   const {state, meta} = useDraftContext();
   return (
     <header style={headerStyle}>
@@ -34,11 +34,11 @@ function DraftWorkspaceHeader() {
   );
 }
 
-function DraftWorkspaceBody({children}: {children: React.ReactNode}) {
+export function DraftWorkspaceBody({children}: {children: React.ReactNode}) {
   return <div style={{display: 'grid', gap: 20}}>{children}</div>;
 }
 
-function DraftWorkspaceSidebar({children}: {children: React.ReactNode}) {
+export function DraftWorkspaceSidebar({children}: {children: React.ReactNode}) {
   return (
     <aside style={{display: 'grid', gap: 20, alignContent: 'start'}}>
       {children}
@@ -46,7 +46,7 @@ function DraftWorkspaceSidebar({children}: {children: React.ReactNode}) {
   );
 }
 
-function DraftWorkspaceWelcomeNote() {
+export function DraftWorkspaceWelcomeNote() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
@@ -59,7 +59,7 @@ function DraftWorkspaceWelcomeNote() {
   );
 }
 
-function DraftWorkspaceChecklist() {
+export function DraftWorkspaceChecklist() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
@@ -74,12 +74,12 @@ function DraftWorkspaceChecklist() {
   );
 }
 
-function DraftWorkspacePreview() {
+export function DraftWorkspacePreview() {
   const {state} = useDraftContext();
   return <DraftPreview pkg={state.pkg} />;
 }
 
-function DraftWorkspaceAgentTimeline() {
+export function DraftWorkspaceAgentTimeline() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
@@ -114,7 +114,7 @@ function DraftWorkspaceAgentTimeline() {
   );
 }
 
-function DraftWorkspaceCritiquePanel() {
+export function DraftWorkspaceCritiquePanel() {
   const {state, actions} = useDraftContext();
   return (
     <>
@@ -146,7 +146,7 @@ function DraftWorkspaceCritiquePanel() {
   );
 }
 
-function DraftWorkspaceSendToSlack() {
+export function DraftWorkspaceSendToSlack() {
   const {state, actions} = useDraftContext();
   const criticalFindings = useMemo(
     () => state.findings.filter((f) => f.severity === 'critical'),
