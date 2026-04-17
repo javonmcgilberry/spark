@@ -19,14 +19,14 @@ You don't need to configure any of this — it's already set up:
 
 Never commit any of the following. The `.gitignore` blocks most of these, but stay vigilant:
 
-| Type | Examples |
-|------|----------|
-| API keys | `sk-...`, `AKIA...`, `ghp_...`, `xoxb-...` |
-| Environment files | `.env`, `.env.local`, `.env.production` |
-| Private keys | `*.pem`, `*.key`, `id_rsa`, `id_ed25519` |
-| Credential files | `credentials.json`, `service-account.json` |
-| Passwords | Hardcoded in source code or config files |
-| Cloud configs | `.aws/credentials`, `terraform.tfvars` |
+| Type              | Examples                                   |
+| ----------------- | ------------------------------------------ |
+| API keys          | `sk-...`, `AKIA...`, `ghp_...`, `xoxb-...` |
+| Environment files | `.env`, `.env.local`, `.env.production`    |
+| Private keys      | `*.pem`, `*.key`, `id_rsa`, `id_ed25519`   |
+| Credential files  | `credentials.json`, `service-account.json` |
+| Passwords         | Hardcoded in source code or config files   |
+| Cloud configs     | `.aws/credentials`, `terraform.tfvars`     |
 
 **Use environment variables instead.** See `.env.example` for the pattern.
 
@@ -46,13 +46,13 @@ This happens. Here's what to do immediately:
 
 ### Rotation Links for Common Providers
 
-| Provider | Where to rotate |
-|----------|----------------|
-| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| Anthropic | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
-| Google AI | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
-| AWS | [console.aws.amazon.com/iam](https://console.aws.amazon.com/iam) — rotate access keys |
-| GitHub | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| Provider  | Where to rotate                                                                       |
+| --------- | ------------------------------------------------------------------------------------- |
+| OpenAI    | [platform.openai.com/api-keys](https://platform.openai.com/api-keys)                  |
+| Anthropic | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)    |
+| Google AI | [aistudio.google.com/apikey](https://aistudio.google.com/apikey)                      |
+| AWS       | [console.aws.amazon.com/iam](https://console.aws.amazon.com/iam) — rotate access keys |
+| GitHub    | [github.com/settings/tokens](https://github.com/settings/tokens)                      |
 
 ---
 

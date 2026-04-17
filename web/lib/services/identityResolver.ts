@@ -12,23 +12,18 @@
  * directly. Caching is per-ctx via a Map kept on ctx.scratch.
  */
 
-import type { HandlerCtx } from "../ctx";
+import type {HandlerCtx} from '../ctx';
 import {
   buildChecklist,
   buildDefaultChannels,
   buildDefaultPeople,
   buildDefaultRituals,
   buildDefaultTools,
-} from "../onboarding/catalog";
-import { getDocDefinitions, DOC_PAGE_IDS } from "../onboarding/catalog";
-import type {
-  DocLink,
-  OnboardingPerson,
-  RoleTrack,
-  TeamProfile,
-} from "../types";
-import { findGitHubTeamSlug, suggestPathsForTeam } from "./codeowners";
-import type { SlackClient, SlackProfileFieldValue, SlackUser } from "./slack";
+} from '../onboarding/catalog';
+import {getDocDefinitions, DOC_PAGE_IDS} from '../onboarding/catalog';
+import type {DocLink, OnboardingPerson, RoleTrack, TeamProfile} from '../types';
+import {findGitHubTeamSlug, suggestPathsForTeam} from './codeowners';
+import type {SlackProfileFieldValue, SlackUser} from './slack';
 
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const SLACK_FIELD_IDS_TTL_MS = 60 * 60 * 1000;
@@ -51,8 +46,8 @@ interface SlackCustomFields {
 }
 
 interface Caches {
-  profile: Map<string, { profile: TeamProfile; expiresAt: number }>;
-  fieldIds: { fieldIds: Map<string, string>; expiresAt: number } | undefined;
+  profile: Map<string, {profile: TeamProfile; expiresAt: number}>;
+  fieldIds: {fieldIds: Map<string, string>; expiresAt: number} | undefined;
 }
 
 function getCaches(ctx: HandlerCtx): Caches {
@@ -68,7 +63,7 @@ function getCaches(ctx: HandlerCtx): Caches {
 
 export async function resolveFromSlack(
   ctx: HandlerCtx,
-  userId: string,
+  userId: string
 ): Promise<TeamProfile> {
   const caches = getCaches(ctx);
   const cached = caches.profile.get(userId);
@@ -77,7 +72,7 @@ export async function resolveFromSlack(
   const slackSeed = await lookupSlackSeed(ctx, caches, userId);
   const profile = await buildProfile(
     ctx,
-    mergeSeed(userId, slackSeed.displayName, slackSeed),
+    mergeSeed(userId, slackSeed.displayName, slackSeed)
   );
   caches.profile.set(userId, {
     profile,
@@ -88,7 +83,7 @@ export async function resolveFromSlack(
 
 export async function resolveFromEmail(
   ctx: HandlerCtx,
-  email: string,
+  email: string
 ): Promise<TeamProfile> {
   const caches = getCaches(ctx);
   const cached = caches.profile.get(email);
@@ -97,7 +92,7 @@ export async function resolveFromEmail(
   const slackSeed = await lookupSlackSeedByEmail(ctx, caches, email);
   const profile = await buildProfile(
     ctx,
-    mergeSeed(email, email.split("@")[0], slackSeed, email),
+    mergeSeed(email, email.split('@')[0], slackSeed, email)
   );
   caches.profile.set(email, {
     profile,
@@ -108,22 +103,22 @@ export async function resolveFromEmail(
 
 async function buildProfile(
   ctx: HandlerCtx,
-  seed: ProfileSeed,
+  seed: ProfileSeed
 ): Promise<TeamProfile> {
   const resolvedFirstName =
     firstNonEmpty(
       seed.firstName,
       firstNameFromValue(seed.displayName),
-      "there",
-    ) ?? "there";
-  const teamName = seed.teamName ?? "Engineering";
+      'there'
+    ) ?? 'there';
+  const teamName = seed.teamName ?? 'Engineering';
   const roleTrack = inferRoleTrack(teamName);
   const codeowners = await getCachedCodeowners(ctx);
   const githubTeamSlug = await findGitHubTeamSlug(codeowners, teamName);
   const keyPaths = await suggestPathsForTeam(
     codeowners,
     teamName,
-    githubTeamSlug,
+    githubTeamSlug
   );
   const people = await buildPeople(ctx, teamName, seed.manager);
 
@@ -152,7 +147,7 @@ async function buildProfile(
 async function buildPeople(
   ctx: HandlerCtx,
   teamName: string,
-  managerOverride: OnboardingPerson | undefined,
+  managerOverride: OnboardingPerson | undefined
 ): Promise<{
   manager: OnboardingPerson;
   buddy: OnboardingPerson;
@@ -179,14 +174,14 @@ async function buildPeople(
 
 async function hydratePerson(
   ctx: HandlerCtx,
-  person: OnboardingPerson,
+  person: OnboardingPerson
 ): Promise<OnboardingPerson> {
   if (person.slackUserId) {
-    const result = await ctx.slack.users.info({ user: person.slackUserId });
+    const result = await ctx.slack.users.info({user: person.slackUserId});
     return mergeSlackUserProfile(person, result.user);
   }
   if (person.email) {
-    const result = await ctx.slack.users.lookupByEmail({ email: person.email });
+    const result = await ctx.slack.users.lookupByEmail({email: person.email});
     return mergeSlackUserProfile(person, result.user);
   }
   return person;
@@ -195,15 +190,15 @@ async function hydratePerson(
 async function lookupSlackSeedByEmail(
   ctx: HandlerCtx,
   caches: Caches,
-  email: string,
+  email: string
 ): Promise<ProfileSeed | null> {
   try {
-    const result = await ctx.slack.users.lookupByEmail({ email });
+    const result = await ctx.slack.users.lookupByEmail({email});
     if (!result.user?.id) return null;
     const customFields = await lookupSlackCustomFields(
       ctx,
       caches,
-      result.user.id,
+      result.user.id
     );
     return buildSlackSeed(result.user.id, result.user, customFields);
   } catch {
@@ -214,10 +209,10 @@ async function lookupSlackSeedByEmail(
 async function lookupSlackSeed(
   ctx: HandlerCtx,
   caches: Caches,
-  userId: string,
+  userId: string
 ): Promise<ProfileSeed> {
   const [userInfo, customFields] = await Promise.all([
-    ctx.slack.users.info({ user: userId }),
+    ctx.slack.users.info({user: userId}),
     lookupSlackCustomFields(ctx, caches, userId),
   ]);
   return buildSlackSeed(userId, userInfo.user, customFields);
@@ -226,18 +221,18 @@ async function lookupSlackSeed(
 async function lookupSlackCustomFields(
   ctx: HandlerCtx,
   caches: Caches,
-  userId: string,
+  userId: string
 ): Promise<SlackCustomFields> {
   try {
     const [fieldIds, response] = await Promise.all([
       getSlackFieldIds(ctx, caches),
-      ctx.slack.users.profile.get({ user: userId }),
+      ctx.slack.users.profile.get({user: userId}),
     ]);
     const fields = response.profile?.fields ?? {};
     return {
-      division: readSlackField(fields, fieldIds, "division"),
-      team: readSlackField(fields, fieldIds, "team"),
-      manager: readSlackField(fields, fieldIds, "manager"),
+      division: readSlackField(fields, fieldIds, 'division'),
+      team: readSlackField(fields, fieldIds, 'team'),
+      manager: readSlackField(fields, fieldIds, 'manager'),
     };
   } catch {
     return {};
@@ -246,7 +241,7 @@ async function lookupSlackCustomFields(
 
 async function getSlackFieldIds(
   ctx: HandlerCtx,
-  caches: Caches,
+  caches: Caches
 ): Promise<Map<string, string>> {
   if (caches.fieldIds && caches.fieldIds.expiresAt > Date.now()) {
     return caches.fieldIds.fieldIds;
@@ -255,8 +250,8 @@ async function getSlackFieldIds(
     const response = await ctx.slack.team.profile.get();
     const fieldIds = new Map(
       (response.profile?.fields ?? []).flatMap((field) =>
-        field.label && field.id ? [[field.label.toLowerCase(), field.id]] : [],
-      ),
+        field.label && field.id ? [[field.label.toLowerCase(), field.id]] : []
+      )
     );
     caches.fieldIds = {
       fieldIds,
@@ -270,10 +265,10 @@ async function getSlackFieldIds(
 
 async function getCachedCodeowners(ctx: HandlerCtx): Promise<string> {
   const cached = ctx.scratch.codeownersText as
-    | { text: string; expiresAt: number }
+    | {text: string; expiresAt: number}
     | undefined;
   if (cached && cached.expiresAt > Date.now()) return cached.text;
-  const fetched = (await ctx.github.fetchCodeowners().catch(() => null)) ?? "";
+  const fetched = (await ctx.github.fetchCodeowners().catch(() => null)) ?? '';
   ctx.scratch.codeownersText = {
     text: fetched,
     expiresAt: Date.now() + 60 * 60 * 1000,
@@ -286,7 +281,7 @@ function getDocsForTrack(ctx: HandlerCtx, track: RoleTrack): DocLink[] {
   return getDocDefinitions(track).map((doc) => ({
     ...doc,
     url: baseUrl
-      ? `${baseUrl.replace(/\/$/, "")}/spaces/ENG/pages/${DOC_PAGE_IDS[doc.id]}`
+      ? `${baseUrl.replace(/\/$/, '')}/spaces/ENG/pages/${DOC_PAGE_IDS[doc.id]}`
       : null,
   }));
 }
@@ -297,7 +292,7 @@ function mergeSeed(
   userId: string,
   fallbackDisplayName: string,
   slackSeed: ProfileSeed | null,
-  email?: string,
+  email?: string
 ): ProfileSeed {
   return {
     userId,
@@ -314,45 +309,45 @@ function mergeSeed(
 function inferRoleTrack(teamName: string): RoleTrack {
   const normalized = teamName.toLowerCase();
   if (
-    ["frontend", "designer", "design", "ui", "spring"].some((value) =>
-      normalized.includes(value),
+    ['frontend', 'designer', 'design', 'ui', 'spring'].some((value) =>
+      normalized.includes(value)
     )
   ) {
-    return "frontend";
+    return 'frontend';
   }
   if (
-    ["backend", "server", "billing", "cms", "auth", "api"].some((value) =>
-      normalized.includes(value),
+    ['backend', 'server', 'billing', 'cms', 'auth', 'api'].some((value) =>
+      normalized.includes(value)
     )
   ) {
-    return "backend";
+    return 'backend';
   }
   if (
-    ["infra", "platform", "cloud", "build", "delivery"].some((value) =>
-      normalized.includes(value),
+    ['infra', 'platform', 'cloud', 'build', 'delivery'].some((value) =>
+      normalized.includes(value)
     )
   ) {
-    return "infrastructure";
+    return 'infrastructure';
   }
-  return "general";
+  return 'general';
 }
 
 function personalizePerson(
   person: OnboardingPerson,
-  teamName: string,
+  teamName: string
 ): OnboardingPerson {
-  if (person.role === "Engineering Manager") {
-    const label = teamName.toLowerCase().includes("engineering")
-      ? "Your engineering manager"
+  if (person.role === 'Engineering Manager') {
+    const label = teamName.toLowerCase().includes('engineering')
+      ? 'Your engineering manager'
       : `Your ${teamName} engineering manager`;
-    return { ...person, name: label };
+    return {...person, name: label};
   }
   return person;
 }
 
 function buildFallbackTeammate(
   teamName: string,
-  template: OnboardingPerson,
+  template: OnboardingPerson
 ): OnboardingPerson {
   return {
     ...template,
@@ -364,13 +359,13 @@ function buildFallbackTeammate(
 function buildSlackSeed(
   userId: string,
   user: SlackUser | undefined,
-  customFields: SlackCustomFields,
+  customFields: SlackCustomFields
 ): ProfileSeed {
   const profile = user?.profile;
   return {
     userId,
     firstName: slackFirstName(user),
-    displayName: slackDisplayName(user) ?? "New hire",
+    displayName: slackDisplayName(user) ?? 'New hire',
     avatarUrl: profile?.image_192 ?? profile?.image_72,
     email: profile?.email,
     teamName: slackFieldText(customFields.team),
@@ -381,7 +376,7 @@ function buildSlackSeed(
 
 function mergeSlackUserProfile(
   person: OnboardingPerson,
-  user: SlackUser | undefined,
+  user: SlackUser | undefined
 ): OnboardingPerson {
   const profile = user?.profile;
   const title = profile?.title?.trim();
@@ -401,7 +396,7 @@ function slackDisplayName(user: SlackUser | undefined): string | undefined {
   return firstNonEmpty(
     profile?.display_name,
     profile?.real_name,
-    user?.real_name,
+    user?.real_name
   );
 }
 
@@ -411,45 +406,45 @@ function slackFirstName(user: SlackUser | undefined): string | undefined {
     profile?.first_name,
     firstNameFromValue(profile?.display_name),
     firstNameFromValue(profile?.real_name),
-    firstNameFromValue(user?.real_name),
+    firstNameFromValue(user?.real_name)
   );
 }
 
 function readSlackField(
   fields: Record<string, SlackProfileFieldValue>,
   fieldIds: Map<string, string>,
-  label: string,
+  label: string
 ): SlackProfileFieldValue | undefined {
   const fieldId = fieldIds.get(label);
   return fieldId ? fields[fieldId] : undefined;
 }
 
 function buildManagerPerson(
-  managerField: SlackProfileFieldValue | undefined,
+  managerField: SlackProfileFieldValue | undefined
 ): OnboardingPerson | undefined {
   const name = slackFieldText(managerField);
   if (!name) return undefined;
   return {
     name,
-    role: "Engineering Manager",
-    kind: "manager",
-    editableBy: "manager",
+    role: 'Engineering Manager',
+    kind: 'manager',
+    editableBy: 'manager',
     discussionPoints:
-      "Role expectations, day-to-day support, performance goals, and how the team roadmap connects to your first few weeks.",
-    weekBucket: "week1-2",
+      'Role expectations, day-to-day support, performance goals, and how the team roadmap connects to your first few weeks.',
+    weekBucket: 'week1-2',
     slackUserId: parseSlackUserId(managerField?.value),
   };
 }
 
 function slackFieldText(
-  field: SlackProfileFieldValue | undefined,
+  field: SlackProfileFieldValue | undefined
 ): string | undefined {
   const value = field?.alt?.trim() || field?.value?.trim();
   return value || undefined;
 }
 
 function parseSlackUserId(value?: string): string | undefined {
-  const cleaned = value?.trim().replace(/[<@>]/g, "");
+  const cleaned = value?.trim().replace(/[<@>]/g, '');
   return cleaned && /^U[A-Z0-9]+$/.test(cleaned) ? cleaned : undefined;
 }
 

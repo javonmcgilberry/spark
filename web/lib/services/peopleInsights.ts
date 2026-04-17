@@ -11,12 +11,12 @@
  * cache; cross-invocation caching via KV can come later if needed.
  */
 
-import type { HandlerCtx } from "../ctx";
-import type { InsightAttempt, OnboardingPerson } from "../types";
-import type { GitHubPullRequest } from "./github";
-import { inferGithubUsername } from "./github";
-import type { JiraIssue } from "./jira";
-import { writePersonBlurb } from "./llmBlurbs";
+import type {HandlerCtx} from '../ctx';
+import type {InsightAttempt, OnboardingPerson} from '../types';
+import type {GitHubPullRequest} from './github';
+import {inferGithubUsername} from './github';
+import type {JiraIssue} from './jira';
+import {writePersonBlurb} from './llmBlurbs';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_TICKETS_PER_PERSON = 3;
@@ -63,7 +63,7 @@ export function personCacheKey(person: OnboardingPerson): string {
 export async function getInsight(
   ctx: HandlerCtx,
   person: OnboardingPerson,
-  teamName: string,
+  teamName: string
 ): Promise<PersonInsight> {
   const cache = getCache(ctx);
   const key = personCacheKey(person);
@@ -74,16 +74,15 @@ export async function getInsight(
     fetchTickets(ctx, person.email),
     fetchPullRequests(ctx, person.email),
   ]);
-  return writeInsight(ctx, person, teamName, key, { tickets, prs });
+  return writeInsight(ctx, person, teamName, key, {tickets, prs});
 }
 
 export async function getInsightWithHints(
   ctx: HandlerCtx,
   person: OnboardingPerson,
   teamName: string,
-  hints: InsightHints,
+  hints: InsightHints
 ): Promise<PersonInsight> {
-  const cache = getCache(ctx);
   const key = personCacheKey(person);
   const effectiveEmail = hints.email?.trim() || person.email;
   const overrideHandle = hints.githubUsername?.trim();
@@ -103,7 +102,7 @@ export async function getInsightWithHints(
   ]);
 
   const mergedTickets: FetchResult<JiraIssue> = extraTicket
-    ? { items: [extraTicket, ...tickets.items], attempt: tickets.attempt }
+    ? {items: [extraTicket, ...tickets.items], attempt: tickets.attempt}
     : tickets;
 
   return writeInsight(ctx, person, teamName, key, {
@@ -114,7 +113,7 @@ export async function getInsightWithHints(
 
 export function getCachedInsight(
   ctx: HandlerCtx,
-  person: OnboardingPerson,
+  person: OnboardingPerson
 ): PersonInsight | undefined {
   const cached = getCache(ctx).get(personCacheKey(person));
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -124,13 +123,13 @@ export function getCachedInsight(
 export async function getInsightsForPeople(
   ctx: HandlerCtx,
   people: OnboardingPerson[],
-  teamName: string,
+  teamName: string
 ): Promise<Record<string, PersonInsight>> {
   const entries = await Promise.all(
     people.map(async (person) => {
       const insight = await getInsight(ctx, person, teamName);
       return [personCacheKey(person), insight] as const;
-    }),
+    })
   );
   return Object.fromEntries(entries);
 }
@@ -143,16 +142,16 @@ async function writeInsight(
   results: {
     tickets: FetchResult<JiraIssue>;
     prs: FetchResult<GitHubPullRequest>;
-  },
+  }
 ): Promise<PersonInsight> {
-  const { tickets, prs } = results;
+  const {tickets, prs} = results;
   const askMeAbout = await writePersonBlurb(ctx, {
     person,
     teamName,
     tickets: tickets.items,
     prs: prs.items,
   }).catch((error) => {
-    ctx.logger.warn("Person insight blurb failed.", error);
+    ctx.logger.warn('Person insight blurb failed.', error);
     return null;
   });
 
@@ -173,35 +172,35 @@ async function writeInsight(
 
 async function fetchTickets(
   ctx: HandlerCtx,
-  email: string | undefined,
+  email: string | undefined
 ): Promise<FetchResult<JiraIssue>> {
   if (!ctx.jira.isConfigured()) {
     return {
       items: [],
-      attempt: { kind: "jira", input: "", count: 0, reason: "not_configured" },
+      attempt: {kind: 'jira', input: '', count: 0, reason: 'not_configured'},
     };
   }
   if (!email) {
     return {
       items: [],
-      attempt: { kind: "jira", input: "", count: 0, reason: "no_email" },
+      attempt: {kind: 'jira', input: '', count: 0, reason: 'no_email'},
     };
   }
   try {
     const items = await ctx.jira.findAssignedToEmail(email);
     return {
       items,
-      attempt: { kind: "jira", input: email, count: items.length },
+      attempt: {kind: 'jira', input: email, count: items.length},
     };
   } catch (error) {
     ctx.logger.warn(`Jira lookup failed for ${email}.`, error);
     return {
       items: [],
       attempt: {
-        kind: "jira",
+        kind: 'jira',
         input: email,
         count: 0,
-        reason: "lookup_failed",
+        reason: 'lookup_failed',
       },
     };
   }
@@ -209,7 +208,7 @@ async function fetchTickets(
 
 async function fetchTicketByKey(
   ctx: HandlerCtx,
-  key: string,
+  key: string
 ): Promise<JiraIssue | null> {
   if (!ctx.jira.isConfigured()) return null;
   try {
@@ -222,16 +221,16 @@ async function fetchTicketByKey(
 
 async function fetchPullRequests(
   ctx: HandlerCtx,
-  email: string | undefined,
+  email: string | undefined
 ): Promise<FetchResult<GitHubPullRequest>> {
   if (!ctx.github.isConfigured()) {
     return {
       items: [],
       attempt: {
-        kind: "github",
-        input: "",
+        kind: 'github',
+        input: '',
         count: 0,
-        reason: "not_configured",
+        reason: 'not_configured',
       },
     };
   }
@@ -239,7 +238,7 @@ async function fetchPullRequests(
   if (!handle) {
     return {
       items: [],
-      attempt: { kind: "github", input: "", count: 0, reason: "no_email" },
+      attempt: {kind: 'github', input: '', count: 0, reason: 'no_email'},
     };
   }
   return fetchPullRequestsForHandle(ctx, handle);
@@ -247,16 +246,16 @@ async function fetchPullRequests(
 
 async function fetchPullRequestsForHandle(
   ctx: HandlerCtx,
-  handle: string,
+  handle: string
 ): Promise<FetchResult<GitHubPullRequest>> {
   if (!ctx.github.isConfigured()) {
     return {
       items: [],
       attempt: {
-        kind: "github",
+        kind: 'github',
         input: handle,
         count: 0,
-        reason: "not_configured",
+        reason: 'not_configured',
       },
     };
   }
@@ -264,17 +263,17 @@ async function fetchPullRequestsForHandle(
     const items = await ctx.github.findOpenPullRequestsForUser(handle);
     return {
       items,
-      attempt: { kind: "github", input: handle, count: items.length },
+      attempt: {kind: 'github', input: handle, count: items.length},
     };
   } catch (error) {
     ctx.logger.warn(`GitHub lookup failed for ${handle}.`, error);
     return {
       items: [],
       attempt: {
-        kind: "github",
+        kind: 'github',
         input: handle,
         count: 0,
-        reason: "lookup_failed",
+        reason: 'lookup_failed',
       },
     };
   }
