@@ -6,7 +6,10 @@ export interface SlackUserHit {
   slackUserId: string;
   name: string;
   displayName: string;
-  email: string;
+  // Optional: Slack may redact the email for some users (restricted guests,
+  // missing `users:read.email` scope, privacy settings). slackUserId alone
+  // is enough for the onboarding flow.
+  email?: string;
   title?: string;
   avatarUrl?: string;
 }
@@ -70,8 +73,6 @@ export class SlackUserDirectoryService {
         if (member.deleted || member.is_bot) continue;
         if (member.id === 'USLACKBOT' || !member.id) continue;
         const profile = member.profile ?? {};
-        const email = profile.email?.trim();
-        if (!email) continue;
         const realName =
           profile.real_name_normalized ??
           profile.real_name ??
@@ -80,11 +81,12 @@ export class SlackUserDirectoryService {
           'Unknown';
         const displayName =
           profile.display_name_normalized ?? profile.display_name ?? realName;
+        const email = profile.email?.trim();
         hits.push({
           slackUserId: member.id,
           name: realName,
           displayName: displayName || realName,
-          email,
+          email: email || undefined,
           title: profile.title?.trim() || undefined,
           avatarUrl: profile.image_192 ?? profile.image_72 ?? undefined,
         });
@@ -106,10 +108,10 @@ export class SlackUserDirectoryService {
 function rank(user: SlackUserHit, needle: string): number {
   const name = user.name.toLowerCase();
   const display = user.displayName.toLowerCase();
-  const email = user.email.toLowerCase();
+  const email = user.email?.toLowerCase() ?? '';
   if (name.startsWith(needle) || display.startsWith(needle)) return 100;
-  if (email.startsWith(needle)) return 90;
+  if (email && email.startsWith(needle)) return 90;
   if (name.includes(needle) || display.includes(needle)) return 50;
-  if (email.includes(needle)) return 40;
+  if (email && email.includes(needle)) return 40;
   return 0;
 }

@@ -191,7 +191,7 @@ export interface SlackUserHit {
   slackUserId: string;
   name: string;
   displayName: string;
-  email: string;
+  email?: string;
   title?: string;
   avatarUrl?: string;
 }

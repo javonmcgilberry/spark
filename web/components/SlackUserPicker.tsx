@@ -184,7 +184,10 @@ export function SlackUserPicker({
               <div style={{display: 'grid', gap: 2}}>
                 <strong style={{fontSize: 14}}>{hit.displayName}</strong>
                 <span style={{fontSize: 12, color: '#94a3b8'}}>
-                  {hit.title ?? hit.email} · {hit.slackUserId}
+                  {[hit.title, hit.email, hit.slackUserId]
+                    .filter((part): part is string => Boolean(part))
+                    .slice(0, 2)
+                    .join(' · ')}
                 </span>
               </div>
             </li>

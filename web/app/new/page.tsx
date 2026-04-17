@@ -28,6 +28,7 @@ export default function NewDraftPage() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           newHireSlackId: hire.slackUserId,
+          // Slack may redact email for some users — slackUserId alone is fine.
           newHireEmail: hire.email,
         }),
       });
@@ -79,7 +80,7 @@ export default function NewDraftPage() {
             label="New hire"
             hint={
               hire
-                ? `${hire.name} · ${hire.email}`
+                ? `${hire.name}${hire.email ? ' · ' + hire.email : ''}`
                 : 'Type a name, display name, or email'
             }
             required
