@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import type {EnvConfig} from '../config/env.js';
 import type {Services} from '../app/services.js';
-import type {TeamProfile} from '../onboarding/types.js';
+import type {OnboardingPackage, TeamProfile} from '../onboarding/types.js';
 
 const checklistItemSchema = z.object({
   label: z.string().min(1),
@@ -543,23 +543,12 @@ function paramValue(req: express.Request, key: string): string {
   return typeof raw === 'string' ? raw : '';
 }
 
-type PeopleInsightsLike = Pick<Services['peopleInsights'], 'getCachedInsight'>;
-
-function enrichPackageInsights<
-  T extends {
-    sections: {
-      peopleToMeet: {
-        people: Array<{
-          insightsStatus?: string;
-          askMeAbout?: string;
-          insightsAttempts?: unknown;
-        }>;
-      };
-    };
-  },
->(pkg: T, insights: PeopleInsightsLike): T {
+function enrichPackageInsights(
+  pkg: OnboardingPackage,
+  insights: Services['peopleInsights']
+): OnboardingPackage {
   const people = pkg.sections.peopleToMeet.people.map((person) => {
-    const cached = insights.getCachedInsight(person as never);
+    const cached = insights.getCachedInsight(person);
     if (!cached) {
       return {...person, insightsStatus: 'pending' as const};
     }

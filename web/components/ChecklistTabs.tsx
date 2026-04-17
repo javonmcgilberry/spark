@@ -16,13 +16,7 @@ const KIND_LABELS: Record<ChecklistItemKind, string> = {
   recording: 'Recording',
 };
 
-const KIND_OPTIONS: ChecklistItemKind[] = [
-  'task',
-  'live-training',
-  'workramp',
-  'reading',
-  'recording',
-];
+const KIND_OPTIONS = Object.keys(KIND_LABELS) as ChecklistItemKind[];
 
 export function ChecklistTabs({
   pkg,
