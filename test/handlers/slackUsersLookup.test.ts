@@ -131,11 +131,14 @@ describe('handleLookupSlackUsers', () => {
     expect(body.users.map((u) => u.slackUserId)).toEqual(['UAKSHAR']);
   });
 
-  it('falls back to the Slack directory when the warehouse returns no matches', async () => {
+  it('treats a successful-but-empty warehouse response as the authoritative answer (does not secretly fall back to Slack)', async () => {
+    // Critical property: when the warehouse says "no matches," the
+    // picker returns [] instead of falling back to Slack users.list,
+    // which would hit Tier 2 rate limits to surface stale / partial
+    // data and hide what is already a correct answer.
     const ctx = makeTestCtx({
       org: {
         configured: true,
-        // Empty search pool — warehouse path returns [], handler falls through.
         searchPool: [],
       },
     });
@@ -149,7 +152,11 @@ describe('handleLookupSlackUsers', () => {
     ]);
 
     const res = await handleLookupSlackUsers(makeRequest('ak'), ctx, session);
-    const body = (await res.json()) as {users: Array<{slackUserId: string}>};
-    expect(body.users.map((u) => u.slackUserId)).toEqual(['UAKSHAR']);
+    const body = (await res.json()) as {
+      users: Array<{slackUserId: string}>;
+      partial: boolean;
+    };
+    expect(body.users).toEqual([]);
+    expect(body.partial).toBe(false);
   });
 });

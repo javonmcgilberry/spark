@@ -42,28 +42,4 @@ describe('slackUserDirectory', () => {
     const results = await searchUsers(ctx, '', 5);
     expect(results.map((r) => r.slackUserId)).toEqual(['UB', 'UA']);
   });
-
-  it('seeds missing manager ids via users.info', async () => {
-    const ctx = makeTestCtx({
-      slack: {
-        usersInfo: {
-          UMANAGER1: {
-            id: 'UMANAGER1',
-            real_name: 'Zeta Manager',
-            profile: {
-              real_name_normalized: 'Zeta Manager',
-              display_name_normalized: 'zeta',
-              email: 'zeta@example.com',
-            },
-          },
-        },
-      },
-    });
-    primeDirectoryForTests(ctx, []);
-
-    const results = await searchUsers(ctx, 'zeta', 5, {
-      seedSlackUserIds: ['UMANAGER1'],
-    });
-    expect(results[0]?.slackUserId).toBe('UMANAGER1');
-  });
 });

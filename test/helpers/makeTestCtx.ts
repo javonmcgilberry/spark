@@ -28,6 +28,9 @@ import type {
   OrgGraphClient,
   OrgGraphStubOverrides,
 } from '../../lib/services/orgGraph';
+import {resetBreakerForTests} from '../../lib/services/orgGraph';
+import {resetIsolateFieldIdsForTests} from '../../lib/services/identityResolver';
+import {resetIsolateDirectoryCacheForTests} from '../../lib/services/slackUserDirectory';
 import type {DraftStore} from '../../lib/draftStore';
 import type {Logger} from '../../lib/logger';
 
@@ -55,6 +58,14 @@ export interface MakeTestCtxOptions {
  * service.
  */
 export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
+  // Isolate-scoped caches (directory, field-ids, orgGraph breaker) live
+  // on globalThis so they survive across HandlerCtx instances in prod.
+  // Tests expect each case to start clean, so wipe the singletons
+  // whenever a fresh ctx is built.
+  resetIsolateDirectoryCacheForTests();
+  resetIsolateFieldIdsForTests();
+  resetBreakerForTests();
+
   const slack = isSlackClient(options.slack)
     ? options.slack
     : makeRecordingSlackClient(options.slack);

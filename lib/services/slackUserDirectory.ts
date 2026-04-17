@@ -80,29 +80,19 @@ function getCache(ctx: HandlerCtx): CacheContainer {
 export async function searchUsers(
   ctx: HandlerCtx,
   query: string,
-  limit = 10,
-  options: {seedSlackUserIds?: string[]} = {}
+  limit = 10
 ): Promise<SlackUserHit[]> {
-  const result = await searchUsersWithState(ctx, query, limit, options);
+  const result = await searchUsersWithState(ctx, query, limit);
   return result.users;
 }
 
 export async function searchUsersWithState(
   ctx: HandlerCtx,
   query: string,
-  limit = 10,
-  options: {seedSlackUserIds?: string[]} = {}
+  limit = 10
 ): Promise<SearchUsersResult> {
   const users = await getAll(ctx);
   const cache = getCache(ctx);
-
-  const missing = (options.seedSlackUserIds ?? []).filter(
-    (id) => !users.some((u) => u.slackUserId === id)
-  );
-  if (missing.length > 0) {
-    await seedByIds(ctx, cache, missing);
-  }
-
   const pool = cache.current?.users ?? users;
   const partial = cache.current?.partial ?? false;
   const needle = query.trim().toLowerCase();
@@ -204,60 +194,6 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
   return hits;
 }
 
-async function seedByIds(
-  ctx: HandlerCtx,
-  cache: CacheContainer,
-  ids: string[]
-): Promise<void> {
-  // Cold / uninitialized cache: still do the lookups and bootstrap a
-  // partial cache with whatever users.info returns. The next full
-  // users.list refresh will replace it. Without this, the picker can
-  // appear empty for an entire request when the cache hasn't loaded
-  // yet and someone passes explicit seed ids.
-  if (!cache.current) {
-    cache.current = {
-      users: [],
-      expiresAt: Date.now() + 60_000,
-      partial: true,
-    };
-  }
-  const current = cache.current;
-  for (const id of ids) {
-    try {
-      const res = await ctx.slack.users.info({user: id});
-      const member = res.user;
-      if (!member?.id || member.deleted || member.is_bot) continue;
-      const profile = member.profile ?? {};
-      const realName =
-        profile.real_name_normalized ??
-        profile.real_name ??
-        member.real_name ??
-        member.name ??
-        'Unknown';
-      const displayName =
-        profile.display_name_normalized ?? profile.display_name ?? realName;
-      current.users.push({
-        slackUserId: member.id,
-        name: realName,
-        displayName: displayName || realName,
-        email: profile.email?.trim() || undefined,
-        title: profile.title?.trim() || undefined,
-        avatarUrl: profile.image_192 ?? profile.image_72 ?? undefined,
-      });
-    } catch (error) {
-      ctx.logger.warn(
-        `Slack user directory: seed-by-id failed for ${id}`,
-        error
-      );
-    }
-  }
-  current.users.sort((a, b) =>
-    a.displayName.localeCompare(b.displayName, undefined, {
-      sensitivity: 'base',
-    })
-  );
-}
-
 function rank(user: SlackUserHit, needle: string): number {
   const name = user.name.toLowerCase();
   const display = user.displayName.toLowerCase();
@@ -287,4 +223,10 @@ export function primeDirectoryForTests(
     inFlight: null,
   };
   ctx.scratch.slackDirectory = fresh;
+}
+
+/** Test-only: wipe the globalThis-scoped directory so cases start clean. */
+export function resetIsolateDirectoryCacheForTests(): void {
+  const host = globalThis as unknown as Record<symbol, CacheContainer>;
+  delete host[DIRECTORY_SYMBOL];
 }

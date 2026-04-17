@@ -10,18 +10,6 @@ describe('identityResolver', () => {
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
-          UHIRE001: {
-            id: 'UHIRE001',
-            real_name: 'Hira Test',
-            profile: {
-              first_name: 'Hira',
-              real_name: 'Hira Test',
-              display_name: 'hira',
-              email: 'hira@webflow.com',
-              title: 'Senior Frontend Engineer',
-              image_192: 'https://img/192.png',
-            },
-          },
           UMANAGER1: {
             id: 'UMANAGER1',
             real_name: 'Mia Manager',
@@ -36,6 +24,12 @@ describe('identityResolver', () => {
         },
         usersProfileGet: {
           UHIRE001: {
+            first_name: 'Hira',
+            real_name: 'Hira Test',
+            display_name: 'hira',
+            email: 'hira@webflow.com',
+            title: 'Senior Frontend Engineer',
+            image_192: 'https://img/192.png',
             fields: {
               F_TEAM: {value: 'Frontend Platform'},
               F_DIVISION: {value: 'Platform'},
@@ -78,17 +72,6 @@ describe('identityResolver', () => {
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
-          UHIRE001: {
-            id: 'UHIRE001',
-            real_name: 'Hira Test',
-            profile: {
-              first_name: 'Hira',
-              real_name: 'Hira Test',
-              display_name: 'hira',
-              email: 'hira@webflow.com',
-              title: 'Software Engineer',
-            },
-          },
           UMANAGER1: {
             id: 'UMANAGER1',
             real_name: 'Mia Manager',
@@ -103,6 +86,11 @@ describe('identityResolver', () => {
         },
         usersProfileGet: {
           UHIRE001: {
+            first_name: 'Hira',
+            real_name: 'Hira Test',
+            display_name: 'hira',
+            email: 'hira@webflow.com',
+            title: 'Software Engineer',
             fields: {
               F_DEPARTMENT: {value: '1500 Engineering Team'},
               F_DIVISION: {value: 'Collaboration'},
@@ -151,17 +139,6 @@ describe('identityResolver', () => {
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
-          UHIRE001: {
-            id: 'UHIRE001',
-            real_name: 'Hira Test',
-            profile: {
-              first_name: 'Hira',
-              real_name: 'Hira Test',
-              display_name: 'hira',
-              email: 'hira@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
           UMANAGER1: {
             id: 'UMANAGER1',
             real_name: 'Bob Rose',
@@ -176,6 +153,11 @@ describe('identityResolver', () => {
         },
         usersProfileGet: {
           UHIRE001: {
+            first_name: 'Hira',
+            real_name: 'Hira Test',
+            display_name: 'hira',
+            email: 'hira@webflow.com',
+            title: 'Senior Software Engineer, Frontend',
             fields: {
               F_TEAM: {value: 'Frontend Platform'},
               F_DIVISION: {value: 'Collaboration'},
@@ -291,17 +273,6 @@ describe('identityResolver', () => {
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
-          UHIRE001: {
-            id: 'UHIRE001',
-            real_name: 'Hira Test',
-            profile: {
-              first_name: 'Hira',
-              real_name: 'Hira Test',
-              display_name: 'hira',
-              email: 'hira@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
           UMANAGER1: {
             id: 'UMANAGER1',
             real_name: 'Bob Rose',
@@ -316,6 +287,11 @@ describe('identityResolver', () => {
         },
         usersProfileGet: {
           UHIRE001: {
+            first_name: 'Hira',
+            real_name: 'Hira Test',
+            display_name: 'hira',
+            email: 'hira@webflow.com',
+            title: 'Senior Software Engineer, Frontend',
             fields: {
               F_TEAM: {value: 'Frontend Platform'},
               F_DIVISION: {value: 'Collaboration'},

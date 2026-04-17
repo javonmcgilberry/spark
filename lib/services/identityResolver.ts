@@ -29,12 +29,41 @@ import {getDocDefinitions, DOC_PAGE_IDS} from '../onboarding/catalog';
 import type {DocLink, OnboardingPerson, RoleTrack, TeamProfile} from '../types';
 import {findGitHubTeamSlug, suggestPathsForTeam} from './codeowners';
 import type {OrgPerson} from './orgGraph';
-import type {SlackProfileFieldValue, SlackUser} from './slack';
+import type {
+  SlackProfileFieldValue,
+  SlackUser,
+  SlackUserProfile,
+} from './slack';
 import {listAllUsers, type SlackUserHit} from './slackUserDirectory';
 
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const SLACK_FIELD_IDS_TTL_MS = 60 * 60 * 1000;
 const SLACK_CUSTOM_FIELDS_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Team field-id → label lookup (from team.profile.get) lives on the
+ * isolate so it survives across HandlerCtx instances. Workspace custom
+ * field config almost never changes; no point hitting Slack Tier 3 for
+ * it on every cold HandlerCtx.
+ */
+const FIELD_IDS_SYMBOL = Symbol.for('spark.slackFieldIds');
+interface IsolateFieldIds {
+  value: Map<string, string> | null;
+  expiresAt: number;
+}
+function getIsolateFieldIds(): IsolateFieldIds {
+  const host = globalThis as unknown as Record<symbol, IsolateFieldIds>;
+  if (!host[FIELD_IDS_SYMBOL]) {
+    host[FIELD_IDS_SYMBOL] = {value: null, expiresAt: 0};
+  }
+  return host[FIELD_IDS_SYMBOL];
+}
+
+/** Test-only: wipe the field-ids cache so each test starts clean. */
+export function resetIsolateFieldIdsForTests(): void {
+  const host = globalThis as unknown as Record<symbol, IsolateFieldIds>;
+  delete host[FIELD_IDS_SYMBOL];
+}
 
 /**
  * Visible-roster caps. peopleToMeet stays small and reviewable; the
@@ -66,9 +95,18 @@ interface Caches {
   profile: Map<string, {profile: TeamProfile; expiresAt: number}>;
   customFields: Map<
     string,
-    {customFields: SlackCustomFields; expiresAt: number}
+    {
+      customFields: SlackCustomFields;
+      /**
+       * Raw Slack profile alongside the custom-field map, so
+       * lookupSlackSeed can build a ProfileSeed without a second API
+       * call. Optional because the profile response can come back
+       * without a profile payload on certain error modes.
+       */
+      profile?: SlackUserProfile;
+      expiresAt: number;
+    }
   >;
-  fieldIds: {fieldIds: Map<string, string>; expiresAt: number} | undefined;
   /** Directory lookup by lowercase email. Built lazily from listAllUsers. */
   directoryByEmail: Map<string, SlackUserHit> | undefined;
 }
@@ -88,7 +126,6 @@ function getCaches(ctx: HandlerCtx): Caches {
   const created: Caches = {
     profile: new Map(),
     customFields: new Map(),
-    fieldIds: undefined,
     directoryByEmail: undefined,
   };
   ctx.scratch.identityCaches = created;
@@ -434,6 +471,10 @@ async function lookupSlackSeedByEmail(
   email: string
 ): Promise<ProfileSeed | null> {
   try {
+    // users.lookupByEmail is Tier 4 and returns the full user object
+    // (id, real_name, profile.*), so we can build the seed without a
+    // second users.info round trip. Custom fields still need
+    // users.profile.get — run them in parallel.
     const result = await ctx.slack.users.lookupByEmail({email});
     if (!result.user?.id) return null;
     const customFields = await lookupSlackCustomFields(
@@ -441,22 +482,35 @@ async function lookupSlackSeedByEmail(
       caches,
       result.user.id
     );
-    return buildSlackSeed(result.user.id, result.user, customFields);
+    return buildSlackSeed(
+      result.user.id,
+      result.user.profile,
+      customFields,
+      result.user
+    );
   } catch {
     return null;
   }
 }
 
+/**
+ * Fetch the hire's profile + custom fields in a single Slack call.
+ *
+ * users.profile.get returns display_name, real_name, first_name, email,
+ * title, images, and the custom `fields` map — everything buildSlackSeed
+ * needs. The older implementation also called users.info in parallel to
+ * get top-level `real_name`, but that was fully redundant: the same
+ * data is available on `profile.real_name`. Removing it saves one
+ * Tier-4 round trip on every draft create / resolve.
+ */
 async function lookupSlackSeed(
   ctx: HandlerCtx,
   caches: Caches,
   userId: string
 ): Promise<ProfileSeed> {
-  const [userInfo, customFields] = await Promise.all([
-    ctx.slack.users.info({user: userId}),
-    lookupSlackCustomFields(ctx, caches, userId),
-  ]);
-  return buildSlackSeed(userId, userInfo.user, customFields);
+  const customFields = await lookupSlackCustomFields(ctx, caches, userId);
+  const profile = caches.customFields.get(userId)?.profile;
+  return buildSlackSeed(userId, profile, customFields);
 }
 
 async function lookupSlackCustomFields(
@@ -470,10 +524,11 @@ async function lookupSlackCustomFields(
   }
   try {
     const [fieldIds, response] = await Promise.all([
-      getSlackFieldIds(ctx, caches),
+      getSlackFieldIds(ctx),
       ctx.slack.users.profile.get({user: userId}),
     ]);
-    const fields = response.profile?.fields ?? {};
+    const profile = response.profile;
+    const fields = profile?.fields ?? {};
     const customFields = {
       division: readSlackField(fields, fieldIds, 'division'),
       team: readSlackField(fields, fieldIds, 'team'),
@@ -482,6 +537,7 @@ async function lookupSlackCustomFields(
     };
     caches.customFields.set(userId, {
       customFields,
+      profile: profile ?? undefined,
       expiresAt: Date.now() + SLACK_CUSTOM_FIELDS_TTL_MS,
     });
     return customFields;
@@ -490,13 +546,14 @@ async function lookupSlackCustomFields(
   }
 }
 
-async function getSlackFieldIds(
-  ctx: HandlerCtx,
-  caches: Caches
-): Promise<Map<string, string>> {
-  if (caches.fieldIds && caches.fieldIds.expiresAt > Date.now()) {
-    return caches.fieldIds.fieldIds;
-  }
+/**
+ * Returns the workspace's field-id → label map. Cached on the isolate
+ * for SLACK_FIELD_IDS_TTL_MS so Slack's Tier 3 team.profile.get endpoint
+ * is hit at most once per isolate per hour.
+ */
+async function getSlackFieldIds(ctx: HandlerCtx): Promise<Map<string, string>> {
+  const cache = getIsolateFieldIds();
+  if (cache.value && cache.expiresAt > Date.now()) return cache.value;
   try {
     const response = await ctx.slack.team.profile.get();
     const fieldIds = new Map(
@@ -504,10 +561,8 @@ async function getSlackFieldIds(
         field.label && field.id ? [[field.label.toLowerCase(), field.id]] : []
       )
     );
-    caches.fieldIds = {
-      fieldIds,
-      expiresAt: Date.now() + SLACK_FIELD_IDS_TTL_MS,
-    };
+    cache.value = fieldIds;
+    cache.expiresAt = Date.now() + SLACK_FIELD_IDS_TTL_MS;
     return fieldIds;
   } catch {
     return new Map();
@@ -646,14 +701,14 @@ function canonicalPersonKey(person: OnboardingPerson): string {
 
 function buildSlackSeed(
   userId: string,
-  user: SlackUser | undefined,
-  customFields: SlackCustomFields
+  profile: SlackUserProfile | undefined,
+  customFields: SlackCustomFields,
+  user?: SlackUser
 ): ProfileSeed {
-  const profile = user?.profile;
   return {
     userId,
-    firstName: slackFirstName(user),
-    displayName: slackDisplayName(user) ?? 'New hire',
+    firstName: slackFirstName(profile, user),
+    displayName: slackDisplayName(profile, user) ?? 'New hire',
     avatarUrl: profile?.image_192 ?? profile?.image_72,
     email: profile?.email,
     title: profile?.title?.trim() || undefined,
@@ -674,7 +729,7 @@ function mergeSlackUserProfile(
   const title = profile?.title?.trim();
   return {
     ...person,
-    name: slackDisplayName(user) ?? person.name,
+    name: slackDisplayName(profile, user) ?? person.name,
     role: title || person.role,
     title,
     email: profile?.email ?? person.email,
@@ -683,8 +738,10 @@ function mergeSlackUserProfile(
   };
 }
 
-function slackDisplayName(user: SlackUser | undefined): string | undefined {
-  const profile = user?.profile;
+function slackDisplayName(
+  profile: SlackUserProfile | undefined,
+  user?: SlackUser
+): string | undefined {
   return firstNonEmpty(
     profile?.display_name,
     profile?.real_name,
@@ -692,8 +749,10 @@ function slackDisplayName(user: SlackUser | undefined): string | undefined {
   );
 }
 
-function slackFirstName(user: SlackUser | undefined): string | undefined {
-  const profile = user?.profile;
+function slackFirstName(
+  profile: SlackUserProfile | undefined,
+  user?: SlackUser
+): string | undefined {
   return firstNonEmpty(
     profile?.first_name,
     firstNameFromValue(profile?.display_name),

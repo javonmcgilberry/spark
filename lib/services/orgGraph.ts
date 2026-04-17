@@ -106,6 +106,12 @@ function getBreaker(): BreakerState {
   return host[BREAKER_SYMBOL];
 }
 
+/** Test-only: reset the circuit breaker between cases. */
+export function resetBreakerForTests(): void {
+  const host = globalThis as unknown as Record<symbol, BreakerState>;
+  delete host[BREAKER_SYMBOL];
+}
+
 /**
  * Title patterns per role. Kept conservative so a misspelled or highly
  * creative title falls through to the empty-set path rather than
