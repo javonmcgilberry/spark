@@ -323,7 +323,13 @@ describe('drafts handlers', () => {
       'UHIRE001'
     );
     expect(generated.status).toBe(200);
-    await new Response(generated.body).text();
+    const sseText = await new Response(generated.body).text();
+
+    // The preflight step is the FIRST thing the manager sees in the
+    // agent timeline — it reports the already-resolved roster so
+    // they're not guessing whether teammates got built.
+    expect(sseText).toContain('"tool":"resolve_team_roster"');
+    expect(sseText).toMatch(/"iteration":-1/);
 
     const stored = await ctx.db.get('UHIRE001');
     expect(stored?.welcomeIntro).toContain('Welcome aboard!');
