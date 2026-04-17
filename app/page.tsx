@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {getManagerSession} from '../lib/session';
+import {getSessionDetails, type AccessDiagnostic} from '../lib/session';
 import {buildRouteCtx} from '../lib/routeCtx';
 import {resolveFromSlack} from '../lib/services/identityResolver';
 import {enrichPackageInsights} from '../lib/handlers/drafts/enrich';
@@ -9,13 +9,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const {ctx} = await buildRouteCtx();
-  const session = await getManagerSession(ctx);
+  const {session, access} = await getSessionDetails(ctx);
   if (!session) {
     return (
-      <EmptyState
-        title="No manager session"
-        body="On Webflow Inside you're identified automatically via Okta SSO. If you're seeing this locally, set DEMO_MANAGER_SLACK_ID in .env to continue."
-      />
+      <EmptyState title="No manager session" body={describeNoSession(access)} />
     );
   }
 
@@ -214,6 +211,34 @@ function EmptyState({title, body}: {title: string; body: string}) {
       </section>
     </div>
   );
+}
+
+/**
+ * Explain WHY we couldn't build a session. The three failure modes:
+ *
+ *   - CF Access asserted an email, Slack resolved it happily, but we
+ *     still landed here: can't actually happen — kept defensive.
+ *   - CF Access asserted an email and Slack couldn't resolve it. Shows
+ *     the email + Slack error code so the operator can fix the env
+ *     (SLACK_BOT_TOKEN, users:read.email scope, workspace mismatch).
+ *   - No CF Access at all. Either we're running locally without the
+ *     Okta proxy, or Webflow Cloud is somehow not forwarding the JWT.
+ *     `/api/whoami` tells you which.
+ */
+function describeNoSession(access: AccessDiagnostic): string {
+  if (access.email) {
+    const reason =
+      access.slackLookup === 'user-not-found'
+        ? `Slack returned "${access.slackLookupError ?? 'users_not_found'}" — check SLACK_BOT_TOKEN is set in Webflow Cloud env with the users:read.email scope, and that your Slack profile email matches ${access.email}.`
+        : access.slackLookup === 'api-error'
+          ? `Slack API call failed: ${access.slackLookupError ?? 'unknown error'}. Most common cause is a missing or stale SLACK_BOT_TOKEN in Webflow Cloud env.`
+          : 'Slack lookup did not complete.';
+    return `Cloudflare Access identified you as ${access.email}, but ${reason}`;
+  }
+  if (access.hasAccessHeader || access.hasAccessCookie) {
+    return `Cloudflare Access forwarded a JWT but we couldn't decode an email out of it. Open /api/whoami to inspect the raw payload.`;
+  }
+  return `On Webflow Inside you're identified automatically via Okta SSO. If you're seeing this locally, set DEMO_MANAGER_SLACK_ID in .env. Hit /api/whoami to confirm whether Cloudflare Access headers are reaching the Worker.`;
 }
 
 const panelStyle = {

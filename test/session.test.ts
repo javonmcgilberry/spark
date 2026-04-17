@@ -167,3 +167,71 @@ describe('requireManagerSession', () => {
     await expect(requireManagerSession(ctx)).rejects.toBeInstanceOf(Response);
   });
 });
+
+describe('getSessionDetails diagnostic', () => {
+  beforeEach(() => {
+    headersRef.value = new Headers();
+    cookieStore.clear();
+  });
+
+  it('surfaces slackLookup=user-not-found when CF Access email is unknown to Slack', async () => {
+    headersRef.value = new Headers({
+      'Cf-Access-Jwt-Assertion': makeJwt({
+        email: 'ghost@webflow.com',
+        sub: 'cf-ghost',
+      }),
+    });
+    const ctx = makeTestCtx(); // no usersLookupByEmail override → ok:false
+
+    const {getSessionDetails} = await import('../lib/session');
+    const result = await getSessionDetails(ctx);
+
+    expect(result.session).toBeNull();
+    expect(result.access.hasAccessHeader).toBe(true);
+    expect(result.access.email).toBe('ghost@webflow.com');
+    expect(result.access.slackLookup).toBe('user-not-found');
+  });
+
+  it('surfaces slackLookup=ok and resolved session on the happy path', async () => {
+    headersRef.value = new Headers({
+      'Cf-Access-Jwt-Assertion': makeJwt({
+        email: 'javon@webflow.com',
+        sub: 'cf-javon',
+      }),
+    });
+    const ctx = makeTestCtx({
+      slack: {
+        usersLookupByEmail: {
+          'javon@webflow.com': {
+            id: 'U12345',
+            real_name: 'Javon McGilberry',
+            profile: {email: 'javon@webflow.com'},
+          },
+        },
+      },
+    });
+
+    const {getSessionDetails} = await import('../lib/session');
+    const result = await getSessionDetails(ctx);
+
+    expect(result.session).toEqual({
+      managerSlackId: 'U12345',
+      email: 'javon@webflow.com',
+      source: 'cloudflare-access',
+    });
+    expect(result.access.slackLookup).toBe('ok');
+  });
+
+  it('reports hasAccessHeader=false when no CF Access signal is present', async () => {
+    const ctx = makeTestCtx();
+    (ctx.env as Record<string, unknown>).DEMO_MANAGER_SLACK_ID = undefined;
+
+    const {getSessionDetails} = await import('../lib/session');
+    const result = await getSessionDetails(ctx);
+
+    expect(result.session).toBeNull();
+    expect(result.access.hasAccessHeader).toBe(false);
+    expect(result.access.hasAccessCookie).toBe(false);
+    expect(result.access.slackLookup).toBe('not-attempted');
+  });
+});

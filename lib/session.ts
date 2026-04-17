@@ -1,5 +1,5 @@
 import {cookies, headers} from 'next/headers';
-import {readAccessIdentity} from './auth/cloudflareAccess';
+import {inspectAccessHeaders} from './auth/cloudflareAccess';
 import type {HandlerCtx} from './ctx';
 
 /**
@@ -7,49 +7,95 @@ import type {HandlerCtx} from './ctx';
  *
  *   1. Cloudflare Access JWT (Cf-Access-Jwt-Assertion / CF_Authorization)
  *      — present on every Webflow Inside request behind Webflow Okta SSO.
- *      We pull the verified email off the JWT and resolve it to a Slack
- *      user via `users.lookupByEmail`. Requires ctx so we have a Slack
- *      client; when CF Access asserts an identity but Slack can't
- *      resolve it we 401 rather than falling through — we'd rather
- *      refuse than attribute actions to the wrong person.
+ *      The verified email comes off the JWT; we resolve it to a Slack
+ *      user via `users.lookupByEmail`. If CF Access asserted an identity
+ *      but Slack can't resolve it we return null rather than falling
+ *      through — silent fallback would attribute actions to the wrong
+ *      person.
  *
  *   2. Signed cookie `spark_manager_slack_id` — manual override useful
- *      for the dev sandbox and local testing.
+ *      for the dev sandbox.
  *
  *   3. `DEMO_MANAGER_SLACK_ID` env — local-dev escape hatch when no CF
- *      Access proxy sits in front of the Worker (e.g. `npm run dev`).
- *
- * Callers who only need the fallback paths (cookie / env) can skip the
- * ctx argument; production routes pass it so the CF Access path is tried
- * first.
+ *      Access proxy sits in front of the Worker.
  */
 
 export const SESSION_COOKIE_NAME = 'spark_manager_slack_id';
 
 export interface ManagerSession {
   managerSlackId: string;
-  /** Present when we learned it from CF Access or looked it up on Slack. */
   email?: string;
   source: 'cloudflare-access' | 'cookie' | 'env';
+}
+
+export type SlackLookupOutcome =
+  | 'ok'
+  | 'user-not-found'
+  | 'api-error'
+  | 'not-attempted';
+
+export interface AccessDiagnostic {
+  hasAccessHeader: boolean;
+  hasAccessCookie: boolean;
+  /** Email off the CF Access JWT, if decode succeeded. */
+  email: string | null;
+  slackLookup: SlackLookupOutcome;
+  /** Slack's `ok:false` error code or a network error message. */
+  slackLookupError: string | null;
+}
+
+export interface SessionDetails {
+  session: ManagerSession | null;
+  access: AccessDiagnostic;
+}
+
+const EMPTY_ACCESS: AccessDiagnostic = {
+  hasAccessHeader: false,
+  hasAccessCookie: false,
+  email: null,
+  slackLookup: 'not-attempted',
+  slackLookupError: null,
+};
+
+export async function getSessionDetails(
+  ctx?: HandlerCtx
+): Promise<SessionDetails> {
+  let access: AccessDiagnostic = EMPTY_ACCESS;
+  let resolvedSlackId: string | null = null;
+  if (ctx) {
+    const resolution = await resolveCloudflareAccess(ctx);
+    access = resolution.diagnostic;
+    resolvedSlackId = resolution.slackId;
+  }
+
+  // CF Access asserted an identity. Use the Slack-resolved session or
+  // refuse — never fall through to cookie/env (that would attribute
+  // actions to whoever set them, not the authenticated user).
+  if (access.hasAccessHeader || access.hasAccessCookie) {
+    if (resolvedSlackId && access.email) {
+      return {
+        session: {
+          managerSlackId: resolvedSlackId,
+          email: access.email,
+          source: 'cloudflare-access',
+        },
+        access,
+      };
+    }
+    return {session: null, access};
+  }
+
+  const cookieSession = await tryCookie();
+  if (cookieSession) return {session: cookieSession, access};
+
+  const env = ctx?.env ?? (process.env as unknown as CloudflareEnv);
+  return {session: tryEnvFallback(env), access};
 }
 
 export async function getManagerSession(
   ctx?: HandlerCtx
 ): Promise<ManagerSession | null> {
-  if (ctx) {
-    const access = await resolveCloudflareAccess(ctx);
-    if (access) {
-      // CF Access asserted an identity — return whatever it resolved
-      // to (session or null). Never fall through to cookie/env.
-      return access.session;
-    }
-  }
-
-  const cookieSession = await tryCookie();
-  if (cookieSession) return cookieSession;
-
-  const env = ctx?.env ?? (process.env as unknown as CloudflareEnv);
-  return tryEnvFallback(env);
+  return (await getSessionDetails(ctx)).session;
 }
 
 export async function requireManagerSession(
@@ -65,46 +111,72 @@ export async function requireManagerSession(
   return session;
 }
 
-/**
- * Returns the CF Access-derived session, or null if CF Access didn't
- * identify anyone or Slack couldn't resolve the asserted email. When
- * CF Access IS present, the caller must not fall through to cookie/env
- * — that would attribute actions to the wrong user. Returning null
- * from here short-circuits the fallback chain in getManagerSession.
- */
+interface AccessResolution {
+  diagnostic: AccessDiagnostic;
+  slackId: string | null;
+}
+
 async function resolveCloudflareAccess(
   ctx: HandlerCtx
-): Promise<{status: 'identified'; session: ManagerSession | null} | null> {
+): Promise<AccessResolution> {
   const h = await headers();
-  const identity = readAccessIdentity(h);
-  if (!identity) return null;
+  const inspection = inspectAccessHeaders(h);
+  const email = inspection.payload?.email ?? null;
+  const base = {
+    hasAccessHeader: inspection.hasHeader,
+    hasAccessCookie: inspection.hasCookie,
+  } as const;
 
-  const slackUser = await ctx.slack.users
-    .lookupByEmail({email: identity.email})
-    .catch((error: unknown) => {
-      ctx.logger.warn(
-        `users.lookupByEmail failed for ${identity.email}`,
-        error
-      );
-      return null;
-    });
-
-  const slackId = slackUser?.user?.id;
-  if (!slackId) {
-    ctx.logger.warn(
-      `Cloudflare Access identified ${identity.email} but Slack has no matching user`
-    );
-    return {status: 'identified', session: null};
+  if (!email || !inspection.payload?.sub) {
+    return {
+      diagnostic: {
+        ...base,
+        email,
+        slackLookup: 'not-attempted',
+        slackLookupError: null,
+      },
+      slackId: null,
+    };
   }
 
-  return {
-    status: 'identified',
-    session: {
-      managerSlackId: slackId,
-      email: identity.email,
-      source: 'cloudflare-access',
-    },
-  };
+  try {
+    const response = await ctx.slack.users.lookupByEmail({email});
+    if (response.ok && response.user?.id) {
+      return {
+        diagnostic: {
+          ...base,
+          email,
+          slackLookup: 'ok',
+          slackLookupError: null,
+        },
+        slackId: response.user.id,
+      };
+    }
+    ctx.logger.warn(
+      `users.lookupByEmail for ${email} returned ok=false (${response.error ?? 'no-error-field'})`
+    );
+    return {
+      diagnostic: {
+        ...base,
+        email,
+        slackLookup: 'user-not-found',
+        slackLookupError: response.error ?? null,
+      },
+      slackId: null,
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    ctx.logger.warn(`users.lookupByEmail for ${email} threw: ${message}`);
+    return {
+      diagnostic: {
+        ...base,
+        email,
+        slackLookup: 'api-error',
+        slackLookupError: message,
+      },
+      slackId: null,
+    };
+  }
 }
 
 async function tryCookie(): Promise<ManagerSession | null> {
