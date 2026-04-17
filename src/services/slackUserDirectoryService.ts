@@ -95,6 +95,12 @@ export class SlackUserDirectoryService {
         );
       }
     }
+    // Maintain alphabetical sort after any injections.
+    this.cache.users.sort((a, b) =>
+      a.displayName.localeCompare(b.displayName, undefined, {
+        sensitivity: 'base',
+      })
+    );
   }
 
   private async getAll(client: App['client']): Promise<SlackUserHit[]> {
@@ -146,6 +152,14 @@ export class SlackUserDirectoryService {
       cursor = res.response_metadata?.next_cursor;
       if (!cursor) break;
     }
+    // Slack returns users in account-creation order. Sort alphabetically by
+    // displayName (case-insensitive, locale-aware) so empty-query results
+    // and ties in rank() scoring are predictable + scannable.
+    hits.sort((a, b) =>
+      a.displayName.localeCompare(b.displayName, undefined, {
+        sensitivity: 'base',
+      })
+    );
     this.cache = {users: hits, expiresAt: Date.now() + CACHE_TTL_MS};
     this.logger.info(
       `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)`
