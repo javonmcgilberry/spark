@@ -1,54 +1,29 @@
-import {NextResponse} from 'next/server';
-import {requireManagerContext} from '../../../../lib/session';
-import {getDraft, patchDraft, SparkApiError} from '../../../../lib/sparkApi';
-import type {DraftFieldPatch} from '../../../../lib/types';
+import { buildManagerCtx, handleRouteError } from "../../../../lib/routeCtx";
+import {
+  handleGetDraft,
+  handlePatchDraft,
+} from "../../../../lib/handlers/drafts/byId";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-type RouteParams = {params: Promise<{id: string}>};
+type RouteParams = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, {params}: RouteParams) {
+export async function GET(_req: Request, { params }: RouteParams) {
   try {
-    const ctx = await requireManagerContext();
-    const {id} = await params;
-    const pkg = await getDraft(
-      {env: ctx.env, managerSlackId: ctx.managerSlackId},
-      id
-    );
-    return NextResponse.json({pkg});
+    const { ctx, session } = await buildManagerCtx();
+    const { id } = await params;
+    return await handleGetDraft(ctx, session, id);
   } catch (error) {
-    return handleError(error);
+    return handleRouteError(error);
   }
 }
 
-export async function PATCH(request: Request, {params}: RouteParams) {
+export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const ctx = await requireManagerContext();
-    const {id} = await params;
-    const body = (await request
-      .json()
-      .catch(() => null)) as DraftFieldPatch | null;
-    if (!body) {
-      return NextResponse.json({error: 'body required'}, {status: 400});
-    }
-    const pkg = await patchDraft(
-      {env: ctx.env, managerSlackId: ctx.managerSlackId},
-      id,
-      body
-    );
-    return NextResponse.json({pkg});
+    const { ctx, session } = await buildManagerCtx();
+    const { id } = await params;
+    return await handlePatchDraft(request, ctx, session, id);
   } catch (error) {
-    return handleError(error);
+    return handleRouteError(error);
   }
-}
-
-function handleError(error: unknown) {
-  if (error instanceof Response) return error;
-  if (error instanceof SparkApiError) {
-    return NextResponse.json({error: error.message}, {status: error.status});
-  }
-  return NextResponse.json(
-    {error: error instanceof Error ? error.message : 'internal error'},
-    {status: 500}
-  );
 }

@@ -1,8 +1,9 @@
-import {notFound} from 'next/navigation';
-import type {CSSProperties} from 'react';
-import {requireManagerContext} from '../../../lib/session';
-import {getDraft, SparkApiError} from '../../../lib/sparkApi';
-import {DraftProvider} from '../../../components/DraftProvider';
+import { notFound } from "next/navigation";
+import type { CSSProperties } from "react";
+import { requireManagerSession } from "../../../lib/session";
+import { buildRouteCtx } from "../../../lib/routeCtx";
+import { enrichPackageInsights } from "../../../lib/handlers/drafts/enrich";
+import { DraftProvider } from "../../../components/DraftProvider";
 import {
   DraftWorkspaceHeader,
   DraftWorkspaceBody,
@@ -13,36 +14,28 @@ import {
   DraftWorkspaceAgentTimeline,
   DraftWorkspaceCritiquePanel,
   DraftWorkspaceSendToSlack,
-} from '../../../components/DraftWorkspace';
+} from "../../../components/DraftWorkspace";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function DraftPage({
   params,
 }: {
-  params: Promise<{newHireId: string}>;
+  params: Promise<{ newHireId: string }>;
 }) {
-  const {newHireId} = await params;
-  const ctx = await requireManagerContext();
+  const { newHireId } = await params;
+  const { ctx, env } = await buildRouteCtx();
+  const session = await requireManagerSession(env);
 
-  let initialPackage;
-  try {
-    initialPackage = await getDraft(
-      {env: ctx.env, managerSlackId: ctx.managerSlackId},
-      newHireId
-    );
-  } catch (error) {
-    if (error instanceof SparkApiError && error.status === 404) {
-      notFound();
-    }
-    throw error;
-  }
+  const pkg = await ctx.db.get(newHireId);
+  if (!pkg) notFound();
+  const initialPackage = enrichPackageInsights(ctx, pkg);
 
   return (
     <DraftProvider
       initialPackage={initialPackage}
       newHireId={newHireId}
-      managerSlackId={ctx.managerSlackId}
+      managerSlackId={session.managerSlackId}
     >
       <div style={outerStyle}>
         <DraftWorkspaceHeader />
@@ -64,14 +57,14 @@ export default async function DraftPage({
 }
 
 const outerStyle: CSSProperties = {
-  display: 'grid',
+  display: "grid",
   gap: 20,
   maxWidth: 1200,
-  margin: '0 auto',
+  margin: "0 auto",
 };
 
 const layoutGrid: CSSProperties = {
-  display: 'grid',
+  display: "grid",
   gap: 20,
-  gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 380px)',
+  gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 380px)",
 };

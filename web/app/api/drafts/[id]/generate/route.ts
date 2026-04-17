@@ -1,120 +1,16 @@
-import {NextResponse} from 'next/server';
-import {requireManagerContext} from '../../../../../lib/session';
-import {patchDraft} from '../../../../../lib/sparkApi';
-import {
-  runGenerator,
-  type GeneratorInput,
-} from '../../../../../lib/agents/generator';
+import { buildManagerCtx, handleRouteError } from "../../../../../lib/routeCtx";
+import { handleGenerateDraft } from "../../../../../lib/handlers/drafts/generate";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-type RouteParams = {params: Promise<{id: string}>};
+type RouteParams = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, {params}: RouteParams) {
-  let ctx;
+export async function POST(request: Request, { params }: RouteParams) {
   try {
-    ctx = await requireManagerContext();
+    const { ctx, session } = await buildManagerCtx();
+    const { id } = await params;
+    return await handleGenerateDraft(request, ctx, session, id);
   } catch (error) {
-    if (error instanceof Response) return error;
-    throw error;
+    return handleRouteError(error);
   }
-  const {id} = await params;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      {error: 'ANTHROPIC_API_KEY not configured'},
-      {status: 503}
-    );
-  }
-  const body = (await request
-    .json()
-    .catch(() => null)) as GeneratorInput | null;
-  if (!body || !body.newHireName) {
-    return NextResponse.json({error: 'newHireName required'}, {status: 400});
-  }
-
-  const sparkCtx = {env: ctx.env, managerSlackId: ctx.managerSlackId};
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: unknown) => {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
-        );
-      };
-      try {
-        for await (const event of runGenerator(body, {
-          apiKey,
-          model: process.env.ANTHROPIC_MODEL,
-          spark: sparkCtx,
-          signal: request.signal,
-        })) {
-          send(event);
-          if (
-            event.type === 'tool_call' &&
-            event.tool === 'draft_welcome_note'
-          ) {
-            const early = event.input as {
-              welcomeIntro?: string;
-              welcomeNote?: string;
-            } | null;
-            if (early?.welcomeIntro && early?.welcomeNote) {
-              try {
-                const pkg = await patchDraft(sparkCtx, id, {
-                  welcomeIntro: early.welcomeIntro,
-                  welcomeNote: early.welcomeNote,
-                });
-                send({type: 'draft_persisted', pkgUserId: pkg.userId});
-              } catch (error) {
-                // Early persist is best-effort. finalize_draft will write
-                // the authoritative copy if this fails.
-                send({
-                  type: 'thinking',
-                  iteration: event.iteration,
-                  text:
-                    'Could not persist early welcome: ' +
-                    (error instanceof Error ? error.message : 'unknown'),
-                });
-              }
-            }
-          }
-          if (event.type === 'draft_ready') {
-            try {
-              const pkg = await patchDraft(sparkCtx, id, {
-                welcomeIntro: event.draft.welcomeIntro,
-                welcomeNote: event.draft.welcomeNote,
-                buddyUserId: event.draft.buddyUserId ?? null,
-                stakeholderUserIds: event.draft.stakeholderUserIds,
-                customChecklistItems: event.draft.customChecklistItems,
-              });
-              send({type: 'draft_persisted', pkgUserId: pkg.userId});
-            } catch (error) {
-              send({
-                type: 'error',
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : 'failed to persist draft',
-              });
-            }
-          }
-        }
-      } catch (error) {
-        send({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'generator failed',
-        });
-      } finally {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-    },
-  });
 }
