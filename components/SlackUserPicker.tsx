@@ -76,6 +76,11 @@ export function SlackUserPicker({
 
   useEffect(() => {
     if (!open) return;
+    // Don't fire a lookup for an empty query. The old behavior paginated
+    // the whole Slack directory just to surface a generic alphabetical
+    // slice on focus — a free Tier 2 crawl per page mount when the
+    // user hadn't even typed yet. Wait for a real keystroke.
+    if (query.trim().length === 0) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       void runSearch(query);
@@ -153,7 +158,12 @@ export function SlackUserPicker({
         }}
         onFocus={() => {
           setOpen(true);
-          if (hits.length === 0) void runSearch(query);
+          // Only run a lookup on focus if the user has already typed
+          // something and we somehow don't have results for it. Empty
+          // query → do nothing; user types → useEffect picks it up.
+          if (query.trim().length > 0 && hits.length === 0) {
+            void runSearch(query);
+          }
         }}
         onBlur={() => {
           // delay so clicks on options land before we close
@@ -213,9 +223,11 @@ export function SlackUserPicker({
           ))}
           {!loading && hits.length === 0 && !error ? (
             <li style={{...rowStyle, color: '#94a3b8'}}>
-              {partial
-                ? 'Workspace directory is still loading. Try again in a moment.'
-                : 'No matches'}
+              {query.trim().length === 0
+                ? 'Type a name, display name, or email'
+                : partial
+                  ? 'Workspace directory is still loading. Try again in a moment.'
+                  : 'No matches'}
             </li>
           ) : null}
           {partial && hits.length > 0 ? (
