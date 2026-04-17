@@ -117,27 +117,19 @@ certainly work.
 
 ## 5. Webflow Cloud setup (first deploy)
 
-### 5a. Initialize the project
+### 5a. Skip the CLI auth — use the dashboard
 
-```bash
-cd spark/web
-webflow cloud init
-```
-
-Prompts, with the exact answers for this project:
-
-| #   | Prompt                                     | Answer                                                                                  |
-| --- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
-| 1   | `Login to Webflow?`                        | Yes → browser opens, log in with your `webflow-inside` account                          |
-| 2   | `Select a framework`                       | **Next.js**                                                                             |
-| 3   | `Enter the mount path`                     | **`/spark-manager`** ← must match `basePath` in [next.config.ts](../web/next.config.ts) |
-| 4   | `Select a Webflow site`                    | Pick the site in the `webflow-inside` workspace you want to host this under             |
-| 5   | `Import Webflow design system components?` | **Skip** (not needed for the admin UI)                                                  |
-
-The CLI writes `WEBFLOW_SITE_ID` and `WEBFLOW_API_TOKEN` into
-`spark/web/.env` (tracked as `.env.local` thanks to our symlink; note
-`.env.local` trumps `.env` per Next precedence, so this ends up in
-`spark/.env` — the CLI appends, it doesn't overwrite existing keys).
+> **Known trap: the Webflow CLI's OAuth app is not registered on Webflow
+> Inside.** `webflow auth login` opens a browser tab that reads "There
+> is no app to authorize from Webflow Inside" and times out after 5
+> minutes. The same applies to `webflow cloud init` and
+> `webflow cloud deploy` — anything that triggers the CLI's OAuth flow.
+>
+> The CLI auth is only needed to write `WEBFLOW_SITE_ID` and
+> `WEBFLOW_API_TOKEN` to `.env` for DevLink/devlink-sync commands. This
+> project does not use DevLink.
+>
+> **Do not use the CLI. Use the dashboard (5b) for everything.**
 
 ### 5b. Connect GitHub + create project in the Webflow dashboard
 
@@ -290,18 +282,19 @@ openssl rand -hex 32  # generate new
 
 ## 8. Troubleshooting
 
-| Symptom                                                 | Cause                                     | Fix                                                                                                                                                           |
-| ------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UI shows "No manager session"                           | `DEMO_MANAGER_SLACK_ID` not loaded        | Check `spark/web/.env.local` is a symlink to `../.env` with `readlink .env.local`                                                                             |
-| UI shows "Bot unreachable"                              | Tunnel down, wrong URL, or wrong token    | Restart `scripts/tunnel.sh`, update `SPARK_API_BASE_URL` in Webflow Cloud, confirm `SPARK_API_TOKEN` matches on both sides                                    |
-| `/spark-manager/new` → 404                              | basePath mismatch                         | `basePath` in [next.config.ts](../web/next.config.ts) must exactly equal the Webflow Cloud mount path                                                         |
-| OpenNext build fails with "cannot use the edge runtime" | `runtime = 'edge'` marker on a route      | Remove the export; OpenNext runs the entire app on Workers and doesn't allow split edge functions                                                             |
-| Webflow Cloud deploy doesn't start on push              | GitHub App not installed on the repo      | Site Settings → Webflow Cloud → reinstall the GitHub App and grant access to the `spark` repo                                                                 |
-| Agent stalls at "Looking up team"                       | `DX_WAREHOUSE_DSN` missing on the bot     | Add it to `spark/.env`, restart the bot                                                                                                                       |
-| Canvas creation fails in Slack                          | `canvases:write` scope missing            | Add the scope in your Slack app config, reinstall the app to the workspace                                                                                    |
-| `.env` changes don't take effect                        | Node/Next processes cached the old values | Restart both the bot (`npm run dev` in `spark/`) and the UI (`npm run dev` in `spark/web/`)                                                                   |
-| `.dev.vars` changes don't take effect in preview        | Wrangler caches                           | Kill `npm run preview` and restart                                                                                                                            |
-| `.env.example` gained new keys, unsure which            | Template updated without touching `.env`  | `cd spark && diff <(grep -oE '^[A-Z_]+=' .env.example \| sort -u) <(grep -oE '^[A-Z_]+=' .env \| sort -u)` — keys only on the left need to be added to `.env` |
+| Symptom                                                           | Cause                                          | Fix                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI shows "No manager session"                                     | `DEMO_MANAGER_SLACK_ID` not loaded             | Check `spark/web/.env.local` is a symlink to `../.env` with `readlink .env.local`                                                                             |
+| UI shows "Bot unreachable"                                        | Tunnel down, wrong URL, or wrong token         | Restart `scripts/tunnel.sh`, update `SPARK_API_BASE_URL` in Webflow Cloud, confirm `SPARK_API_TOKEN` matches on both sides                                    |
+| `/spark-manager/new` → 404                                        | basePath mismatch                              | `basePath` in [next.config.ts](../web/next.config.ts) must exactly equal the Webflow Cloud mount path                                                         |
+| OpenNext build fails with "cannot use the edge runtime"           | `runtime = 'edge'` marker on a route           | Remove the export; OpenNext runs the entire app on Workers and doesn't allow split edge functions                                                             |
+| Webflow Cloud deploy doesn't start on push                        | GitHub App not installed on the repo           | Site Settings → Webflow Cloud → reinstall the GitHub App and grant access to the `spark` repo                                                                 |
+| `webflow auth login` times out / "no app to authorize" in browser | Webflow Inside has no CLI OAuth app registered | Skip the CLI entirely. Deploy via the dashboard (section 5b). The CLI auth is only needed for DevLink, which this project does not use.                       |
+| Agent stalls at "Looking up team"                                 | `DX_WAREHOUSE_DSN` missing on the bot          | Add it to `spark/.env`, restart the bot                                                                                                                       |
+| Canvas creation fails in Slack                                    | `canvases:write` scope missing                 | Add the scope in your Slack app config, reinstall the app to the workspace                                                                                    |
+| `.env` changes don't take effect                                  | Node/Next processes cached the old values      | Restart both the bot (`npm run dev` in `spark/`) and the UI (`npm run dev` in `spark/web/`)                                                                   |
+| `.dev.vars` changes don't take effect in preview                  | Wrangler caches                                | Kill `npm run preview` and restart                                                                                                                            |
+| `.env.example` gained new keys, unsure which                      | Template updated without touching `.env`       | `cd spark && diff <(grep -oE '^[A-Z_]+=' .env.example \| sort -u) <(grep -oE '^[A-Z_]+=' .env \| sort -u)` — keys only on the left need to be added to `.env` |
 
 ---
 
