@@ -12,6 +12,8 @@
     "build": "npm run build --prefix web",
     "typecheck": "npm run typecheck --prefix web",
     "test": "npm run test --prefix web",
-    "test:watch": "npm run test:watch --prefix web"
+    "test:watch": "npm run test:watch --prefix web",
+    "format": "cd web && prettier --write \"../**/*.{ts,tsx,js,jsx,json,md,jsonc}\" --ignore-path ../.prettierignore",
+    "format:check": "cd web && prettier --check \"../**/*.{ts,tsx,js,jsx,json,md,jsonc}\" --ignore-path ../.prettierignore"
   }
 }

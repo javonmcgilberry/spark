@@ -9,7 +9,9 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview --port 8788",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,jsonc}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,jsonc}\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -24,6 +26,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "prettier": "3.8.1",
     "typescript": "^5.7.3",
     "vitest": "^4.1.4",
     "wrangler": "^4.24.4"
