@@ -1,5 +1,7 @@
 # Spark
 
+https://spark.wf.app/new
+
 **An AI onboarding co-pilot for engineering managers.** Tell Spark who's
 starting next Monday. A team of agents pulls the real org data, drafts
 the welcome, picks the right people to meet, tunes the checklist, and
