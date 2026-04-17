@@ -314,16 +314,33 @@ export function makeOrgGraphClient(
     },
     async searchByName(query, limit = 10) {
       if (!query.trim()) return [];
-      return runSafely(
-        `searchByName(${query})`,
-        async (sql) => {
+      // Picker semantics differ from identityResolver: an empty array
+      // from searchByName is an AUTHORITATIVE "no matches found in the
+      // warehouse", not a signal to fall back to Slack. So we MUST NOT
+      // swallow timeouts or breaker-open state with an empty array
+      // here — doing so turned a degraded warehouse into a blanket
+      // "no users exist" for 60s, breaking the picker entirely.
+      // Instead, throw on both conditions so the picker handler's
+      // try/catch catches and routes to the Slack fallback path.
+      const breaker = getBreaker();
+      if (breaker.openUntil > Date.now()) {
+        throw new Error('warehouse breaker open');
+      }
+      try {
+        return await withClient(async (sql) => {
           const rows = await querySearchByName(sql, query, limit);
           return rows
             .map((row) => toOrgPerson(row, 'teammate'))
             .filter((person): person is OrgPerson => Boolean(person));
-        },
-        []
-      );
+        });
+      } catch (error) {
+        breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
+        logger.warn(
+          `DX warehouse searchByName(${query}) failed; breaker open for ${BREAKER_COOLDOWN_MS / 1000}s.`,
+          error
+        );
+        throw error;
+      }
     },
   };
 }
@@ -353,6 +370,12 @@ export interface OrgGraphStubOverrides {
    * filters this list by substring against name and email.
    */
   searchPool?: OrgPerson[];
+  /**
+   * Full override for searchByName — lets tests simulate a warehouse
+   * throw (e.g. breaker-open / TCP timeout) so we can exercise the
+   * picker handler's fallback path. Takes precedence over searchPool.
+   */
+  searchByName?: (query: string, limit: number) => Promise<OrgPerson[]>;
 }
 
 /**
@@ -411,6 +434,9 @@ export function makeStubOrgGraph(
       return chain.slice(0, depth);
     },
     async searchByName(query, limit = 10) {
+      if (overrides.searchByName) {
+        return overrides.searchByName(query, limit);
+      }
       const needle = normalize(query);
       if (!needle) return [];
       const pool = overrides.searchPool ?? [];

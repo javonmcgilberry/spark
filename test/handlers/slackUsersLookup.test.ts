@@ -131,6 +131,40 @@ describe('handleLookupSlackUsers', () => {
     expect(body.users.map((u) => u.slackUserId)).toEqual(['UAKSHAR']);
   });
 
+  it('falls back to the Slack directory when the warehouse throws (e.g. TCP timeout or breaker open)', async () => {
+    // Regression guard: when the warehouse is CONFIGURED but unreachable
+    // (DSN set, socket times out, breaker flips open), searchByName
+    // throws. The picker must catch that, fall back to Slack, and keep
+    // serving results. Prior to this guard, a single timeout flipped
+    // the breaker which then silently returned [] for 60s — turning
+    // the picker into a no-results dead zone across the whole
+    // workspace for every subsequent query.
+    const ctx = makeTestCtx({
+      org: {
+        configured: true,
+        searchByName: () => {
+          throw new Error('warehouse breaker open');
+        },
+      },
+    });
+    primeDirectoryForTests(ctx, [
+      {
+        slackUserId: 'UAKSHAR',
+        name: 'Akshar Patel',
+        displayName: 'akshar',
+        email: 'akshar@webflow.com',
+      },
+    ]);
+
+    const res = await handleLookupSlackUsers(
+      makeRequest('akshar'),
+      ctx,
+      session
+    );
+    const body = (await res.json()) as {users: Array<{slackUserId: string}>};
+    expect(body.users.map((u) => u.slackUserId)).toEqual(['UAKSHAR']);
+  });
+
   it('treats a successful-but-empty warehouse response as the authoritative answer (does not secretly fall back to Slack)', async () => {
     // Critical property: when the warehouse says "no matches," the
     // picker returns [] instead of falling back to Slack users.list,

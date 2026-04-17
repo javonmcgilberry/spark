@@ -124,36 +124,51 @@ describe('makeOrgGraphClient circuit breaker', () => {
     if (breaker) breaker.openUntil = 0;
   });
 
-  it('opens after a single failure and skips subsequent warehouse calls within the cooldown window', async () => {
+  it('searchByName throws on failure so the picker falls back to Slack instead of serving a false empty', async () => {
+    // searchByName MUST throw rather than return [] when the warehouse
+    // is unreachable. The picker treats [] as an authoritative
+    // "no matches" and skips the Slack fallback — so silently
+    // swallowing errors would make the picker return zero results
+    // across the whole workspace for the breaker cooldown window.
     const client = makeOrgGraphClient(
       {DX_WAREHOUSE_DSN: 'postgres://nonexistent.invalid:5432/x'},
       createSilentLogger()
     );
-    // postgres.js will try to import; since we're in a test env without
-    // actual network, we mock Date.now() to observe breaker state.
     const originalNow = Date.now;
     const now = vi.fn(() => 1_000_000);
     Date.now = now as typeof Date.now;
     try {
-      // First call trips the breaker and returns the fallback ([]). We
-      // allow a small amount of time by advancing the clock.
-      const first = await client.searchByName('any');
-      expect(first).toEqual([]);
+      // First call attempts to connect, fails, trips the breaker, throws.
+      await expect(client.searchByName('any')).rejects.toThrow();
 
-      // Advance 10 seconds — still within cooldown. No additional
-      // warehouse attempt should happen; confirmed by the call still
-      // returning fast with [].
+      // Inside the cooldown window, subsequent calls short-circuit on
+      // the breaker and still throw (so picker falls back immediately
+      // instead of paying another connect timeout).
       now.mockReturnValue(1_000_000 + 10_000);
-      const second = await client.searchByName('any');
-      expect(second).toEqual([]);
+      await expect(client.searchByName('any')).rejects.toThrow(/breaker open/);
 
-      // Advance past the 60s window; breaker closes. Still returns []
-      // because the network still fails, but the path is re-attempted.
+      // After the cooldown, the path is re-attempted. Still throws
+      // because the network is still bad in this test environment.
       now.mockReturnValue(1_000_000 + 61_000);
-      const third = await client.searchByName('any');
-      expect(third).toEqual([]);
+      await expect(client.searchByName('any')).rejects.toThrow();
     } finally {
       Date.now = originalNow;
     }
+  });
+
+  it('identityResolver callers (lookupTeammates etc.) keep the silent-fallback semantic so they degrade to Slack inside a try', async () => {
+    // lookupTeammates/lookupCrossFunctional/lookupManagerChain MUST
+    // continue to return empty collections on failure. identityResolver
+    // catches around them, observes the empty result, and switches to
+    // the Slack fallback roster builder. If they threw, a one-off
+    // hiccup would blow up draft creation.
+    const client = makeOrgGraphClient(
+      {DX_WAREHOUSE_DSN: 'postgres://nonexistent.invalid:5432/x'},
+      createSilentLogger()
+    );
+    // First hit fails quietly.
+    await expect(client.lookupTeammates('Platform')).resolves.toEqual([]);
+    await expect(client.lookupCrossFunctional('Platform')).resolves.toEqual({});
+    await expect(client.lookupManagerChain('x@y.com')).resolves.toEqual([]);
   });
 });
