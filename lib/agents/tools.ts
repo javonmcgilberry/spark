@@ -4,10 +4,7 @@
  */
 
 import type {HandlerCtx} from '../ctx';
-import {
-  findOnboardingReferences,
-  findPeopleGuides,
-} from '../services/confluenceSearch';
+import {findOnboardingReferences} from '../services/confluenceSearch';
 import {resolveFromEmail, resolveFromSlack} from '../services/identityResolver';
 import type {OnboardingPerson} from '../types';
 import {APP_NAME} from '../branding';
@@ -118,69 +115,10 @@ export const resolveTeamTool: ToolDescriptor = {
   },
 };
 
-export const fetchTeamRosterTool: ToolDescriptor = {
-  name: 'fetch_team_roster',
+export const findTeamReferencesTool: ToolDescriptor = {
+  name: 'find_team_references',
   description:
-    "Fetch the real roster around the new hire's team. Use this to ground people-to-meet and welcome copy in actual teammates.",
-  input_schema: {
-    type: 'object',
-    properties: {
-      team: {type: 'string'},
-      emailSeed: {type: 'string'},
-    },
-  },
-  async run(input, tctx) {
-    const opts = (input ?? {}) as {team?: string; emailSeed?: string};
-    return withTimeout(tctx, async () => {
-      const seedEmail =
-        opts.emailSeed ??
-        (opts.team
-          ? `${opts.team.toLowerCase().replace(/\s+/g, '-')}@webflow-test.local`
-          : undefined);
-      if (!seedEmail) {
-        return {teamName: opts.team ?? 'Engineering', teammates: []};
-      }
-      const profile = await resolveFromEmail(tctx.ctx, seedEmail);
-      return {
-        teamName: profile.teamName,
-        teammates: profile.teammates.map(sanitizePerson),
-      };
-    });
-  },
-};
-
-export const proposeBuddyTool: ToolDescriptor = {
-  name: 'propose_buddy',
-  description:
-    'LLM-native tool. Take a roster and return 3 ranked buddy candidates with rationale. The model should call this after fetch_team_roster to synthesize its pick.',
-  input_schema: {
-    type: 'object',
-    required: ['candidates', 'recommendedSlackUserId'],
-    properties: {
-      candidates: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['slackUserId', 'name', 'rationale'],
-          properties: {
-            slackUserId: {type: 'string'},
-            name: {type: 'string'},
-            rationale: {type: 'string'},
-          },
-        },
-      },
-      recommendedSlackUserId: {type: 'string'},
-    },
-  },
-  async run(input) {
-    return {received: true, candidates: input};
-  },
-};
-
-export const findStakeholdersTool: ToolDescriptor = {
-  name: 'find_stakeholders',
-  description:
-    "Look up Confluence user guides for the team's manager and teammates.",
+    "Look up Confluence references for the hire's team (team page, pillar page, new-hire guide). Read-only — returns page titles and URLs for context only. Does not produce people, slack ids, or reviewer assignments.",
   input_schema: {
     type: 'object',
     required: ['email'],
@@ -190,12 +128,8 @@ export const findStakeholdersTool: ToolDescriptor = {
     const {email} = input as {email: string};
     return withTimeout(tctx, async () => {
       const profile = await resolveFromEmail(tctx.ctx, email);
-      const people = [profile.manager, ...profile.teammates];
-      const [refs, guides] = await Promise.all([
-        findOnboardingReferences(tctx.ctx, profile),
-        findPeopleGuides(tctx.ctx, profile, people),
-      ]);
-      return {references: refs, guides};
+      const refs = await findOnboardingReferences(tctx.ctx, profile);
+      return {references: refs};
     });
   },
 };
@@ -264,39 +198,18 @@ export const tuneChecklistTool: ToolDescriptor = {
 export const finalizeDraftTool: ToolDescriptor = {
   name: 'finalize_draft',
   description:
-    'Commit the full draft. Call this EXACTLY ONCE at the end. The server validates against a schema; if it fails you will get a retry with the errors.',
+    'Commit the draft. Call this EXACTLY ONCE at the end. The server validates against a schema; if it fails you will get a retry with the errors. This tool accepts welcome copy and checklist additions only. It does NOT accept people, slack ids, or reviewer assignments — the roster is resolved deterministically from the workspace and the manager owns buddy selection in the UI.',
   input_schema: {
     type: 'object',
     required: [
       'welcomeIntro',
       'welcomeNote',
-      'stakeholderUserIds',
-      'peopleToMeet',
       'customChecklistItems',
       'summary',
     ],
     properties: {
       welcomeIntro: {type: 'string'},
       welcomeNote: {type: 'string'},
-      buddyUserId: {type: 'string'},
-      stakeholderUserIds: {type: 'array', items: {type: 'string'}},
-      peopleToMeet: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['name', 'role', 'discussionPoints', 'weekBucket'],
-          properties: {
-            name: {type: 'string'},
-            role: {type: 'string'},
-            discussionPoints: {type: 'string'},
-            weekBucket: {
-              type: 'string',
-              enum: ['week1-2', 'week2-3', 'week3+'],
-            },
-            slackUserId: {type: 'string'},
-          },
-        },
-      },
       customChecklistItems: {type: 'array'},
       summary: {type: 'string'},
     },
@@ -309,8 +222,7 @@ export const finalizeDraftTool: ToolDescriptor = {
 export const GENERATOR_TOOLS: ToolDescriptor[] = [
   resolveNewHireTool,
   resolveTeamTool,
-  fetchTeamRosterTool,
-  findStakeholdersTool,
+  findTeamReferencesTool,
   draftWelcomeNoteTool,
   tuneChecklistTool,
   finalizeDraftTool,

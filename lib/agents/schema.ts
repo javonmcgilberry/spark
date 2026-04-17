@@ -1,9 +1,12 @@
 import {z} from 'zod';
 
 /**
- * Zod schemas for validating the Generator agent's finalize_draft
- * tool input before the draft is persisted. If a type in `lib/types.ts`
- * changes, add the matching field here too.
+ * Zod schema for the Generator agent's finalize_draft tool input.
+ *
+ * Scope: welcome copy (two voices) + team-specific checklist additions.
+ * That's it. People selection, buddy assignment, and reviewer identity
+ * are resolved deterministically server-side — the LLM is not allowed
+ * to name people, fabricate Slack ids, or carry reviewer state.
  */
 
 export const checklistItemSchema = z.object({
@@ -15,59 +18,9 @@ export const checklistItemSchema = z.object({
   sectionId: z.string().optional(),
 });
 
-export const onboardingPersonSchema = z.object({
-  name: z.string().min(1),
-  role: z.string().min(1),
-  discussionPoints: z.string().min(1),
-  weekBucket: z.enum(['week1-2', 'week2-3', 'week3+']),
-  kind: z
-    .enum([
-      'manager',
-      'buddy',
-      'teammate',
-      'pm',
-      'designer',
-      'director',
-      'people-partner',
-      'custom',
-    ])
-    .optional(),
-  title: z.string().optional(),
-  notes: z.string().optional(),
-  slackUserId: z.string().optional(),
-});
-
-export const buddyProposalSchema = z.object({
-  candidates: z
-    .array(
-      z.object({
-        slackUserId: z.string(),
-        name: z.string(),
-        rationale: z.string(),
-      })
-    )
-    .min(1)
-    .max(5),
-  recommendedSlackUserId: z.string(),
-});
-
-/**
- * Minimum shape the Generator must produce for the finalize_draft tool
- * to succeed. Only fields the agent is expected to populate are
- * validated here — the finalize route merges these into the existing
- * draft shell via PATCH, so catalog-built sections stay intact.
- *
- * Two voices: `welcomeIntro` is short and Spark-branded (the fun
- * welcoming line); `welcomeNote` is the manager-voice paragraph that
- * actually does the introducing. No upper bound on welcomeNote — a
- * manager may want to write a page, and that's fine.
- */
 export const generatorFinalizeSchema = z.object({
   welcomeIntro: z.string().min(20).max(280),
   welcomeNote: z.string().min(40),
-  buddyUserId: z.string().optional(),
-  stakeholderUserIds: z.array(z.string()).min(0).max(10),
-  peopleToMeet: z.array(onboardingPersonSchema).min(0).max(12),
   customChecklistItems: z.array(checklistItemSchema).min(0).max(20),
   summary: z.string().max(600),
 });

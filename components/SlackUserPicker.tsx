@@ -30,6 +30,7 @@ export function SlackUserPicker({
   const [loading, setLoading] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
   const inputId = useId();
   const listboxId = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,8 +58,12 @@ export function SlackUserPicker({
         {signal: controller.signal}
       );
       if (!res.ok) throw new Error(`lookup failed (${res.status})`);
-      const body = (await res.json()) as {users: SlackUserHit[]};
+      const body = (await res.json()) as {
+        users: SlackUserHit[];
+        partial?: boolean;
+      };
       setHits(body.users);
+      setPartial(Boolean(body.partial));
       setHighlight(0);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -207,7 +212,23 @@ export function SlackUserPicker({
             </li>
           ))}
           {!loading && hits.length === 0 && !error ? (
-            <li style={{...rowStyle, color: '#94a3b8'}}>No matches</li>
+            <li style={{...rowStyle, color: '#94a3b8'}}>
+              {partial
+                ? 'Workspace directory is still loading. Try again in a moment.'
+                : 'No matches'}
+            </li>
+          ) : null}
+          {partial && hits.length > 0 ? (
+            <li
+              style={{
+                ...rowStyle,
+                color: '#94a3b8',
+                fontSize: 11,
+                fontStyle: 'italic',
+              }}
+            >
+              Partial results — workspace directory is still loading.
+            </li>
           ) : null}
         </ul>
       ) : null}

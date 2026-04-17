@@ -18,17 +18,24 @@ The hackathon asked for apps where the **LLM is the reasoning engine**,
 not a fancy autocomplete. Spark is built around three agents doing real
 work against real production systems:
 
-| Agent               | What it reasons about                                        | Tools it can actually call                                                                                             |
-| ------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| **Generator**       | "Who is this hire, what team, what should week 1 look like?" | `resolve_new_hire`, `fetch_team_roster`, `find_stakeholders`, `draft_welcome_note`, `tune_checklist`, `finalize_draft` |
-| **Critique**        | "Does this draft actually make sense to ship?"               | Structured findings back into the draft store — the manager can one-click apply a fix.                                 |
-| **Slack assistant** | "What does this new hire need right now?"                    | Assistant threads, 1:1 DMs, Home tab surfaces, Block Kit canvases.                                                     |
+| Agent               | What it reasons about                                                              | Tools it can actually call                                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Generator**       | "What should the welcome note say and which checklist items are right for week 1?" | `resolve_new_hire`, `resolve_team`, `find_team_references`, `draft_welcome_note`, `tune_checklist`, `finalize_draft` |
+| **Critique**        | "Does this draft actually make sense to ship?"                                     | Structured findings back into the draft store — the manager can one-click apply a fix.                               |
+| **Slack assistant** | "What does this new hire need right now?"                                          | Assistant threads, 1:1 DMs, Home tab surfaces, Block Kit canvases.                                                   |
+
+The roster itself is resolved deterministically from the DX warehouse
+(`ctx.org`, over Cloudflare Workers TCP sockets) before the LLM loop
+starts. Slack hydrates avatars + display names. The LLM never names
+people, never fabricates Slack ids, and never picks the buddy — that's
+the manager's call, every time.
 
 The agents share a single dependency-injected runtime (`HandlerCtx`) so
 the same tools run in prod, in vitest, and in the dev sandbox. You can
 watch every tool call stream in live on the manager UI while the agent
 is working — it's not a progress bar, it's the actual
-`resolve_new_hire → fetch_team_roster → draft_welcome_note …` trace.
+`resolve_new_hire → draft_welcome_note → tune_checklist → finalize_draft`
+trace.
 
 ### What makes it genuinely agentic (not just LLM-wrapped)
 
@@ -40,11 +47,14 @@ is working — it's not a progress bar, it's the actual
   works. The welcome note persists the instant `draft_welcome_note`
   fires, so the manager sees the real output before the rest of the
   loop finishes.
-- **Multi-system grounding.** Tools reach into Slack (`users.list`,
-  `users.profile.get`, custom profile fields, `team.profile.get`),
-  Jira (`/rest/api/3/search/jql`), GitHub (`search/issues`, CODEOWNERS),
-  and Confluence (space search). The agent can't make up a teammate —
-  every person it suggests has a verified Slack ID.
+- **Multi-system grounding.** The DX warehouse is the source of truth
+  for the org graph: a single SQL call returns teammates, the manager
+  chain, and cross-functional partners. Slack (`users.list`,
+  `users.profile.get`, `team.profile.get`) hydrates avatars + display
+  names. Jira (`/rest/api/3/search/jql`), GitHub (`search/issues`,
+  CODEOWNERS), and Confluence ground the "Ask me about…" blurbs. The
+  LLM never names a teammate; every surfaced person is a verified
+  warehouse row with a verified Slack id.
 - **Human in the loop by design.** Spark hands the manager a draft, not
   a published plan. Buddy assignment is always the manager's call.
   Publishing is explicit.
@@ -110,7 +120,8 @@ Browser → spark.wf.app (Next.js on Webflow Cloud / Cloudflare Workers)
   │
   └─ lib/
       ├─ agents/                 Generator + Critique agents (Anthropic tool_use)
-      ├─ services/               slack, llm, jira, github, confluence,
+      ├─ services/               slack, llm, jira, github, confluence, orgGraph
+      │                          (DX warehouse via Workers TCP sockets),
       │                          peopleInsights, slackUserDirectory,
       │                          identityResolver, canvas, onboardingPackages
       ├─ handlers/               HTTP handler logic (drafts, lookup)
@@ -118,6 +129,21 @@ Browser → spark.wf.app (Next.js on Webflow Cloud / Cloudflare Workers)
       ├─ auth/                   Cloudflare Access JWT + Atlassian OAuth
       └─ ctx.ts                  HandlerCtx DI — makeProdCtx / makeTestCtx
 ```
+
+### DX warehouse org graph
+
+Spark looks up the hire's team, manager chain, and cross-functional
+partners from the DX warehouse (`public.dx_users`,
+`dx_versioned_team_members`, `dx_versioned_teams`). The warehouse
+client ([lib/services/orgGraph.ts](lib/services/orgGraph.ts)) speaks
+Postgres directly from Cloudflare Workers via `postgres.js` on
+Workers TCP sockets — no Hyperdrive binding needed. Set
+`DX_WAREHOUSE_DSN` in the Webflow Cloud environment variables to turn
+it on. When the DSN is unset or the warehouse is unreachable, the
+identity resolver logs the miss and falls back to Slack custom fields
+
+- catalog defaults so the UI still works on laptops and in demo
+  sandboxes.
 
 Every handler, service, and tool takes a `HandlerCtx`. Production builds
 `makeProdCtx(env)` which resolves real clients (D1, fetch-based Slack,

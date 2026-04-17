@@ -252,7 +252,7 @@ describe('drafts handlers', () => {
     expect(hydrated?.askMeAbout).toContain('Ask me about');
   });
 
-  it('generateDraft persists peopleToMeet but ignores generated buddy assignment', async () => {
+  it('generateDraft only patches welcome copy + checklist; never touches peopleToMeet or buddyUserId', async () => {
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
@@ -293,165 +293,13 @@ describe('drafts handlers', () => {
               "Welcome aboard! I've mapped out your first few weeks — people, a PR, and the rooms that matter.",
             welcomeNote:
               'Welcome to the team. Your first few weeks will focus on learning the codebase and pairing with your onboarding buddy.',
-            buddyUserId: 'UBUDDY1',
-            stakeholderUserIds: ['USTAKE1'],
-            peopleToMeet: [
+            customChecklistItems: [
               {
-                name: 'Buddy One',
-                role: 'Senior Software Engineer',
-                discussionPoints: 'Codebase tour',
-                weekBucket: 'week1-2',
-                slackUserId: 'UBUDDY1',
-              },
-              {
-                name: 'Stake Holder',
-                role: 'Product Manager',
-                discussionPoints: 'Roadmap context',
-                weekBucket: 'week2-3',
-                slackUserId: 'USTAKE1',
+                label: 'Pair on a small ticket in week 2',
+                kind: 'task' as const,
+                notes: 'Shadow a teammate while shipping.',
               },
             ],
-            customChecklistItems: [],
-            summary: 'Draft ready.',
-          }),
-        ],
-        defaultText: 'done',
-      },
-    });
-
-    const created = await handleCreateDraft(
-      jsonRequest({newHireSlackId: 'UHIRE001'}),
-      ctx,
-      session
-    );
-    expect(created.status).toBe(201);
-
-    const generated = await handleGenerateDraft(
-      jsonRequest({newHireName: 'Alice', slackUserIdIfKnown: 'UHIRE001'}),
-      ctx,
-      session,
-      'UHIRE001'
-    );
-    expect(generated.status).toBe(200);
-    await new Response(generated.body).text();
-
-    const stored = await ctx.db.get('UHIRE001');
-    expect(stored?.buddyUserId).toBeUndefined();
-    expect(
-      stored?.sections.peopleToMeet.people.map((person) => person.slackUserId)
-    ).toEqual(expect.arrayContaining(['UBUDDY1', 'USTAKE1']));
-  });
-
-  it('generateDraft keeps resolved people when finalize_draft omits them', async () => {
-    const ctx = makeTestCtx({
-      slack: {
-        usersInfo: {
-          UHIRE001: {
-            id: 'UHIRE001',
-            real_name: 'Alice Adams',
-            profile: {
-              first_name: 'Alice',
-              display_name: 'alice',
-              email: 'alice@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
-          UMANAGER1: {
-            id: 'UMANAGER1',
-            real_name: 'Grace Hopper',
-            profile: {
-              first_name: 'Grace',
-              display_name: 'grace',
-              email: 'grace@webflow.com',
-              title: 'Engineering Manager',
-            },
-          },
-        },
-        usersProfileGet: {
-          UHIRE001: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Grace Hopper'},
-            },
-          },
-          UBUDDY1: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Grace Hopper'},
-            },
-          },
-          UPMREAL: {
-            fields: {
-              F_DEPARTMENT: {value: '1600 Product Team'},
-              F_DIVISION: {value: 'Collaboration'},
-            },
-          },
-          UMANAGER1: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-            },
-          },
-        },
-        usersList: [
-          {
-            id: 'UHIRE001',
-            real_name: 'Alice Adams',
-            profile: {
-              real_name: 'Alice Adams',
-              display_name: 'alice',
-              email: 'alice@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
-          {
-            id: 'UBUDDY1',
-            real_name: 'Buddy One',
-            profile: {
-              real_name: 'Buddy One',
-              display_name: 'buddy',
-              email: 'buddy@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
-          {
-            id: 'UPMREAL',
-            real_name: 'Real PM',
-            profile: {
-              real_name: 'Real PM',
-              display_name: 'pm',
-              email: 'pm@webflow.com',
-              title: 'Senior Product Manager',
-            },
-          },
-        ],
-        teamProfileFields: [
-          {id: 'F_DEPARTMENT', label: 'Department'},
-          {id: 'F_DIVISION', label: 'Division'},
-          {id: 'F_MANAGER', label: 'Manager'},
-        ],
-      },
-      llm: {
-        messageQueue: [
-          toolUseMessage('finalize_draft', {
-            welcomeIntro:
-              "Welcome aboard! I've mapped out your first few weeks — people, a PR, and the rooms that matter.",
-            welcomeNote:
-              'Welcome to the team. Your first few weeks will focus on learning the codebase and pairing with your onboarding buddy.',
-            buddyUserId: 'UBUDDY1',
-            stakeholderUserIds: [],
-            peopleToMeet: [
-              {
-                name: 'Buddy One',
-                role: 'Senior Software Engineer, Frontend',
-                discussionPoints: 'Codebase tour',
-                weekBucket: 'week1-2',
-                slackUserId: 'UBUDDY1',
-              },
-            ],
-            customChecklistItems: [],
             summary: 'Draft ready.',
           }),
         ],
@@ -466,11 +314,7 @@ describe('drafts handlers', () => {
     );
     expect(created.status).toBe(201);
     const before = await ctx.db.get('UHIRE001');
-    expect(
-      before?.sections.peopleToMeet.people.some(
-        (person) => person.slackUserId === 'UPMREAL'
-      )
-    ).toBe(true);
+    const beforePeople = before?.sections.peopleToMeet.people ?? [];
 
     const generated = await handleGenerateDraft(
       jsonRequest({newHireName: 'Alice', slackUserIdIfKnown: 'UHIRE001'}),
@@ -482,9 +326,17 @@ describe('drafts handlers', () => {
     await new Response(generated.body).text();
 
     const stored = await ctx.db.get('UHIRE001');
+    expect(stored?.welcomeIntro).toContain('Welcome aboard!');
+    expect(stored?.welcomeNote).toContain('Welcome to the team.');
+    expect(stored?.customChecklistItems?.[0]?.label).toBe(
+      'Pair on a small ticket in week 2'
+    );
+    // Generator must not affect identity. The roster and buddy state
+    // come from the deterministic server-side resolver.
+    expect(stored?.buddyUserId).toBe(before?.buddyUserId);
     expect(
       stored?.sections.peopleToMeet.people.map((person) => person.slackUserId)
-    ).toEqual(expect.arrayContaining(['UBUDDY1', 'UPMREAL']));
+    ).toEqual(beforePeople.map((person) => person.slackUserId));
   });
 
   it('patchDraft updates welcomeNote', async () => {
@@ -535,4 +387,95 @@ describe('drafts handlers', () => {
     const body = (await res.json()) as {findings: Array<{id: string}>};
     expect(body.findings.some((f) => f.id === 'no-buddy')).toBe(true);
   });
+
+  it('patchDraft rejects a fabricated slackUserId (must be U-prefixed)', async () => {
+    const ctx = await setupWithDraft();
+    const res = await handlePatchDraft(
+      jsonRequest(
+        {
+          peopleToMeet: [
+            {
+              name: 'Fabricated Person',
+              role: 'Teammate',
+              discussionPoints: '',
+              weekBucket: 'week2-3',
+              slackUserId: 'bogus-id',
+            },
+          ],
+        },
+        'PATCH'
+      ),
+      ctx,
+      session,
+      'UHIRE001'
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('patchDraft returns 409 when expectedUpdatedAt is stale', async () => {
+    const ctx = await setupWithDraft();
+    const res = await handlePatchDraft(
+      jsonRequest(
+        {
+          welcomeNote: 'stale client',
+          expectedUpdatedAt: '1999-01-01T00:00:00.000Z',
+        },
+        'PATCH'
+      ),
+      ctx,
+      session,
+      'UHIRE001'
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it('patchDraft preserves manager-authored discussionPoints across a refresh-insights cycle', async () => {
+    const ctx = await setupWithDraft();
+    const baseline = await ctx.db.get('UHIRE001');
+    const target = baseline?.sections.peopleToMeet.people[0];
+    expect(target).toBeDefined();
+
+    // Manager edits discussionPoints → insightsStatus becomes user-overridden.
+    const editRes = await handlePatchDraft(
+      jsonRequest(
+        {
+          peopleToMeet: [
+            {
+              ...target,
+              discussionPoints: 'Ask Alice about the Q2 migration she led.',
+              insightsStatus: 'user-overridden',
+            },
+          ],
+        },
+        'PATCH'
+      ),
+      ctx,
+      session,
+      'UHIRE001'
+    );
+    expect(editRes.status).toBe(200);
+
+    // Refresh-insights then runs; the user-overridden row must survive.
+    const refresh = await handleRefreshInsights(ctx, session, 'UHIRE001');
+    expect(refresh.status).toBe(200);
+
+    const stored = await ctx.db.get('UHIRE001');
+    const row = stored?.sections.peopleToMeet.people.find(
+      (person) => canonicalKeyFor(person) === canonicalKeyFor(target!)
+    );
+    expect(row?.discussionPoints).toBe(
+      'Ask Alice about the Q2 migration she led.'
+    );
+    expect(row?.insightsStatus).toBe('user-overridden');
+  });
 });
+
+function canonicalKeyFor(person: {
+  slackUserId?: string;
+  email?: string;
+  name: string;
+}): string {
+  return (person.slackUserId || person.email || person.name)
+    .trim()
+    .toLowerCase();
+}

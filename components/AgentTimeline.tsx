@@ -7,10 +7,7 @@ import type {GeneratorEvent} from '../lib/agents/generator';
 const TOOL_LABELS: Record<string, string> = {
   resolve_new_hire: 'Resolving new hire',
   resolve_team: 'Looking up team',
-  fetch_team_roster: 'Fetching team roster',
-  propose_buddy: 'Proposing buddy',
-  find_stakeholders: 'Finding stakeholders',
-  find_contribution_tasks: 'Scanning for contribution tasks',
+  find_team_references: 'Finding team references',
   draft_welcome_note: 'Drafting welcome note',
   tune_checklist: 'Tuning checklist',
   finalize_draft: 'Finalizing draft',

@@ -15,6 +15,11 @@ export function enrichPackageInsights(
   pkg: OnboardingPackage
 ): OnboardingPackage {
   const people = pkg.sections.peopleToMeet.people.map((person) => {
+    // Manager-authored discussion points are sacred — never overwrite
+    // them with a cached blurb on reload or a follow-up enrichment.
+    if (person.insightsStatus === 'user-overridden') {
+      return person;
+    }
     const cached = getCachedInsight(ctx, person);
     if (!cached) {
       if (

@@ -6,6 +6,7 @@ import {
   makeStubGitHub,
   makeStubJira,
   makeStubLlm,
+  makeStubOrgGraph,
   TEST_ENV,
   type HandlerCtx,
 } from '../../lib/ctx';
@@ -23,6 +24,10 @@ import type {
   ConfluenceClient,
   ConfluenceStubOverrides,
 } from '../../lib/services/confluence';
+import type {
+  OrgGraphClient,
+  OrgGraphStubOverrides,
+} from '../../lib/services/orgGraph';
 import type {DraftStore} from '../../lib/draftStore';
 import type {Logger} from '../../lib/logger';
 
@@ -32,6 +37,7 @@ export interface MakeTestCtxOptions {
   jira?: JiraClient | JiraStubOverrides;
   github?: GitHubClient | GitHubStubOverrides;
   confluence?: ConfluenceClient | ConfluenceStubOverrides;
+  org?: OrgGraphClient | OrgGraphStubOverrides;
   db?: DraftStore;
   logger?: Logger;
   env?: Partial<CloudflareEnv>;
@@ -67,6 +73,10 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
     ? options.confluence
     : makeStubConfluence(options.confluence);
 
+  const org = isOrgGraphClient(options.org)
+    ? options.org
+    : makeStubOrgGraph(options.org);
+
   const db = options.db ?? makeMemoryDraftStore();
   const logger = options.logger ?? createSilentLogger();
   const waitUntilTasks = options.waitUntilTasks ?? [];
@@ -78,6 +88,7 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
     jira,
     github,
     confluence,
+    org,
     logger,
     env: {...TEST_ENV, ...(options.env ?? {})} as CloudflareEnv,
     scratch: options.scratch ?? {},
@@ -135,5 +146,12 @@ function isConfluenceClient(v: unknown): v is ConfluenceClient {
     typeof v === 'object' &&
     v !== null &&
     typeof (v as {searchFirst?: unknown}).searchFirst === 'function'
+  );
+}
+function isOrgGraphClient(v: unknown): v is OrgGraphClient {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as {lookupTeammates?: unknown}).lookupTeammates === 'function'
   );
 }

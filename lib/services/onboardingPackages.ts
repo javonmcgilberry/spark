@@ -15,6 +15,7 @@ import type {
   OnboardingPackage,
   OnboardingPerson,
   OnboardingPersonKind,
+  OnboardingReferences,
   TeamProfile,
 } from '../types';
 import {
@@ -183,20 +184,21 @@ async function buildPackage(
     ...stakeholderPeople,
   ]);
 
-  const references = await findOnboardingReferences(ctx, profile).catch(
-    (error) => {
+  // Confluence references and per-person user guides are independent
+  // searches against the same Confluence client. Run them in parallel so
+  // the create-draft handler pays max(refs, guides) instead of the sum.
+  const [references, peopleGuides] = await Promise.all([
+    findOnboardingReferences(ctx, profile).catch((error) => {
       ctx.logger.warn('findOnboardingReferences failed.', error);
-      return {};
-    }
-  );
-  const peopleGuides: Record<string, ConfluenceLink> = await findPeopleGuides(
-    ctx,
-    profile,
-    people
-  ).catch((error) => {
-    ctx.logger.warn('findPeopleGuides failed.', error);
-    return {};
-  });
+      return {} as OnboardingReferences;
+    }),
+    findPeopleGuides(ctx, profile, people).catch(
+      (error): Record<string, ConfluenceLink> => {
+        ctx.logger.warn('findPeopleGuides failed.', error);
+        return {};
+      }
+    ),
+  ]);
   const peopleWithGuides = people.map((person) => ({
     ...person,
     userGuide: peopleGuides[personIdentifier(person)] ?? person.userGuide,

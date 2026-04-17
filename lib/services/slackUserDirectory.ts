@@ -19,6 +19,17 @@ export interface SlackUserHit {
   avatarUrl?: string;
 }
 
+export interface SearchUsersResult {
+  users: SlackUserHit[];
+  /**
+   * `partial` signals that the current directory snapshot is
+   * incomplete (rate-limit, pagination cap, or transient error).
+   * Pickers can surface a "still loading" hint so an empty result
+   * doesn't read as "no matches."
+   */
+  partial: boolean;
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const PAGE_LIMIT = 200;
 const MAX_PAGES = 100;
@@ -26,17 +37,18 @@ const MAX_PAGES = 100;
 interface Cache {
   users: SlackUserHit[];
   expiresAt: number;
+  partial: boolean;
 }
 
-function getCache(ctx: HandlerCtx): {
+interface CacheContainer {
   current: Cache | null;
   inFlight: Promise<SlackUserHit[]> | null;
-} {
-  const existing = ctx.scratch.slackDirectory as
-    | {current: Cache | null; inFlight: Promise<SlackUserHit[]> | null}
-    | undefined;
+}
+
+function getCache(ctx: HandlerCtx): CacheContainer {
+  const existing = ctx.scratch.slackDirectory as CacheContainer | undefined;
   if (existing) return existing;
-  const created = {current: null as Cache | null, inFlight: null};
+  const created: CacheContainer = {current: null, inFlight: null};
   ctx.scratch.slackDirectory = created;
   return created;
 }
@@ -47,6 +59,16 @@ export async function searchUsers(
   limit = 10,
   options: {seedSlackUserIds?: string[]} = {}
 ): Promise<SlackUserHit[]> {
+  const result = await searchUsersWithState(ctx, query, limit, options);
+  return result.users;
+}
+
+export async function searchUsersWithState(
+  ctx: HandlerCtx,
+  query: string,
+  limit = 10,
+  options: {seedSlackUserIds?: string[]} = {}
+): Promise<SearchUsersResult> {
   const users = await getAll(ctx);
   const cache = getCache(ctx);
 
@@ -58,8 +80,9 @@ export async function searchUsers(
   }
 
   const pool = cache.current?.users ?? users;
+  const partial = cache.current?.partial ?? false;
   const needle = query.trim().toLowerCase();
-  if (!needle) return pool.slice(0, limit);
+  if (!needle) return {users: pool.slice(0, limit), partial};
 
   const scored: Array<{hit: SlackUserHit; score: number}> = [];
   for (const user of pool) {
@@ -67,7 +90,7 @@ export async function searchUsers(
     if (score > 0) scored.push({hit: user, score});
   }
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.hit);
+  return {users: scored.slice(0, limit).map((s) => s.hit), partial};
 }
 
 export async function listAllUsers(ctx: HandlerCtx): Promise<SlackUserHit[]> {
@@ -145,7 +168,7 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
   // whatever we got so the picker stays usable, but cut the TTL so we
   // retry sooner instead of serving a half-empty directory for 10 min.
   const ttl = partial ? 60_000 : CACHE_TTL_MS;
-  cache.current = {users: hits, expiresAt: Date.now() + ttl};
+  cache.current = {users: hits, expiresAt: Date.now() + ttl, partial};
   ctx.logger.info(
     `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)${partial ? ' (partial — pagination cut short)' : ''}`
   );
@@ -159,10 +182,22 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
 
 async function seedByIds(
   ctx: HandlerCtx,
-  cache: ReturnType<typeof getCache>,
+  cache: CacheContainer,
   ids: string[]
 ): Promise<void> {
-  if (!cache.current) return;
+  // Cold / uninitialized cache: still do the lookups and bootstrap a
+  // partial cache with whatever users.info returns. The next full
+  // users.list refresh will replace it. Without this, the picker can
+  // appear empty for an entire request when the cache hasn't loaded
+  // yet and someone passes explicit seed ids.
+  if (!cache.current) {
+    cache.current = {
+      users: [],
+      expiresAt: Date.now() + 60_000,
+      partial: true,
+    };
+  }
+  const current = cache.current;
   for (const id of ids) {
     try {
       const res = await ctx.slack.users.info({user: id});
@@ -177,7 +212,7 @@ async function seedByIds(
         'Unknown';
       const displayName =
         profile.display_name_normalized ?? profile.display_name ?? realName;
-      cache.current.users.push({
+      current.users.push({
         slackUserId: member.id,
         name: realName,
         displayName: displayName || realName,
@@ -192,7 +227,7 @@ async function seedByIds(
       );
     }
   }
-  cache.current.users.sort((a, b) =>
+  current.users.sort((a, b) =>
     a.displayName.localeCompare(b.displayName, undefined, {
       sensitivity: 'base',
     })
@@ -216,5 +251,9 @@ export function primeDirectoryForTests(
   users: SlackUserHit[]
 ): void {
   const cache = getCache(ctx);
-  cache.current = {users, expiresAt: Date.now() + CACHE_TTL_MS};
+  cache.current = {
+    users,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+    partial: false,
+  };
 }

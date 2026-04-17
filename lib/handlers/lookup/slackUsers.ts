@@ -1,6 +1,6 @@
 import type {HandlerCtx} from '../../ctx';
 import type {ManagerSession} from '../../session';
-import {searchUsers} from '../../services/slackUserDirectory';
+import {searchUsersWithState} from '../../services/slackUserDirectory';
 
 export async function handleLookupSlackUsers(
   request: Request,
@@ -13,8 +13,8 @@ export async function handleLookupSlackUsers(
   const limit = Number.isFinite(rawLimit)
     ? Math.max(1, Math.min(25, Math.floor(rawLimit)))
     : 10;
-  const users = await searchUsers(ctx, q, limit, {
+  const {users, partial} = await searchUsersWithState(ctx, q, limit, {
     seedSlackUserIds: [session.managerSlackId],
   });
-  return Response.json({users});
+  return Response.json({users, partial});
 }

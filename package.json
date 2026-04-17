@@ -23,6 +23,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@opennextjs/cloudflare": "1.6.5",
     "next": "15.1.0",
+    "postgres": "^3.4.9",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "zod": "^3.24.2"

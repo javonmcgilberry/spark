@@ -126,7 +126,28 @@ describe('identityResolver', () => {
     expect(profile.manager.slackUserId).toBe('UMANAGER1');
   });
 
-  it('keeps buddy as a placeholder while building real people-to-meet from Slack', async () => {
+  it('builds people-to-meet from the DX warehouse, hydrates Slack ids from the cached directory, and keeps buddy as a placeholder', async () => {
+    const warehouseRow = (overrides: {
+      name: string;
+      email: string;
+      title?: string;
+      role?:
+        | 'teammate'
+        | 'pm'
+        | 'designer'
+        | 'director'
+        | 'people-partner'
+        | 'manager-chain';
+    }) => ({
+      name: overrides.name,
+      email: overrides.email,
+      title: overrides.title,
+      teamName: 'Frontend Platform',
+      pillarName: 'Collaboration',
+      source: 'warehouse' as const,
+      role: overrides.role ?? 'teammate',
+    });
+
     const ctx = makeTestCtx({
       slack: {
         usersInfo: {
@@ -156,64 +177,13 @@ describe('identityResolver', () => {
         usersProfileGet: {
           UHIRE001: {
             fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
+              F_TEAM: {value: 'Frontend Platform'},
               F_DIVISION: {value: 'Collaboration'},
               F_MANAGER: {value: '<@UMANAGER1>', alt: 'Bob Rose'},
-            },
-          },
-          UENG1: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Bob Rose'},
-            },
-          },
-          UENG2: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Bob Rose'},
-            },
-          },
-          UPM1: {
-            fields: {
-              F_DEPARTMENT: {value: '1600 Product Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UPMGR1>', alt: 'Pat Product'},
-            },
-          },
-          UDES1: {
-            fields: {
-              F_DEPARTMENT: {value: '1700 Design Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UDESMGR1>', alt: 'Dana Design'},
-            },
-          },
-          UMANAGER1: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
-              F_MANAGER: {value: '<@UDIR1>', alt: 'Dina Director'},
-            },
-          },
-          UDIR1: {
-            fields: {
-              F_DEPARTMENT: {value: '1500 Engineering Team'},
-              F_DIVISION: {value: 'Collaboration'},
             },
           },
         },
         usersList: [
-          {
-            id: 'UHIRE001',
-            real_name: 'Hira Test',
-            profile: {
-              real_name: 'Hira Test',
-              display_name: 'hira',
-              email: 'hira@webflow.com',
-              title: 'Senior Software Engineer, Frontend',
-            },
-          },
           {
             id: 'UENG1',
             real_name: 'Nadia Zeng',
@@ -222,6 +192,7 @@ describe('identityResolver', () => {
               display_name: 'nadia',
               email: 'nadia@webflow.com',
               title: 'Senior Software Engineer, Frontend',
+              image_192: 'https://img/nadia.png',
             },
           },
           {
@@ -245,16 +216,6 @@ describe('identityResolver', () => {
             },
           },
           {
-            id: 'UDES1',
-            real_name: 'Charlene Foote',
-            profile: {
-              real_name: 'Charlene Foote',
-              display_name: 'charlene',
-              email: 'charlene@webflow.com',
-              title: 'Staff Product Designer',
-            },
-          },
-          {
             id: 'UDIR1',
             real_name: 'Dina Director',
             profile: {
@@ -264,22 +225,44 @@ describe('identityResolver', () => {
               title: 'Director, Engineering',
             },
           },
-          {
-            id: 'UPP1',
-            real_name: 'Priya Partner',
-            profile: {
-              real_name: 'Priya Partner',
-              display_name: 'priya',
-              email: 'priya@webflow.com',
-              title: 'Lead People Business Partner',
-            },
-          },
         ],
         teamProfileFields: [
-          {id: 'F_DEPARTMENT', label: 'Department'},
+          {id: 'F_TEAM', label: 'Team'},
           {id: 'F_DIVISION', label: 'Division'},
           {id: 'F_MANAGER', label: 'Manager'},
         ],
+      },
+      org: {
+        teammates: {
+          'Frontend Platform': [
+            warehouseRow({
+              name: 'Nadia Zeng',
+              email: 'nadia@webflow.com',
+              title: 'Senior Software Engineer, Frontend',
+            }),
+            warehouseRow({
+              name: 'Pawel Mankowski',
+              email: 'pawel@webflow.com',
+              title: 'Senior Software Engineer, Backend',
+            }),
+          ],
+        },
+        crossFunctional: {
+          'Frontend Platform': {
+            pm: warehouseRow({
+              name: 'Cari Bonilla',
+              email: 'cari@webflow.com',
+              title: 'Senior Product Manager',
+              role: 'pm',
+            }),
+            director: warehouseRow({
+              name: 'Dina Director',
+              email: 'dina@webflow.com',
+              title: 'Director, Engineering',
+              role: 'director',
+            }),
+          },
+        },
       },
       github: {configured: false, codeowners: null},
     });
@@ -288,16 +271,75 @@ describe('identityResolver', () => {
 
     expect(profile.buddy.kind).toBe('buddy');
     expect(profile.buddy.slackUserId).toBeUndefined();
-    expect(profile.teammates.map((person) => person.slackUserId)).toEqual(
+    const emails = profile.teammates.map((person) => person.email);
+    expect(emails).toEqual(
       expect.arrayContaining([
-        'UENG1',
-        'UENG2',
-        'UPM1',
-        'UDES1',
-        'UDIR1',
-        'UPP1',
+        'nadia@webflow.com',
+        'pawel@webflow.com',
+        'cari@webflow.com',
+        'dina@webflow.com',
       ])
     );
+    const nadia = profile.teammates.find(
+      (person) => person.email === 'nadia@webflow.com'
+    );
+    expect(nadia?.slackUserId).toBe('UENG1');
+    expect(nadia?.avatarUrl).toBe('https://img/nadia.png');
+  });
+
+  it('falls back to catalog defaults when DX warehouse is unconfigured', async () => {
+    const ctx = makeTestCtx({
+      slack: {
+        usersInfo: {
+          UHIRE001: {
+            id: 'UHIRE001',
+            real_name: 'Hira Test',
+            profile: {
+              first_name: 'Hira',
+              real_name: 'Hira Test',
+              display_name: 'hira',
+              email: 'hira@webflow.com',
+              title: 'Senior Software Engineer, Frontend',
+            },
+          },
+          UMANAGER1: {
+            id: 'UMANAGER1',
+            real_name: 'Bob Rose',
+            profile: {
+              first_name: 'Bob',
+              real_name: 'Bob Rose',
+              display_name: 'bob',
+              email: 'bob@webflow.com',
+              title: 'Senior Manager, Engineering',
+            },
+          },
+        },
+        usersProfileGet: {
+          UHIRE001: {
+            fields: {
+              F_TEAM: {value: 'Frontend Platform'},
+              F_DIVISION: {value: 'Collaboration'},
+              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Bob Rose'},
+            },
+          },
+        },
+        teamProfileFields: [
+          {id: 'F_TEAM', label: 'Team'},
+          {id: 'F_DIVISION', label: 'Division'},
+          {id: 'F_MANAGER', label: 'Manager'},
+        ],
+      },
+      org: {configured: false},
+      github: {configured: false, codeowners: null},
+    });
+
+    const profile = await resolveFromSlack(ctx, 'UHIRE001');
+    expect(profile.manager.slackUserId).toBe('UMANAGER1');
+    expect(profile.teammates.length).toBeGreaterThan(0);
+    // Fallback path never invents Slack ids for teammates.
+    for (const teammate of profile.teammates) {
+      expect(teammate.slackUserId).toBeUndefined();
+    }
   });
 
   it('falls back to email-derived display name when Slack lookup misses', async () => {

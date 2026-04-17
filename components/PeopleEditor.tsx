@@ -113,6 +113,9 @@ function PersonRow({
     person.insightsStatus === 'pending' &&
     !person.askMeAbout &&
     !person.discussionPoints;
+  const needsRetry =
+    person.insightsStatus === 'retryable-error' ||
+    person.insightsStatus === 'error';
   const canRetry = Boolean(onRetryPerson && person.slackUserId);
   const blurb = person.askMeAbout ?? person.discussionPoints ?? '';
 
@@ -208,6 +211,7 @@ function PersonRow({
             onChange({
               discussionPoints: event.target.value,
               askMeAbout: undefined,
+              insightsStatus: 'user-overridden',
             })
           }
           placeholder="What this person contributes, what to ask them, what they own."
@@ -216,6 +220,11 @@ function PersonRow({
           aria-label={`Discussion points for ${person.name}`}
         />
       )}
+      {needsRetry && !canRetry ? (
+        <p style={retryNoteStyle}>
+          Insights weren&apos;t available yet. Try refreshing the page.
+        </p>
+      ) : null}
       {canRetry ? (
         <TroubleshootPanel person={person} onRetryPerson={onRetryPerson!} />
       ) : null}
@@ -513,6 +522,12 @@ const skeletonStyle: CSSProperties = {
   background:
     'linear-gradient(90deg, rgba(148,163,184,0.08) 0%, rgba(148,163,184,0.18) 50%, rgba(148,163,184,0.08) 100%)',
   backgroundSize: '200% 100%',
+};
+
+const retryNoteStyle: CSSProperties = {
+  margin: 0,
+  color: '#fca5a5',
+  fontSize: 11,
 };
 
 const helpLinkStyle: CSSProperties = {

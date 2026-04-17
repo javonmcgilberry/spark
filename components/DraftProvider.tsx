@@ -138,7 +138,13 @@ export function DraftProvider({
   // where refresh-insights bumps updatedAt and re-triggers itself, and
   // it also means a newly-assigned buddy fires exactly one refresh
   // covering just the roster that actually needs blurbs.
+  //
+  // The ref is only updated AFTER a successful persisted response. A
+  // transient failure (5xx, network error) flips the affected rows to
+  // `retryable-error` so the UI can offer a retry affordance, and the
+  // key stays unset so the effect will run again on the next render.
   const insightsRefreshedFor = useRef<string>('');
+  const lastAttemptedKey = useRef<string>('');
   useEffect(() => {
     const pending = draft.pkg.sections.peopleToMeet.people
       .filter((p) => p.insightsStatus === 'pending' && p.slackUserId)
@@ -146,19 +152,45 @@ export function DraftProvider({
       .sort();
     if (pending.length === 0) return;
     const refreshKey = `${newHireId}:${pending.join(',')}`;
-    if (insightsRefreshedFor.current === refreshKey) return;
-    insightsRefreshedFor.current = refreshKey;
+    if (
+      insightsRefreshedFor.current === refreshKey ||
+      lastAttemptedKey.current === refreshKey
+    ) {
+      return;
+    }
+    lastAttemptedKey.current = refreshKey;
     void (async () => {
+      const markRetryable = () => {
+        const nextPkg = {
+          ...draft.pkg,
+          sections: {
+            ...draft.pkg.sections,
+            peopleToMeet: {
+              ...draft.pkg.sections.peopleToMeet,
+              people: draft.pkg.sections.peopleToMeet.people.map((person) =>
+                person.insightsStatus === 'pending' && person.slackUserId
+                  ? {...person, insightsStatus: 'retryable-error' as const}
+                  : person
+              ),
+            },
+          },
+        };
+        draft.replace(nextPkg);
+      };
       try {
         const res = await fetch(
           `/api/drafts/${encodeURIComponent(newHireId)}/refresh-insights`,
           {method: 'POST'}
         );
-        if (!res.ok) return;
+        if (!res.ok) {
+          markRetryable();
+          return;
+        }
         const body = (await res.json()) as {pkg: OnboardingPackage};
         draft.replace(body.pkg);
+        insightsRefreshedFor.current = refreshKey;
       } catch {
-        // Insights are best-effort — the template discussionPoints still render.
+        markRetryable();
       }
     })();
   }, [newHireId, draft]);
