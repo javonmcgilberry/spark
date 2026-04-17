@@ -143,7 +143,10 @@ export async function resolveFromSlack(
   const slackSeed = await lookupSlackSeed(ctx, caches, userId);
   const profile = await buildProfile(
     ctx,
-    mergeSeed(userId, slackSeed.displayName, slackSeed)
+    await canonicalizeSeedFromOrg(
+      ctx,
+      mergeSeed(userId, slackSeed.displayName, slackSeed)
+    )
   );
   caches.profile.set(userId, {
     profile,
@@ -164,7 +167,10 @@ export async function resolveFromEmail(
   const canonicalUserId = slackSeed?.userId ?? email;
   const profile = await buildProfile(
     ctx,
-    mergeSeed(canonicalUserId, email.split('@')[0], slackSeed, email)
+    await canonicalizeSeedFromOrg(
+      ctx,
+      mergeSeed(canonicalUserId, email.split('@')[0], slackSeed, email)
+    )
   );
   const cacheEntry = {
     profile,
@@ -608,6 +614,37 @@ function mergeSeed(
     pillarName: slackSeed?.pillarName,
     manager: slackSeed?.manager,
   };
+}
+
+/**
+ * Slack is good at identity and custom-profile hydration, but the DX
+ * warehouse is the source of truth for the hire's actual team/pillar.
+ * Canonicalize those fields before we ask the warehouse for teammates,
+ * otherwise broad Slack values like "Engineering" collapse the roster
+ * query to zero rows and force the placeholder fallback.
+ */
+async function canonicalizeSeedFromOrg(
+  ctx: HandlerCtx,
+  seed: ProfileSeed
+): Promise<ProfileSeed> {
+  const email = seed.email?.trim().toLowerCase();
+  if (!email || !ctx.org.isConfigured()) return seed;
+  try {
+    const row = await ctx.org.lookupByEmail(email);
+    if (!row) return seed;
+    return {
+      ...seed,
+      title: firstNonEmpty(row.title, seed.title),
+      teamName: firstNonEmpty(row.teamName, seed.teamName),
+      pillarName: firstNonEmpty(row.pillarName, seed.pillarName),
+    };
+  } catch (error) {
+    ctx.logger.warn(
+      `identityResolver: warehouse seed lookup threw for ${email}; keeping Slack seed`,
+      error
+    );
+    return seed;
+  }
 }
 
 function inferRoleTrack(teamName: string): RoleTrack {

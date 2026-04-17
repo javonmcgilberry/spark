@@ -22,11 +22,10 @@ export async function handleRefreshInsights(
     teamName
   ).catch((error) => ctx.logger.warn('refresh-insights failed', error));
 
-  const enriched = enrichPackageInsights(ctx, pkg);
-  const persisted =
-    (await ctx.db.applyFieldPatch(userId, {
-      peopleToMeet: enriched.sections.peopleToMeet.people,
-    })) ?? enriched;
+  const persisted = await persistLatestPeopleInsights(ctx, userId);
+  if (!persisted) {
+    return Response.json({error: 'draft not found'}, {status: 404});
+  }
 
   return Response.json({pkg: enrichPackageInsights(ctx, persisted)});
 }
@@ -75,11 +74,24 @@ export async function handleRetryPersonInsights(
     parsed.data.hints ?? {}
   ).catch((error) => ctx.logger.warn('retry-insights failed', error));
 
-  const enriched = enrichPackageInsights(ctx, pkg);
-  const persisted =
-    (await ctx.db.applyFieldPatch(userId, {
-      peopleToMeet: enriched.sections.peopleToMeet.people,
-    })) ?? enriched;
+  const persisted = await persistLatestPeopleInsights(ctx, userId);
+  if (!persisted) {
+    return Response.json({error: 'draft not found'}, {status: 404});
+  }
 
   return Response.json({pkg: enrichPackageInsights(ctx, persisted)});
+}
+
+async function persistLatestPeopleInsights(ctx: HandlerCtx, userId: string) {
+  // Re-read the draft after the network work finishes. refresh-insights
+  // can race with a manual assignment PATCH; persisting the stale package
+  // snapshot would otherwise drop rows the manager just added.
+  const latest = await ctx.db.get(userId);
+  if (!latest) return null;
+  const enriched = enrichPackageInsights(ctx, latest);
+  return (
+    (await ctx.db.applyFieldPatch(userId, {
+      peopleToMeet: enriched.sections.peopleToMeet.people,
+    })) ?? enriched
+  );
 }

@@ -9,7 +9,8 @@ import {handleGenerateDraft} from '../../lib/handlers/drafts/generate';
 import {handleGetDraft, handlePatchDraft} from '../../lib/handlers/drafts/byId';
 import {handleCritiqueDraft} from '../../lib/handlers/drafts/critique';
 import {handleRefreshInsights} from '../../lib/handlers/drafts/refreshInsights';
-import type {HandlerCtx} from '../../lib/ctx';
+import {makeMemoryDraftStore, type HandlerCtx} from '../../lib/ctx';
+import type {DraftStore} from '../../lib/draftStore';
 
 const session = {managerSlackId: 'UMANAGER1', source: 'env' as const};
 
@@ -473,6 +474,95 @@ describe('drafts handlers', () => {
       'Ask Alice about the Q2 migration she led.'
     );
     expect(row?.insightsStatus).toBe('user-overridden');
+  });
+
+  it('refresh-insights keeps a person that was manually added after the refresh started', async () => {
+    const realDb = makeMemoryDraftStore();
+    let serveStaleOnce = false;
+    let staleSnapshot: Awaited<ReturnType<DraftStore['get']>> | undefined;
+    const db: DraftStore = {
+      async get(userId) {
+        if (serveStaleOnce && staleSnapshot?.userId === userId) {
+          serveStaleOnce = false;
+          return structuredClone(staleSnapshot);
+        }
+        return realDb.get(userId);
+      },
+      listDraftsForManager: (managerUserId) =>
+        realDb.listDraftsForManager(managerUserId),
+      listPackagesManagedBy: (managerUserId) =>
+        realDb.listPackagesManagedBy(managerUserId),
+      create: (pkg) => realDb.create(pkg),
+      update: (pkg) => realDb.update(pkg),
+      applyFieldPatch: (userId, patch) => realDb.applyFieldPatch(userId, patch),
+      publish: (userId, publishedByUserId) =>
+        realDb.publish(userId, publishedByUserId),
+    };
+    const ctx = makeTestCtx({
+      db,
+      slack: {
+        usersLookupByEmail: {
+          'alice@webflow.com': {
+            id: 'UHIRE001',
+            real_name: 'Alice Adams',
+            profile: {
+              first_name: 'Alice',
+              display_name: 'alice',
+              email: 'alice@webflow.com',
+              title: 'Software Engineer',
+            },
+          },
+        },
+        usersInfo: {
+          UHIRE001: {
+            id: 'UHIRE001',
+            real_name: 'Alice Adams',
+            profile: {
+              first_name: 'Alice',
+              display_name: 'alice',
+              email: 'alice@webflow.com',
+            },
+          },
+        },
+      },
+    });
+    const create = await handleCreateDraft(
+      jsonRequest({newHireSlackId: 'UHIRE001'}),
+      ctx,
+      session
+    );
+    expect(create.status).toBe(201);
+
+    staleSnapshot = await realDb.get('UHIRE001');
+    expect(staleSnapshot).toBeDefined();
+
+    await realDb.applyFieldPatch('UHIRE001', {
+      peopleToMeet: [
+        ...(staleSnapshot?.sections.peopleToMeet.people ?? []),
+        {
+          name: 'Nadia Zeng',
+          role: 'Senior Software Engineer',
+          title: 'Senior Software Engineer',
+          discussionPoints: '',
+          weekBucket: 'week3+',
+          kind: 'teammate',
+          slackUserId: 'UENG1',
+          email: 'nadia@webflow.com',
+          insightsStatus: 'pending',
+        },
+      ],
+    });
+
+    serveStaleOnce = true;
+    const refresh = await handleRefreshInsights(ctx, session, 'UHIRE001');
+    expect(refresh.status).toBe(200);
+
+    const stored = await realDb.get('UHIRE001');
+    expect(
+      stored?.sections.peopleToMeet.people.some(
+        (person) => person.slackUserId === 'UENG1'
+      )
+    ).toBe(true);
   });
 });
 

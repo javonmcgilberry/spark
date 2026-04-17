@@ -114,6 +114,105 @@ describe('identityResolver', () => {
     expect(profile.manager.slackUserId).toBe('UMANAGER1');
   });
 
+  it('uses the warehouse hire lookup to canonicalize a broad Slack team before roster lookup', async () => {
+    const warehouseRow = (overrides: {
+      name: string;
+      email: string;
+      title?: string;
+      role?:
+        | 'teammate'
+        | 'pm'
+        | 'designer'
+        | 'director'
+        | 'people-partner'
+        | 'manager-chain';
+    }) => ({
+      name: overrides.name,
+      email: overrides.email,
+      title: overrides.title,
+      teamName: 'Docs Platform',
+      pillarName: 'Collaboration',
+      source: 'warehouse' as const,
+      role: overrides.role ?? 'teammate',
+    });
+
+    const ctx = makeTestCtx({
+      slack: {
+        usersInfo: {
+          UMANAGER1: {
+            id: 'UMANAGER1',
+            real_name: 'Mia Manager',
+            profile: {
+              first_name: 'Mia',
+              real_name: 'Mia Manager',
+              display_name: 'mia',
+              email: 'mia@webflow.com',
+              title: 'Engineering Manager',
+            },
+          },
+        },
+        usersProfileGet: {
+          UHIRE001: {
+            first_name: 'Hira',
+            real_name: 'Hira Test',
+            display_name: 'hira',
+            email: 'hira@webflow.com',
+            title: 'Software Engineer',
+            fields: {
+              F_DEPARTMENT: {value: '1500 Engineering Team'},
+              F_DIVISION: {value: 'Collaboration'},
+              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Mia Manager'},
+            },
+          },
+        },
+        usersList: [
+          {
+            id: 'UENG1',
+            real_name: 'Nadia Zeng',
+            profile: {
+              real_name: 'Nadia Zeng',
+              display_name: 'nadia',
+              email: 'nadia@webflow.com',
+              title: 'Senior Software Engineer',
+            },
+          },
+        ],
+        teamProfileFields: [
+          {id: 'F_DEPARTMENT', label: 'Department'},
+          {id: 'F_DIVISION', label: 'Division'},
+          {id: 'F_MANAGER', label: 'Manager'},
+        ],
+      },
+      org: {
+        byEmail: {
+          'hira@webflow.com': warehouseRow({
+            name: 'Hira Test',
+            email: 'hira@webflow.com',
+            title: 'Software Engineer',
+          }),
+        },
+        teammates: {
+          'Docs Platform': [
+            warehouseRow({
+              name: 'Nadia Zeng',
+              email: 'nadia@webflow.com',
+              title: 'Senior Software Engineer',
+            }),
+          ],
+        },
+      },
+      github: {configured: false, codeowners: null},
+    });
+
+    const profile = await resolveFromSlack(ctx, 'UHIRE001');
+
+    expect(profile.teamName).toBe('Docs Platform');
+    expect(profile.pillarName).toBe('Collaboration');
+    expect(
+      profile.teammates.some((person) => person.email === 'nadia@webflow.com')
+    ).toBe(true);
+  });
+
   it('builds people-to-meet from the DX warehouse, hydrates Slack ids from the cached directory, and keeps buddy as a placeholder', async () => {
     const warehouseRow = (overrides: {
       name: string;
