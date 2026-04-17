@@ -19,6 +19,23 @@ const BUCKET_LABELS: Record<OnboardingPerson['weekBucket'], string> = {
   'week3+': 'Week 3+',
 };
 
+const BUCKET_ORDER: Record<OnboardingPerson['weekBucket'], number> = {
+  'week1-2': 0,
+  'week2-3': 1,
+  'week3+': 2,
+};
+
+function sortByBucket(people: OnboardingPerson[]): OnboardingPerson[] {
+  return people
+    .map((person, index) => ({person, index}))
+    .sort((a, b) => {
+      const delta =
+        BUCKET_ORDER[a.person.weekBucket] - BUCKET_ORDER[b.person.weekBucket];
+      return delta !== 0 ? delta : a.index - b.index;
+    })
+    .map((entry) => entry.person);
+}
+
 export function PeopleEditor({
   people,
   onChange,
@@ -26,11 +43,12 @@ export function PeopleEditor({
   people: OnboardingPerson[];
   onChange: (next: OnboardingPerson[]) => void;
 }) {
+  const emit = (next: OnboardingPerson[]) => onChange(sortByBucket(next));
   const update = (index: number, patch: Partial<OnboardingPerson>) => {
-    onChange(people.map((p, i) => (i === index ? {...p, ...patch} : p)));
+    emit(people.map((p, i) => (i === index ? {...p, ...patch} : p)));
   };
   const remove = (index: number) => {
-    onChange(people.filter((_, i) => i !== index));
+    emit(people.filter((_, i) => i !== index));
   };
   const add = (hit: SlackUserHit) => {
     if (people.some((p) => p.slackUserId === hit.slackUserId)) return;
@@ -45,7 +63,7 @@ export function PeopleEditor({
       avatarUrl: hit.avatarUrl,
       insightsStatus: 'pending',
     };
-    onChange([...people, next]);
+    emit([...people, next]);
   };
 
   return (

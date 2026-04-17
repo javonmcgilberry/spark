@@ -6,7 +6,7 @@ import {useDraftContext} from './DraftContext';
 import {AgentTimeline} from './AgentTimeline';
 import {WelcomeNoteEditor} from './WelcomeNoteEditor';
 import {PeopleEditor} from './PeopleEditor';
-import {ChecklistGrid} from './ChecklistGrid';
+import {ChecklistTabs} from './ChecklistTabs';
 import {CritiquePanel} from './CritiquePanel';
 import {SendToSlackButton} from './SendToSlackButton';
 import {SaveIndicator} from './SaveIndicator';
@@ -74,12 +74,12 @@ export function DraftWorkspacePeople() {
   );
 }
 
-export function DraftWorkspaceChecklistGrid() {
+export function DraftWorkspaceChecklist() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
       <h2 style={sectionHeadingStyle}>Onboarding checklist</h2>
-      <ChecklistGrid
+      <ChecklistTabs
         pkg={state.pkg}
         onColumnChange={(sectionId, items) =>
           actions.patch({checklistRows: {[sectionId]: items}}, {flush: true})
