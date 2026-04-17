@@ -3,7 +3,6 @@
 import {useMemo} from 'react';
 import type {CSSProperties} from 'react';
 import {useDraftContext} from './DraftContext';
-import {DraftProvider} from './DraftProvider';
 import {DraftPreview} from './DraftPreview';
 import {AgentTimeline} from './AgentTimeline';
 import {WelcomeNoteEditor} from './WelcomeNoteEditor';
@@ -176,19 +175,6 @@ export function DraftWorkspaceSendToSlack() {
     />
   );
 }
-
-export const DraftWorkspace = {
-  Root: DraftProvider,
-  Header: DraftWorkspaceHeader,
-  Body: DraftWorkspaceBody,
-  WelcomeNote: DraftWorkspaceWelcomeNote,
-  Checklist: DraftWorkspaceChecklist,
-  Preview: DraftWorkspacePreview,
-  Sidebar: DraftWorkspaceSidebar,
-  AgentTimeline: DraftWorkspaceAgentTimeline,
-  CritiquePanel: DraftWorkspaceCritiquePanel,
-  SendToSlack: DraftWorkspaceSendToSlack,
-};
 
 const headerStyle: CSSProperties = {
   display: 'flex',

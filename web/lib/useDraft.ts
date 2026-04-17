@@ -98,9 +98,7 @@ export function useDraft(
 
   const reload = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/drafts/${encodeURIComponent(pkg.userId)}`
-      );
+      const res = await fetch(`/api/drafts/${encodeURIComponent(pkg.userId)}`);
       if (!res.ok) throw new Error(`reload failed (${res.status})`);
       const body = (await res.json()) as {pkg: OnboardingPackage};
       setPkg(body.pkg);
@@ -122,15 +120,7 @@ export function useDraft(
 }
 
 function mergePatch(a: DraftFieldPatch, b: DraftFieldPatch): DraftFieldPatch {
-  return {
-    ...a,
-    ...b,
-    // arrays replace wholesale — that matches the bot's applyFieldPatch
-    ...(b.stakeholderUserIds ? {stakeholderUserIds: b.stakeholderUserIds} : {}),
-    ...(b.customChecklistItems
-      ? {customChecklistItems: b.customChecklistItems}
-      : {}),
-  };
+  return {...a, ...b};
 }
 
 function applyLocal(

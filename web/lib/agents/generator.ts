@@ -271,7 +271,7 @@ function toAnthropicTool(descriptor: ToolDescriptor): Anthropic.Tool {
   };
 }
 
-function buildUserMessage(input: GeneratorInput): string {
+export function buildUserMessage(input: GeneratorInput): string {
   const lines = [
     `New hire: ${input.newHireName}`,
     input.slackUserIdIfKnown
@@ -345,6 +345,3 @@ async function callAnthropicWithRetry(args: {
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-/** Exported for tests. */
-export {buildUserMessage};

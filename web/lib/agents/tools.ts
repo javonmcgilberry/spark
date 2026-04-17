@@ -16,11 +16,7 @@ import type {OnboardingPerson} from '../types';
 
 export interface AgentToolContext {
   spark: SparkApiContext;
-  /** Abort all in-flight tool fetches. */
   signal: AbortSignal;
-  /**
-   * Per-tool timeout in ms. Default 10_000 per plan.
-   */
   perToolTimeoutMs: number;
 }
 
