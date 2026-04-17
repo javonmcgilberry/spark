@@ -87,6 +87,9 @@ Browser → spark.wf.app (Next.js on Webflow Cloud / Cloudflare Workers)
         ├─ slack/events.ts         Slack event dispatcher
         ├─ slack/handlers/         assistant, onboarding, home
         ├─ auth/cloudflareAccess.ts  CF Access JWT → {email, sub}
+        ├─ auth/atlassianOAuth.ts    Atlassian OAuth 2.0 (3LO) primitives
+        ├─ auth/atlassianSession.ts  Token resolution + auto-refresh
+        ├─ auth/atlassianTokenStore  Per-viewer tokens (D1 or in-memory)
         ├─ session.ts              CF Access → cookie → env fallback
         └─ agents/                 Generator + Critique
 ```
@@ -108,6 +111,45 @@ see what Cloudflare Access is passing through.
 
 Local dev doesn't have Cloudflare Access in front, so session falls
 back to `DEMO_MANAGER_SLACK_ID` in `.env`.
+
+### Jira + Confluence
+
+Two authentication paths, tried in this order on every request:
+
+1. **Atlassian OAuth 2.0 (3LO), per-viewer.** When the manager clicks
+   "Connect Jira & Confluence" on the draft page, they go through
+   Atlassian's consent screen; Spark stores their access + refresh
+   tokens in the `atlassian_tokens` D1 table keyed on their CF Access
+   email. Subsequent Jira/Confluence calls hit
+   `https://api.atlassian.com/ex/{jira,confluence}/<cloudId>/…` with
+   a Bearer token, scoped to that viewer's own Jira/Confluence
+   permissions. Access tokens refresh transparently. Code lives in
+   `lib/auth/atlassian{OAuth,Session,TokenStore}.ts` and
+   `app/api/auth/atlassian/*`.
+2. **Basic auth fallback.** When the viewer hasn't completed OAuth —
+   or OAuth isn't configured on the env — Spark falls back to Basic
+   auth against the site's REST API using `JIRA_API_TOKEN` +
+   `CONFLUENCE_API_TOKEN`. The paired email is the viewer's CF Access
+   identity, or the explicit `JIRA_API_EMAIL` override if that's set
+   (useful for testing and service-account scenarios).
+
+The "Connect Jira & Confluence" button polls `/api/auth/atlassian/status`
+on mount and shows either a primary CTA or a greyed-out "connected"
+pill with the bound Atlassian site name.
+
+To register the OAuth app (one-time, per environment):
+
+1. Visit [developer.atlassian.com/console/myapps/](https://developer.atlassian.com/console/myapps/)
+   and create an **OAuth 2.0 integration**.
+2. Add the **Jira API** and **Confluence API** products. Granted scopes
+   should include `read:jira-user`, `read:jira-work`,
+   `read:confluence-content.all`, `read:confluence-space.summary`, and
+   `offline_access`.
+3. Set the callback URL to
+   `https://<your-spark-url>/api/auth/atlassian/callback`.
+4. Copy the client ID + secret into Webflow Cloud as
+   `ATLASSIAN_OAUTH_CLIENT_ID` and `ATLASSIAN_OAUTH_CLIENT_SECRET`
+   (mark the secret as a Secret). Redeploy.
 
 ## Environment Variables (Webflow Cloud)
 
