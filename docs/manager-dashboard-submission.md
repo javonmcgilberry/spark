@@ -1,103 +1,107 @@
-# Hackathon Submission — Spark: Onboarding Assistant + Draft Generator Agent
+# Hackathon Submission — Spark: Slack Agent on Webflow Cloud
 
 **Team:** Javon McGilberry (+ collaborators)
 
-**Theme adherence:** Agents of Possibility — uses an autonomous multi-tool
-LLM loop (DX warehouse → team roster → buddy selection → welcome draft →
-checklist tuning → Confluence → contribution task scanner → Zod-gated
-finalize) to replace the drafting lift that previously lived in a Slack
-modal.
+**Theme adherence:** Agents of Possibility — an autonomous multi-tool
+LLM loop drafts a full onboarding plan, runs critique on every save,
+and hand-off to a Slack assistant handles the hire's day-1 questions.
+
+**Platform adherence:** the entire system runs on **Webflow Cloud** as
+a single Worker. One deploy. One URL. No side-car bot process. No
+tunnel. Built as a reference implementation of Cloudflare's "Build a
+Slack Agent" pattern, on Webflow's own edge platform.
 
 ## Problem
 
-Engineering managers at Webflow spend hours of pre-boarding time on the
-personalized onboarding guide that every new hire expects on day one:
+Engineering managers at Webflow spend hours of pre-boarding time on
+the personalized onboarding guide every new hire expects on day one:
 welcome note, buddy assignment, people to meet, team-tuned checklist
-items, first contribution targets. The existing Spark Slack bot ships
-the guide to the hire on day 1 — but drafting itself still happened in
-a cramped Slack modal, field by field. The generic catalog covers
+items, first contribution targets. The old Spark Slack bot shipped
+the guide to the hire on day 1 — but drafting still happened in a
+cramped Slack modal, field by field. The generic catalog covers
 company-wide basics but doesn't know _this team_, _this hire_, _this
 moment_.
 
 ## Solution
 
-A Next.js 15 onboarding assistant on Webflow Cloud with two AI teammates:
+A Next.js 15 onboarding app on Webflow Cloud with two AI teammates:
 
-1. **Generator agent.** Takes the new hire's Slack profile + a sentence
-   of context from the manager ("Maria, backend, joining Commerce on May
-   1, cares about reliability") and autonomously runs a 9-tool loop —
-   looks up the team in DX warehouse, fetches the roster, ranks 3 buddy
-   candidates, drafts **two** welcome messages (a short Spark-voice
-   intro and a longer manager-voice note), tunes the week-3 contribution
-   task to the team's codebase, and hands back a Zod-validated draft in
-   ~20 seconds.
+1. **Generator agent** — takes the new hire's Slack profile + a
+   sentence of context ("Maria, backend, joining Commerce on May 1,
+   cares about reliability") and autonomously runs a tool loop
+   (resolve_new_hire → fetch_team_roster → propose_buddy →
+   draft_welcome_note → find_stakeholders → tune_checklist →
+   finalize_draft). Produces a Zod-validated draft in ~20 seconds.
+2. **Critique agent** — runs on every save. Deterministic structural
+   rules flag missing welcome notes, missing buddies, thin
+   people-to-meet lists, uniform task difficulty, dead resource
+   links. Each finding has a one-click Apply Fix.
 
-2. **Critique agent.** Runs on every save and on demand. Structural
-   rules flag missing welcome notes, missing buddies, thin people-to-meet
-   lists, uniform task difficulty, and dead resource links. Each finding
-   has a one-click Apply Fix.
-
-The editor IS the preview: the manager edits the welcome, the
-people-to-meet list (with real Slack avatars and Jira/GitHub-sourced
-"ask me about" blurbs), and a 4-column Week 1 / Week 2 / Week 3 / Week 4
-checklist grid — then clicks "Publish to Slack". The existing Spark bot
-materializes the draft channel + canvas and notifies the reviewers, so
-all the async collaboration stays where it already works.
+The editor IS the preview: managers edit the welcome, the people
+list (with real Slack avatars and Jira/GitHub-sourced "Ask me
+about" blurbs), and a 4-column checklist grid — then click
+**Publish to Slack**. The app materializes the draft channel +
+canvas and notifies reviewers, all from the same Worker.
 
 ## What we built (links)
 
-- Code: <github link>
+- Code: `spark/` in the webflow monorepo
 - Loom demo (4 min): <loom link>
 - Webflow Cloud preview: <webflow-cloud-url>
 
-## Architecture at a glance
+## Architecture
 
+```mermaid
+flowchart LR
+  Browser --> WF["spark.wf.app<br>Next.js 15 on Webflow Cloud"]
+  subgraph wfc ["Webflow Cloud (Cloudflare Workers)"]
+    WF
+    Manager["Manager HTTP routes<br>/api/drafts/*<br>/api/lookup/*"]
+    Slack["Slack webhooks<br>/api/slack/events<br>/api/slack/interactivity"]
+    Gen["Generator + Critique agents"]
+    D1[("D1<br>drafts + history")]
+    Manager --> D1
+    Slack --> D1
+    Manager --> Gen
+    WF --> Manager
+  end
+  SlackAPI[Slack Events] --> Slack
+  Gen --> Anthropic[Anthropic API]
+  Manager --> Jira
+  Manager --> GitHub
+  Manager --> Confluence
+  Slack --> SlackWeb[Slack Web API]
+  Manager --> SlackWeb
 ```
-Manager browser
-  → Webflow Cloud (Next.js 15 edge, Cloudflare Workers)
-    → Anthropic API (tool-use loop, claude-3-5-haiku)
-    → Spark bot HTTP API (bearer auth, server-to-server only)
-      → DX warehouse, GitHub, Confluence, Webflow monorepo, Slack Web API
-```
 
-The bot stays a long-running Node process with its existing in-memory
-draft store. The UI is a thin, stateless edge consumer. For the demo,
-the bot is exposed through a Cloudflare tunnel.
+Every handler, service, and tool takes a `HandlerCtx` — the DI
+container that holds the Slack client, LLM client, DB, Jira,
+GitHub, Confluence, logger, and env. `makeProdCtx(env)` populates
+real clients on Cloudflare. `makeTestCtx({...overrides})` builds an
+in-memory HandlerCtx for sub-second vitest feedback. The dev
+sandbox at `/dev/slack-sandbox` uses the same plumbing with a
+recording Slack mock so every event fixture Spark handles is
+replayable inline.
 
-## How autonomy shows up
+## What changed vs the pre-migration build
 
-- 9 tools the model composes without prompting:
-  `resolve_new_hire`, `resolve_team`, `fetch_team_roster`,
-  `propose_buddy`, `find_stakeholders`, `find_contribution_tasks`,
-  `draft_welcome_note`, `tune_checklist`, `finalize_draft`.
-- Zod-gated finalize: invalid payloads feed validation errors back to
-  the model; the loop retries.
-- Per-tool 10s timeout, 20-iteration hard cap, exponential backoff on
-  Anthropic 529s.
-- PII hygiene — emails stripped before being passed to the model.
-- Streaming SSE so the manager watches the agent think in real time.
+| Before                               | After                              |
+| ------------------------------------ | ---------------------------------- |
+| Node bot (spark/src) + web proxy     | One Next.js app on Webflow Cloud   |
+| Socket Mode via @slack/bolt          | HTTP Events API with HMAC verify   |
+| In-memory draft Map                  | D1 DraftStore + memory in tests    |
+| DX warehouse via `pg`                | Dropped; codeowners + Slack covers |
+| Monorepo filesystem scanner          | Dropped; `find_contribution_tasks` |
+| SPARK_API_BASE_URL / SPARK_API_TOKEN | Removed; routes are native         |
+| SlackApp `client` passed everywhere  | Narrow SlackClient via HandlerCtx  |
+| LlmService class                     | LlmClient interface + stub + real  |
 
-## What we intentionally didn't do (yet)
+## Pitch line
 
-- Slack OAuth. The demo uses a session cookie + `DEMO_MANAGER_SLACK_ID`
-  env fallback.
-- Hosted bot. We tunnel for the demo.
-- Edge-native storage. The bot's in-memory Map is still the source of
-  truth; Webflow Cloud SQLite is the next step.
-- Rate limiting per manager.
-
-Each of these is a straightforward post-hackathon step with no
-architectural surprise.
-
-## Code requirements (hackathon checklist)
-
-- Runs on `dev` branch ✓
-- Setup instructions: see `spark/README.md` and
-  `spark/web/README.md`
-- Demo steps: see `spark/docs/manager-dashboard-demo.md`
-- Required env vars documented in `spark/.env.example` (the web app
-  reads the same file via symlinks `.env.local` + `.dev.vars`)
-- Security pre-submission checklist
-  (`spark/HACKATHON.md`): ggshield clean, no hardcoded secrets,
-  Anthropic spending limit set, no PII sent to LLMs beyond Slack
-  ids + first names.
+**Spark is a Slack agent built on Webflow Cloud. Entire system on
+the edge. Multi-workspace ready.** One Worker handles the manager
+dashboard, the Slack Events API webhook, the Anthropic tool-use
+loop, the D1 persistence, and the Slack canvas + Home view — and
+every layer is reachable from a dev sandbox at `/dev/slack-sandbox`
+with HMAC-signed fixtures, so the next engineer can iterate on a
+new event type without waiting for Slack or burning API tokens.

@@ -1,101 +1,132 @@
 # Spark
 
-AI onboarding companion for new Webflow engineers. Spark lives in Slack, replaces the onboarding spreadsheet with a guided journey, and helps new hires learn their team, tools, docs, rituals, and codebase before guiding them into an early contribution.
+AI onboarding companion for new Webflow engineers. Spark lives in Slack,
+replaces the onboarding spreadsheet with a guided journey, and helps
+managers build reviewable onboarding plans for their new hires in
+minutes — then delivers a personalized plan to the hire via Slack.
+
+Spark runs **entirely on Webflow Cloud** following Cloudflare's "Build
+a Slack Agent" pattern. One Next.js app, one Worker, one deploy, one
+URL. No separate Node bot process. No Cloudflare Tunnel in production.
 
 ## Quick Start
 
 ```bash
-cp .env.example .env
+cd web
 npm install
-npm run dev
+SLACK_MOCK_MODE=1 ANTHROPIC_MOCK_MODE=1 npm run dev
+open http://localhost:3000
 ```
 
-Hit `http://localhost:8787/healthz` to confirm the process is up. Without Slack tokens the bot runs in HTTP-only mode.
+Mock modes mean you can iterate with zero token burn and zero Slack
+traffic. Flip them off when you're ready to exercise the real APIs
+(see `docs/dev-setup.md` for the named tunnel + dev Slack app setup).
 
-Spark's main experience now runs through Slack AI assistant threads, with a DM fallback for quick starts and local testing.
+## The three-tier dev loop
 
-## Project Structure
+1. **vitest (default)** — `cd web && npm run test:watch`. Every
+   handler, service, and tool is tested against `makeTestCtx()` which
+   builds an in-memory `HandlerCtx` with recording Slack mock, stub
+   LLM, and stub Jira/GitHub/Confluence. Sub-second feedback.
+2. **Dev sandbox** — `/dev/slack-sandbox` in `next dev`. Every Slack
+   event fixture Spark understands is reachable from a dropdown. Tweak
+   the JSON, click Send, see response + outbound Slack calls inline.
+3. **Named Cloudflare Tunnel + dev Slack app** — one-time 30-min setup
+   for real end-to-end testing. Only needed when you genuinely need a
+   real Slack round-trip.
+
+Details in `docs/dev-setup.md`.
+
+## Architecture
 
 ```
-src/
-  index.ts                  Boot sequence
-  config/
-    env.ts                  Zod-validated environment config
-  app/
-    logger.ts               Structured logger
-    services.ts             Service container passed to all handlers
-  server/
-    createHttpServer.ts     Express health endpoint
-  slack/
-    createSlackApp.ts       Bolt app factory (Socket Mode)
-    registerHandlers.ts     Wires all handler groups onto the app
-    handlers/
-      assistant.ts          Slack AI assistant thread lifecycle
-      onboarding.ts         member_joined_channel, app_mention, DM fallback
-      commands.ts           /spark slash command
-      actions.ts            Block Kit interactive actions
-  onboarding/
-    catalog.ts              Spreadsheet-derived static onboarding content
-    blocks.ts               Block Kit builders for each onboarding phase
-  services/
-    identityResolver.ts     Slack user -> team/profile resolution
-    journeyService.ts       Stateful onboarding journey orchestration
-    taskScannerService.ts   Contribution task discovery
-    contributionGuideService.ts  Guided local contribution steps
+Browser → spark.wf.app (Next.js on Webflow Cloud / Cloudflare Workers)
+    ├─ app/                        Pages (manager dashboard)
+    │   ├─ page.tsx                Draft inbox
+    │   ├─ new/                    Create-draft flow
+    │   ├─ draft/[newHireId]/      Draft workspace
+    │   └─ dev/slack-sandbox/      Dev-only Slack event replay
+    ├─ app/api/
+    │   ├─ drafts/…                Manager CRUD on onboarding packages
+    │   ├─ lookup/slack-users      Slack directory search
+    │   ├─ slack/events            Slack Events API webhook
+    │   └─ slack/interactivity     Block Kit interactivity
+    └─ lib/
+        ├─ ctx.ts                  HandlerCtx + makeProdCtx/makeTestCtx
+        ├─ draftStore.ts           D1 + in-memory DraftStore
+        ├─ services/               slack, llm, jira, github,
+        │                          confluence, peopleInsights,
+        │                          slackUserDirectory, identityResolver,
+        │                          canvas, onboardingPackages,
+        │                          codeowners, confluenceSearch
+        ├─ handlers/drafts/        Manager HTTP handler logic
+        ├─ handlers/lookup/        Lookup handler logic
+        ├─ slack/events.ts         Slack event dispatcher
+        ├─ slack/handlers/         assistant, onboarding, home
+        └─ agents/                 Generator + Critique
 ```
 
-## Environment Variables
+Every handler, service, and tool takes a `HandlerCtx` — the DI
+backbone. Production builds `makeProdCtx(env)` which resolves real
+clients (D1, fetch-based Slack, Anthropic SDK). Tests build
+`makeTestCtx({...overrides})`. Sandbox uses recording mocks.
 
-Defined in `.env.example`:
+## Environment Variables (Webflow Cloud)
 
-- `PORT` -- HTTP server port (default 8787)
-- `SLACK_APP_TOKEN` / `SLACK_BOT_TOKEN` -- Socket Mode credentials
-- `ANTHROPIC_API_KEY` -- LLM reasoning
-- `ANTHROPIC_MODEL` -- Optional Anthropic model override
-- `GITHUB_TOKEN` -- Read-only GitHub access for skill discovery
-- `STATSIG_CONSOLE_SDK_KEY` -- Stale flag scanning
-- `DX_WAREHOUSE_DSN` -- Team lookup
-- `CONFLUENCE_API_TOKEN` -- Onboarding docs
-- `CONFLUENCE_BASE_URL` -- Base wiki URL for generating onboarding doc links
-- `WEBFLOW_MONOREPO_PATH` -- Path to the monorepo for codebase scanning
+```env
+# Slack
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_SIGNING_SECRET=...
 
-## Slack Setup
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-3-5-haiku-latest
 
-See [docs/slack-app-setup.md](docs/slack-app-setup.md) for the app registration checklist, including the assistant scopes and events Spark needs for its native Slack agent experience.
+# Integrations (optional)
+GITHUB_TOKEN=ghp_...
+JIRA_BASE_URL=https://webflow.atlassian.net
+JIRA_API_EMAIL=you@webflow.com
+JIRA_API_TOKEN=...
+CONFLUENCE_API_TOKEN=...
+CONFLUENCE_BASE_URL=https://webflow.atlassian.net/wiki
 
-## Content Strategy
+# Demo session (replace with Slack OAuth post-hackathon)
+DEMO_MANAGER_SLACK_ID=U...
 
-Spark intentionally does **not** use an LLM for everything.
+# D1 binding — configure in wrangler.jsonc, set database_id from
+# `wrangler d1 create spark-drafts`.
+```
 
-- Static, spreadsheet-shaped content stays structured in code: checklist phases, tool inventory, ritual guidance, baseline Slack channels, and onboarding phase goals.
-- Dynamic but deterministic content is assembled from live context: team name, pillar, key paths, docs, and contribution tasks.
-- LLM usage is reserved for places where reasoning actually helps: blocker triage, task framing, and PR description drafting.
+## Slack app configuration
 
-The spreadsheet-to-product mapping is documented in [docs/spreadsheet-mapping.md](docs/spreadsheet-mapping.md).
+Once per workspace, in https://api.slack.com/apps → your app:
 
-## Onboarding assistant (Webflow Cloud)
+1. **Socket Mode** → Disable.
+2. **Event Subscriptions** → Enable, Request URL
+   `https://spark.wf.app/api/slack/events`.
+3. Subscribe to bot events: `app_mention`, `message.im`,
+   `app_home_opened`, `assistant_thread_started`,
+   `assistant_thread_context_changed`, `member_joined_channel`.
+4. **Interactivity** → Request URL
+   `https://spark.wf.app/api/slack/interactivity`.
+5. **OAuth & Permissions** scopes: `chat:write`, `channels:history`,
+   `im:history`, `im:write`, `app_mentions:read`, `canvases:write`,
+   `users:read`, `users:read.email`.
+6. Copy signing secret + bot token into Webflow Cloud env.
+7. Reinstall app to workspace.
 
-Spark also ships a manager-facing drafting UI on Webflow Cloud that
-composes with this Slack bot. Managers generate a full onboarding plan
-via an autonomous multi-tool agent and then edit it inline — two welcome
-voices (Spark + manager), an editable People-to-meet list with real
-avatars, and a Week 1 / Week 2 / Week 3 / Week 4 checklist grid — before
-publishing to Slack where async collaboration happens. The UI lives in
-[`web/`](web/). It talks to this bot through the productized `/api/*`
-surface protected by `SPARK_API_TOKEN` (bearer) and a per-request
-`X-Spark-Manager-Slack-Id` header (server-to-server from Webflow Cloud).
+## Pitch line
 
-Env is a single file — `spark/.env` — symlinked into the web app as
-`.env.local` and `.dev.vars` so the bot, Next dev, and OpenNext preview
-all read the same values. See
-[docs/manager-dashboard-demo.md](docs/manager-dashboard-demo.md) for the
-full end-to-end runbook (setup, Webflow Cloud deploy, demo script,
-security note on the bearer token) and [`web/README.md`](web/README.md)
-for local dev shortcuts.
+Spark is a Slack agent built on Webflow Cloud. Entire system on the
+edge. Multi-workspace ready. Cloudflare's "Build a Slack Agent" guide,
+implemented as a native reference on Webflow Cloud.
 
-## Demo Docs
+## Testing
 
-- [docs/demo-script.md](docs/demo-script.md)
-- [docs/web-dashboard.md](docs/web-dashboard.md)
-- [docs/manager-dashboard-demo.md](docs/manager-dashboard-demo.md)
-- [docs/manager-dashboard-submission.md](docs/manager-dashboard-submission.md)
+```bash
+cd web
+npm run test           # 68+ tests, sub-second
+npm run test:watch     # watch mode
+npm run typecheck      # tsc --noEmit
+npm run build          # next build (Workers-compatible bundle)
+```
