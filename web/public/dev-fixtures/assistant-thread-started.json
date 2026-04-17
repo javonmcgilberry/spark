@@ -1,0 +1,22 @@
+{
+  "token": "test-verification-token",
+  "team_id": "T0TEST01",
+  "api_app_id": "ATEST001",
+  "event": {
+    "type": "assistant_thread_started",
+    "assistant_thread": {
+      "user_id": "UHIRE0001",
+      "context": {
+        "channel_id": "D0HIRE0001",
+        "team_id": "T0TEST01",
+        "enterprise_id": null
+      },
+      "channel_id": "D0HIRE0001",
+      "thread_ts": "1713400200.000300"
+    },
+    "event_ts": "1713400200.000300"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0003ATS",
+  "event_time": 1713400200
+}

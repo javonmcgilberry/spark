@@ -1,0 +1,15 @@
+{
+  "token": "test-verification-token",
+  "team_id": "T0TEST01",
+  "api_app_id": "ATEST001",
+  "event": {
+    "type": "app_home_opened",
+    "user": "UHIRE0001",
+    "channel": "D0HIRE0001",
+    "tab": "home",
+    "event_ts": "1713400400.000500"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0005HOME",
+  "event_time": 1713400400
+}

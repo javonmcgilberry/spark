@@ -1,0 +1,23 @@
+{
+  "type": "block_actions",
+  "user": {
+    "id": "UHIRE0001",
+    "username": "new.hire",
+    "team_id": "T0TEST01"
+  },
+  "api_app_id": "ATEST001",
+  "token": "test-verification-token",
+  "trigger_id": "1234567890.098765.abcd",
+  "team": {"id": "T0TEST01", "domain": "webflow-inside"},
+  "channel": {"id": "D0HIRE0001", "name": "directmessage"},
+  "response_url": "https://hooks.slack.com/actions/T0TEST01/111/xxx",
+  "actions": [
+    {
+      "action_id": "onboarding:mark-task-complete",
+      "block_id": "checklist:week1-setup",
+      "value": "week1-setup:0",
+      "type": "button",
+      "action_ts": "1713400600.000700"
+    }
+  ]
+}

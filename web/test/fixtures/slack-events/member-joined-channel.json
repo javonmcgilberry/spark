@@ -1,0 +1,16 @@
+{
+  "token": "test-verification-token",
+  "team_id": "T0TEST01",
+  "api_app_id": "ATEST001",
+  "event": {
+    "type": "member_joined_channel",
+    "user": "UHIRE0001",
+    "channel": "C0ONBOARD1",
+    "channel_type": "C",
+    "team": "T0TEST01",
+    "event_ts": "1713400500.000600"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0006MJC",
+  "event_time": 1713400500
+}

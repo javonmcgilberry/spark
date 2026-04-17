@@ -1,0 +1,25 @@
+{
+  "token": "test-verification-token",
+  "team_id": "T0TEST01",
+  "api_app_id": "ATEST001",
+  "event": {
+    "type": "app_mention",
+    "user": "UHIRE0001",
+    "text": "<@UBOT0001> hey can you tell me what i should do first?",
+    "ts": "1713400001.000100",
+    "channel": "C0GEN0001",
+    "event_ts": "1713400001.000100"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0001MENTION",
+  "event_time": 1713400001,
+  "authorizations": [
+    {
+      "enterprise_id": null,
+      "team_id": "T0TEST01",
+      "user_id": "UBOT0001",
+      "is_bot": true,
+      "is_enterprise_install": false
+    }
+  ]
+}

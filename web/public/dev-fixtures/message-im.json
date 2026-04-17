@@ -1,0 +1,17 @@
+{
+  "token": "test-verification-token",
+  "team_id": "T0TEST01",
+  "api_app_id": "ATEST001",
+  "event": {
+    "type": "message",
+    "channel_type": "im",
+    "user": "UHIRE0001",
+    "text": "which Slack channels should I join first?",
+    "ts": "1713400100.000200",
+    "channel": "D0HIRE0001",
+    "event_ts": "1713400100.000200"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0002IM",
+  "event_time": 1713400100
+}

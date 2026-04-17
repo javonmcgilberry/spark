@@ -1,23 +1,22 @@
 /**
- * Structural types shared between the web dashboard and the Spark bot's
- * /api/* surface. These mirror the shapes in spark/src/onboarding/types.ts
- * — keep them in sync when the bot adds fields.
+ * Structural types for the Spark onboarding domain.
  *
- * We intentionally duplicate instead of importing across the package
- * boundary to keep spark/web shippable on Cloudflare Workers without
- * dragging Node-only code into the bundle.
+ * This used to duplicate the Node bot's types across a package boundary
+ * during the Webflow Cloud migration. Now that the bot has been retired
+ * and everything runs on Webflow Cloud, this file is the single source
+ * of truth for the onboarding package shape.
  */
 
-export type RoleTrack = 'frontend' | 'backend' | 'infrastructure' | 'general';
+export type RoleTrack = "frontend" | "backend" | "infrastructure" | "general";
 
 export type ChecklistItemKind =
-  | 'task'
-  | 'live-training'
-  | 'workramp'
-  | 'reading'
-  | 'recording';
+  | "task"
+  | "live-training"
+  | "workramp"
+  | "reading"
+  | "recording";
 
-export type ChecklistItemStatus = 'not-started' | 'in-progress' | 'completed';
+export type ChecklistItemStatus = "not-started" | "in-progress" | "completed";
 
 export interface ChecklistItem {
   label: string;
@@ -35,6 +34,35 @@ export interface ChecklistSection {
   items: ChecklistItem[];
 }
 
+export interface SlackChannelGuide {
+  category: string;
+  channel: string;
+  description: string;
+}
+
+export interface ToolGuide {
+  category: string;
+  tool: string;
+  description: string;
+  accessHint?: string;
+}
+
+export interface RitualGuide {
+  category: string;
+  meeting: string;
+  description: string;
+  cadence: string;
+  attendance: string;
+}
+
+export interface DocLink {
+  id: string;
+  title: string;
+  description: string;
+  url: string | null;
+  source: "static" | "fetched";
+}
+
 export interface ConfluenceLink {
   title: string;
   url: string;
@@ -42,47 +70,47 @@ export interface ConfluenceLink {
 }
 
 export type OnboardingPersonKind =
-  | 'manager'
-  | 'buddy'
-  | 'teammate'
-  | 'pm'
-  | 'designer'
-  | 'director'
-  | 'people-partner'
-  | 'custom';
+  | "manager"
+  | "buddy"
+  | "teammate"
+  | "pm"
+  | "designer"
+  | "director"
+  | "people-partner"
+  | "custom";
 
 export interface OnboardingPerson {
   name: string;
   role: string;
   discussionPoints: string;
-  weekBucket: 'week1-2' | 'week2-3' | 'week3+';
+  weekBucket: "week1-2" | "week2-3" | "week3+";
   kind?: OnboardingPersonKind;
   title?: string;
   notes?: string;
-  editableBy?: 'spark' | 'manager' | 'buddy' | 'team';
+  editableBy?: "spark" | "manager" | "buddy" | "team";
   userGuide?: ConfluenceLink;
   email?: string;
   slackUserId?: string;
   avatarUrl?: string;
   askMeAbout?: string;
-  insightsStatus?: 'pending' | 'ready' | 'error' | 'data-starved';
+  insightsStatus?: "pending" | "ready" | "error" | "data-starved";
   insightsAttempts?: InsightAttempt[];
 }
 
 export interface InsightAttempt {
-  kind: 'jira' | 'github';
+  kind: "jira" | "github";
   input: string;
   count: number;
-  reason?: 'no_email' | 'not_configured' | 'lookup_failed';
+  reason?: "no_email" | "not_configured" | "lookup_failed";
 }
 
 export interface ContributionTask {
   id: string;
-  type: 'stale-flag' | 'styled-migration';
+  type: "stale-flag" | "styled-migration";
   title: string;
   description: string;
   rationale: string;
-  difficulty: 'easy' | 'medium';
+  difficulty: "easy" | "medium";
   filePaths: string[];
   previewLines: string[];
   suggestedPurpose: string;
@@ -104,30 +132,32 @@ export interface TeamProfile {
   manager: OnboardingPerson;
   buddy: OnboardingPerson;
   teammates: OnboardingPerson[];
-  docs: Array<{
-    id: string;
-    title: string;
-    description: string;
-    url: string | null;
-    source: 'static' | 'fetched';
-  }>;
+  docs: DocLink[];
   keyPaths: string[];
+  recommendedChannels: SlackChannelGuide[];
+  tools: ToolGuide[];
+  rituals: RitualGuide[];
+  checklist: ChecklistSection[];
+}
+
+export interface WelcomeJourneyMilestone {
+  label: string;
+  keyActivities: string;
+  supportActions: string;
+}
+
+export interface WelcomePoc {
+  label: string;
+  owner: OnboardingPerson;
+  summary: string;
 }
 
 export interface WelcomeSection {
   title: string;
   intro: string;
   personalizedNote?: string;
-  onboardingPocs: Array<{
-    label: string;
-    owner: OnboardingPerson;
-    summary: string;
-  }>;
-  journeyMilestones: Array<{
-    label: string;
-    keyActivities: string;
-    supportActions: string;
-  }>;
+  onboardingPocs: WelcomePoc[];
+  journeyMilestones: WelcomeJourneyMilestone[];
 }
 
 export interface OnboardingChecklistSection {
@@ -142,6 +172,18 @@ export interface PeopleToMeetSection {
   people: OnboardingPerson[];
 }
 
+export interface ToolsAccessSection {
+  title: string;
+  intro: string;
+  tools: ToolGuide[];
+}
+
+export interface SlackSection {
+  title: string;
+  intro: string;
+  channels: SlackChannelGuide[];
+}
+
 export interface InitialEngineeringTasksSection {
   title: string;
   intro: string;
@@ -149,9 +191,29 @@ export interface InitialEngineeringTasksSection {
   tasks: ContributionTask[];
 }
 
+export interface RitualsSection {
+  title: string;
+  intro: string;
+  rituals: RitualGuide[];
+}
+
+export interface OnboardingReferences {
+  teamPage?: ConfluenceLink;
+  pillarPage?: ConfluenceLink;
+  newHireGuide?: ConfluenceLink;
+}
+
+export interface EngineeringResourceLibrarySection {
+  title: string;
+  intro: string;
+  docs: DocLink[];
+  references: OnboardingReferences;
+  keyPaths: string[];
+}
+
 export interface OnboardingPackage {
   userId: string;
-  status: 'draft' | 'published';
+  status: "draft" | "published";
   createdByUserId: string;
   managerUserId?: string;
   reviewerUserIds: string[];
@@ -174,21 +236,11 @@ export interface OnboardingPackage {
     welcome: WelcomeSection;
     onboardingChecklist: OnboardingChecklistSection;
     peopleToMeet: PeopleToMeetSection;
-    toolsAccess: {title: string; intro: string; tools: unknown[]};
-    slack: {title: string; intro: string; channels: unknown[]};
+    toolsAccess: ToolsAccessSection;
+    slack: SlackSection;
     initialEngineeringTasks: InitialEngineeringTasksSection;
-    rituals: {title: string; intro: string; rituals: unknown[]};
-    engineeringResourceLibrary: {
-      title: string;
-      intro: string;
-      docs: unknown[];
-      references: {
-        teamPage?: ConfluenceLink;
-        pillarPage?: ConfluenceLink;
-        newHireGuide?: ConfluenceLink;
-      };
-      keyPaths: string[];
-    };
+    rituals: RitualsSection;
+    engineeringResourceLibrary: EngineeringResourceLibrarySection;
   };
 }
 
