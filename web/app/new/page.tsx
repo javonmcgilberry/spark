@@ -78,11 +78,7 @@ export default function NewDraftPage() {
         >
           <Field
             label="New hire"
-            hint={
-              hire
-                ? `${hire.name}${hire.email ? ' · ' + hire.email : ''}`
-                : 'Type a name, display name, or email'
-            }
+            hint={hire ? undefined : 'Type a name, display name, or email'}
             required
           >
             <SlackUserPicker value={hire} onChange={setHire} autoFocus />

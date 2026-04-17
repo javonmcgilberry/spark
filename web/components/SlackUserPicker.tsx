@@ -36,10 +36,12 @@ export function SlackUserPicker({
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (value && value.displayName !== query) {
-      setQuery(value.displayName);
+    if (!value) {
+      setQuery('');
+      setHits([]);
+      setError(null);
     }
-    // only when value changes from outside
+    // only when selection is cleared from outside
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value?.slackUserId]);
 
@@ -102,6 +104,38 @@ export function SlackUserPicker({
     }
   }
 
+  if (value) {
+    return (
+      <div style={selectedCardStyle} aria-label="Selected new hire">
+        <div style={{display: 'grid', gap: 2, minWidth: 0, flex: 1}}>
+          <strong style={selectedNameStyle}>
+            {value.name || value.displayName}
+          </strong>
+          <span style={selectedMetaStyle}>
+            {[value.title, value.email]
+              .filter((part): part is string => Boolean(part))
+              .join(' · ') || value.slackUserId}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onChange(null);
+            setQuery('');
+            setHits([]);
+            setOpen(false);
+            setError(null);
+          }}
+          style={clearBtnStyle}
+          aria-label="Clear selection"
+          title="Clear"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{position: 'relative'}}>
       <input
@@ -111,9 +145,6 @@ export function SlackUserPicker({
         onChange={(event) => {
           setQuery(event.target.value);
           setOpen(true);
-          if (value && event.target.value !== value.displayName) {
-            onChange(null);
-          }
         }}
         onFocus={() => {
           setOpen(true);
@@ -135,23 +166,6 @@ export function SlackUserPicker({
         }
         style={inputStyle}
       />
-      {value ? (
-        <div style={badgeStyle}>
-          <span>{value.displayName || value.name || value.slackUserId}</span>
-          <button
-            type="button"
-            onClick={() => {
-              onChange(null);
-              setQuery('');
-              setOpen(true);
-            }}
-            style={clearBtnStyle}
-            aria-label="Clear selection"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
 
       {open && (hits.length > 0 || loading || error) ? (
         <ul id={listboxId} role="listbox" style={listboxStyle}>
@@ -212,27 +226,46 @@ const inputStyle: CSSProperties = {
   width: '100%',
 };
 
-const badgeStyle: CSSProperties = {
-  display: 'inline-flex',
+const selectedCardStyle: CSSProperties = {
+  display: 'flex',
   alignItems: 'center',
-  gap: 6,
-  marginTop: 6,
-  padding: '4px 10px',
-  borderRadius: 999,
-  background: 'rgba(56, 189, 248, 0.14)',
-  color: '#7dd3fc',
+  gap: 12,
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid rgba(56, 189, 248, 0.35)',
+  background: 'rgba(56, 189, 248, 0.08)',
+};
+
+const selectedNameStyle: CSSProperties = {
+  fontSize: 14,
+  color: '#e2e8f0',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const selectedMetaStyle: CSSProperties = {
   fontSize: 12,
-  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+  color: '#94a3b8',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const clearBtnStyle: CSSProperties = {
   background: 'transparent',
-  color: '#7dd3fc',
-  border: 'none',
-  fontSize: 14,
-  cursor: 'pointer',
-  padding: 0,
+  color: '#94a3b8',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
+  borderRadius: 6,
+  width: 26,
+  height: 26,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 16,
   lineHeight: 1,
+  cursor: 'pointer',
+  flexShrink: 0,
 };
 
 const listboxStyle: CSSProperties = {
