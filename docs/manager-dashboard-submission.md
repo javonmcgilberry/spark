@@ -16,11 +16,12 @@ Slack Agent" pattern, on Webflow's own edge platform.
 Engineering managers at Webflow spend hours of pre-boarding time on
 the personalized onboarding guide every new hire expects on day one:
 welcome note, buddy assignment, people to meet, team-tuned checklist
-items, first contribution targets. The old Spark Slack bot shipped
-the guide to the hire on day 1 — but drafting still happened in a
-cramped Slack modal, field by field. The generic catalog covers
-company-wide basics but doesn't know _this team_, _this hire_, _this
-moment_.
+items, first contribution targets. The generic onboarding catalog
+covers company-wide basics but doesn't know _this team_, _this
+hire_, _this moment_ — so the personalization falls on the manager,
+in whatever notes app or spreadsheet they scrape together, with no
+review affordance and no delivery path into Slack where the hire
+actually works.
 
 ## Solution
 

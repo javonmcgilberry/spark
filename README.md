@@ -1,9 +1,10 @@
 # Spark
 
-AI onboarding companion for new Webflow engineers. Spark lives in Slack,
-replaces the onboarding spreadsheet with a guided journey, and helps
-managers build reviewable onboarding plans for their new hires in
-minutes — then delivers a personalized plan to the hire via Slack.
+AI onboarding companion for new Webflow engineers. Managers build
+reviewable onboarding plans for their new hires in minutes — welcome
+note, buddy, people to meet, weekly checklist, first contribution
+target — then publish to Slack, where Spark delivers a personalized
+experience to the hire via assistant threads, DMs, and a Home tab.
 
 Spark runs **entirely on Webflow Cloud** following Cloudflare's "Build
 a Slack Agent" pattern. One Next.js app, one Worker, one deploy, one

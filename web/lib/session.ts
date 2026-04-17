@@ -2,10 +2,7 @@ import {cookies} from 'next/headers';
 
 /**
  * Demo session — cookie first, DEMO_MANAGER_SLACK_ID env fallback.
- * Replace with Slack OAuth post-hackathon.
- *
- * The old getSparkApiEnv helper is gone — routes now build a ctx via
- * makeProdCtx(env) and read directly from CloudflareEnv.
+ * Replace with Slack OAuth when OAuth sign-in ships.
  */
 
 export const SESSION_COOKIE_NAME = 'spark_manager_slack_id';

@@ -1,9 +1,9 @@
 import type {OnboardingPackage} from '../../lib/types';
 
 /**
- * Fixture package that mirrors the shape the Spark bot produces. Used by
- * component tests + integration tests. Keep field values obviously fake
- * so snapshots can tell fixtures apart from real data.
+ * Fixture OnboardingPackage used by component + integration tests.
+ * Keep field values obviously fake so snapshots can tell fixtures
+ * apart from real data.
  */
 export function fixturePackage(
   overrides: Partial<OnboardingPackage> = {}
