@@ -15,7 +15,6 @@ import {
   DraftWorkspaceCritiquePanel,
   DraftWorkspaceSendToSlack,
 } from '../../../components/DraftWorkspace';
-import {AtlassianConnectButton} from '../../../components/AtlassianConnectButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,9 +46,6 @@ export default async function DraftPage({
             <DraftWorkspaceChecklist />
           </DraftWorkspaceBody>
           <DraftWorkspaceSidebar>
-            <div style={connectWrapStyle}>
-              <AtlassianConnectButton />
-            </div>
             <DraftWorkspaceAgentTimeline />
             <DraftWorkspaceCritiquePanel />
             <DraftWorkspaceSendToSlack />
@@ -71,11 +67,4 @@ const layoutGrid: CSSProperties = {
   display: 'grid',
   gap: 20,
   gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 380px)',
-};
-
-const connectWrapStyle: CSSProperties = {
-  padding: '10px 14px',
-  borderRadius: 12,
-  border: '1px solid rgba(148, 163, 184, 0.18)',
-  background: 'rgba(15, 23, 42, 0.62)',
 };

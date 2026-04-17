@@ -117,7 +117,7 @@ back to `DEMO_MANAGER_SLACK_ID` in `.env`.
 Two authentication paths, tried in this order on every request:
 
 1. **Atlassian OAuth 2.0 (3LO), per-viewer.** When the manager clicks
-   "Connect Jira & Confluence" on the draft page, they go through
+   "Connect Jira & Confluence" on the new-plan page, they go through
    Atlassian's consent screen; Spark stores their access + refresh
    tokens in the `atlassian_tokens` D1 table keyed on their CF Access
    email. Subsequent Jira/Confluence calls hit
@@ -133,9 +133,12 @@ Two authentication paths, tried in this order on every request:
    identity, or the explicit `JIRA_API_EMAIL` override if that's set
    (useful for testing and service-account scenarios).
 
-The "Connect Jira & Confluence" button polls `/api/auth/atlassian/status`
-on mount and shows either a primary CTA or a greyed-out "connected"
-pill with the bound Atlassian site name.
+The `AtlassianConnectBanner` on the `/new` page polls
+`/api/auth/atlassian/status` on mount. Before generation it shows a
+value-prop CTA ("combines Jira, Confluence, and GitHub to pull team
+tickets, user guides, and related PRs"); once connected it collapses
+to a green confirmation pill + subtle disconnect link. It never blocks
+the form — OAuth is strictly additive to the fallback.
 
 To register the OAuth app (one-time, per environment):
 

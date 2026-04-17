@@ -3,6 +3,7 @@
 import {useState, type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {SlackUserPicker} from '../../components/SlackUserPicker';
+import {AtlassianConnectBanner} from '../../components/AtlassianConnectBanner';
 import type {SlackUserHit} from '../../lib/services/slackUserDirectory';
 import {APP_NAME} from '../../lib/branding';
 
@@ -63,6 +64,7 @@ export default function NewDraftPage() {
 
   return (
     <div style={{maxWidth: 640, margin: '0 auto'}}>
+      <AtlassianConnectBanner />
       <section style={panelStyle}>
         <p style={eyebrowStyle}>New onboarding plan</p>
         <h1 style={headingStyle}>Tell {APP_NAME} about the new hire</h1>
