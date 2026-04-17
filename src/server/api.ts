@@ -407,7 +407,12 @@ export function createSparkApiRouter(
         res.status(503).json({error: 'slack client not available'});
         return;
       }
-      const users = await slackUserDirectory.search(slackClient, q, limit);
+      // Seed the acting manager into the directory if pagination missed
+      // them (Enterprise Grid cross-workspace or cap hit). Keeps demo
+      // mode usable — manager can always find themselves.
+      const users = await slackUserDirectory.search(slackClient, q, limit, {
+        seedSlackUserIds: [req.managerSlackId],
+      });
       res.json({users});
     })
   );

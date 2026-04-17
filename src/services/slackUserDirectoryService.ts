@@ -16,7 +16,10 @@ export interface SlackUserHit {
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const PAGE_LIMIT = 200;
-const MAX_PAGES = 20; // hard cap (~4000 users) to stay well inside Tier 2 budget
+// 100 pages * 200/page = up to 20,000 users. Webflow is ~3-4k so this has
+// plenty of headroom. One cold-start refresh is ~15 Slack API calls at most
+// for the real workspace; Tier 2 budget is ~20/min so still safe.
+const MAX_PAGES = 100;
 
 /**
  * In-process cache of the Slack workspace's user list, refreshed every
@@ -31,20 +34,67 @@ export class SlackUserDirectoryService {
   async search(
     client: App['client'],
     query: string,
-    limit = 10
+    limit = 10,
+    options: {seedSlackUserIds?: string[]} = {}
   ): Promise<SlackUserHit[]> {
     const users = await this.getAll(client);
+    // Demo-mode safety net: if the manager's own id isn't in the cached
+    // directory (Enterprise Grid cross-workspace, or pagination cap),
+    // fetch them via users.info and merge in. One-shot per missing id.
+    const missing = (options.seedSlackUserIds ?? []).filter(
+      (id) => !users.some((u) => u.slackUserId === id)
+    );
+    if (missing.length > 0) {
+      await this.seedByIds(client, missing);
+    }
+    const pool = this.cache?.users ?? users;
     const needle = query.trim().toLowerCase();
     if (!needle) {
-      return users.slice(0, limit);
+      return pool.slice(0, limit);
     }
     const scored: Array<{hit: SlackUserHit; score: number}> = [];
-    for (const user of users) {
+    for (const user of pool) {
       const score = rank(user, needle);
       if (score > 0) scored.push({hit: user, score});
     }
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, limit).map((s) => s.hit);
+  }
+
+  private async seedByIds(client: App['client'], ids: string[]): Promise<void> {
+    if (!this.cache) return;
+    for (const id of ids) {
+      try {
+        const res = await client.users.info({user: id});
+        const member = res.user;
+        if (!member?.id || member.deleted || member.is_bot) continue;
+        const profile = member.profile ?? {};
+        const realName =
+          profile.real_name_normalized ??
+          profile.real_name ??
+          member.real_name ??
+          member.name ??
+          'Unknown';
+        const displayName =
+          profile.display_name_normalized ?? profile.display_name ?? realName;
+        this.cache.users.push({
+          slackUserId: member.id,
+          name: realName,
+          displayName: displayName || realName,
+          email: profile.email?.trim() || undefined,
+          title: profile.title?.trim() || undefined,
+          avatarUrl: profile.image_192 ?? profile.image_72 ?? undefined,
+        });
+        this.logger.info(
+          `Slack user directory: seeded ${member.id} (${realName}) via users.info`
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Slack user directory: seed-by-id failed for ${id}`,
+          error
+        );
+      }
+    }
   }
 
   private async getAll(client: App['client']): Promise<SlackUserHit[]> {
@@ -64,7 +114,9 @@ export class SlackUserDirectoryService {
   private async refresh(client: App['client']): Promise<SlackUserHit[]> {
     const hits: SlackUserHit[] = [];
     let cursor: string | undefined;
+    let pagesUsed = 0;
     for (let page = 0; page < MAX_PAGES; page += 1) {
+      pagesUsed = page + 1;
       const res: UsersListResponse = await client.users.list({
         limit: PAGE_LIMIT,
         cursor,
@@ -95,7 +147,14 @@ export class SlackUserDirectoryService {
       if (!cursor) break;
     }
     this.cache = {users: hits, expiresAt: Date.now() + CACHE_TTL_MS};
-    this.logger.info(`Slack user directory refreshed: ${hits.length} users`);
+    this.logger.info(
+      `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)`
+    );
+    if (pagesUsed >= MAX_PAGES && cursor) {
+      this.logger.warn(
+        `Slack user directory: pagination cap (${MAX_PAGES} pages) hit, some users may be missing. Bump MAX_PAGES in slackUserDirectoryService.ts.`
+      );
+    }
     return hits;
   }
 
