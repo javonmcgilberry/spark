@@ -133,12 +133,19 @@ export function DraftProvider({
     void runGenerator();
   }, [generatorInput, newHireId, runGenerator]);
 
-  const insightsRefreshedFor = useRef<string | null>(null);
+  // Refresh insights whenever the set of pending people changes. Keying
+  // off the pending slack IDs (not pkg.updatedAt) prevents the loop
+  // where refresh-insights bumps updatedAt and re-triggers itself, and
+  // it also means a newly-assigned buddy fires exactly one refresh
+  // covering just the roster that actually needs blurbs.
+  const insightsRefreshedFor = useRef<string>('');
   useEffect(() => {
-    const people = draft.pkg.sections.peopleToMeet.people;
-    const anyPending = people.some((p) => p.insightsStatus === 'pending');
-    if (!anyPending) return;
-    const refreshKey = `${newHireId}:${draft.pkg.updatedAt}`;
+    const pending = draft.pkg.sections.peopleToMeet.people
+      .filter((p) => p.insightsStatus === 'pending' && p.slackUserId)
+      .map((p) => p.slackUserId!)
+      .sort();
+    if (pending.length === 0) return;
+    const refreshKey = `${newHireId}:${pending.join(',')}`;
     if (insightsRefreshedFor.current === refreshKey) return;
     insightsRefreshedFor.current = refreshKey;
     void (async () => {

@@ -383,14 +383,26 @@ async function lookupOrgPeople(
         isEngineeringIcTitle(user.title)
     )
   );
+  // Rank every engineer and keep the top 3. Weak signals (no manager,
+  // no division/team, no role affinity) still return teammates — the
+  // score just becomes a tie-breaker. Only filter to score>0 when we
+  // actually have strong signals from the hire's custom fields.
+  const hasStrongSignal =
+    Boolean(options.managerUserId) ||
+    Boolean(normalizeLabelValue(options.pillarName)) ||
+    Boolean(normalizeLabelValue(options.teamName));
   const rankedEngineers = engineerCandidates
     .map((candidate) => ({
       candidate,
       score: rankEngineerCandidate(candidate, options),
     }))
-    .filter((entry) => entry.score > 0)
+    .filter((entry) => (hasStrongSignal ? entry.score > 0 : true))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      const seniorityDelta =
+        seniorityScore(b.candidate.user.title) -
+        seniorityScore(a.candidate.user.title);
+      if (seniorityDelta !== 0) return seniorityDelta;
       return a.candidate.user.name.localeCompare(
         b.candidate.user.name,
         undefined,

@@ -94,10 +94,22 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
   const hits: SlackUserHit[] = [];
   let cursor: string | undefined;
   let pagesUsed = 0;
+  let partial = false;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     pagesUsed = page + 1;
-    const res = await ctx.slack.users.list({limit: PAGE_LIMIT, cursor});
+    const res = await ctx.slack.users
+      .list({limit: PAGE_LIMIT, cursor})
+      .catch(
+        (error): {members?: never; response_metadata?: never; ok?: false} => {
+          ctx.logger.warn('Slack users.list threw during pagination', error);
+          return {ok: false};
+        }
+      );
+    if (res.ok === false || !res.members) {
+      partial = true;
+      break;
+    }
     for (const member of res.members ?? []) {
       if (member.deleted || member.is_bot) continue;
       if (member.id === 'USLACKBOT' || !member.id) continue;
@@ -129,9 +141,13 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
     })
   );
 
-  cache.current = {users: hits, expiresAt: Date.now() + CACHE_TTL_MS};
+  // On partial pagination (rate limit, transport error) still cache
+  // whatever we got so the picker stays usable, but cut the TTL so we
+  // retry sooner instead of serving a half-empty directory for 10 min.
+  const ttl = partial ? 60_000 : CACHE_TTL_MS;
+  cache.current = {users: hits, expiresAt: Date.now() + ttl};
   ctx.logger.info(
-    `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)`
+    `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)${partial ? ' (partial — pagination cut short)' : ''}`
   );
   if (pagesUsed >= MAX_PAGES && cursor) {
     ctx.logger.warn(
