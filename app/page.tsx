@@ -8,17 +8,16 @@ import {Avatar} from '../components/Avatar';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const session = await getManagerSession();
+  const {ctx} = await buildRouteCtx();
+  const session = await getManagerSession(ctx);
   if (!session) {
     return (
       <EmptyState
         title="No manager session"
-        body="Set the DEMO_MANAGER_SLACK_ID environment variable to continue. (OAuth sign-in is post-hackathon.)"
+        body="On Webflow Inside you're identified automatically via Okta SSO. If you're seeing this locally, set DEMO_MANAGER_SLACK_ID in .env to continue."
       />
     );
   }
-
-  const {ctx} = await buildRouteCtx();
 
   let drafts = await ctx.db.listDraftsForManager(session.managerSlackId);
   let publishedPackages = (

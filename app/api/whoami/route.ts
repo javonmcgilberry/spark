@@ -14,7 +14,7 @@
 
 import {NextResponse} from 'next/server';
 import {
-  inspectAccessRequest,
+  inspectAccessHeaders,
   previewJwt,
 } from '../../../lib/auth/cloudflareAccess';
 
@@ -25,7 +25,7 @@ const DUMPED_HEADER_NAMES = new Set(['user-agent', 'host']);
 const REDACTED_HEADER_NAMES = new Set(['cookie', 'authorization']);
 
 export async function GET(request: Request) {
-  const access = inspectAccessRequest(request);
+  const access = inspectAccessHeaders(request.headers);
 
   return NextResponse.json(
     {

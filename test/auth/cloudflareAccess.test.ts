@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
-  inspectAccessRequest,
+  inspectAccessHeaders,
   previewJwt,
   readAccessIdentity,
 } from '../../lib/auth/cloudflareAccess';
@@ -37,7 +37,7 @@ describe('readAccessIdentity', () => {
     const request = new Request('https://spark.wf.app/api/drafts', {
       headers: {'Cf-Access-Jwt-Assertion': makeJwt(SAMPLE_PAYLOAD)},
     });
-    const id = readAccessIdentity(request);
+    const id = readAccessIdentity(request.headers);
     expect(id).toEqual({
       email: 'javon@webflow.com',
       sub: '7335d417-61da-459d-899c-0a01c76a2f94',
@@ -53,7 +53,7 @@ describe('readAccessIdentity', () => {
         cookie: `something=else; CF_Authorization=${makeJwt(SAMPLE_PAYLOAD)}; other=xyz`,
       },
     });
-    const id = readAccessIdentity(request);
+    const id = readAccessIdentity(request.headers);
     expect(id?.email).toBe('javon@webflow.com');
     expect(id?.source).toBe('cookie');
   });
@@ -67,19 +67,21 @@ describe('readAccessIdentity', () => {
         cookie: `CF_Authorization=${makeJwt(cookiePayload)}`,
       },
     });
-    expect(readAccessIdentity(request)?.email).toBe('from-header@webflow.com');
+    expect(readAccessIdentity(request.headers)?.email).toBe(
+      'from-header@webflow.com'
+    );
   });
 
   it('returns null when no JWT is present', () => {
     const request = new Request('https://spark.wf.app/api/drafts');
-    expect(readAccessIdentity(request)).toBeNull();
+    expect(readAccessIdentity(request.headers)).toBeNull();
   });
 
   it('returns null for a malformed JWT (not three segments)', () => {
     const request = new Request('https://spark.wf.app/api/drafts', {
       headers: {'Cf-Access-Jwt-Assertion': 'not-a-jwt'},
     });
-    expect(readAccessIdentity(request)).toBeNull();
+    expect(readAccessIdentity(request.headers)).toBeNull();
   });
 
   it('returns null when the payload is missing email or sub', () => {
@@ -88,11 +90,11 @@ describe('readAccessIdentity', () => {
         'Cf-Access-Jwt-Assertion': makeJwt({country: 'US'}),
       },
     });
-    expect(readAccessIdentity(request)).toBeNull();
+    expect(readAccessIdentity(request.headers)).toBeNull();
   });
 });
 
-describe('inspectAccessRequest', () => {
+describe('inspectAccessHeaders', () => {
   it('reports all signals for a request with header + cookie', () => {
     const jwt = makeJwt(SAMPLE_PAYLOAD);
     const request = new Request('https://spark.wf.app/api/whoami', {
@@ -101,7 +103,7 @@ describe('inspectAccessRequest', () => {
         cookie: `CF_Authorization=${jwt}`,
       },
     });
-    const result = inspectAccessRequest(request);
+    const result = inspectAccessHeaders(request.headers);
     expect(result.hasHeader).toBe(true);
     expect(result.hasCookie).toBe(true);
     expect(result.source).toBe('header');
@@ -111,7 +113,7 @@ describe('inspectAccessRequest', () => {
 
   it('reports empty signals when no Access headers are present', () => {
     const request = new Request('https://spark.wf.app/api/whoami');
-    const result = inspectAccessRequest(request);
+    const result = inspectAccessHeaders(request.headers);
     expect(result).toEqual({
       hasHeader: false,
       hasCookie: false,

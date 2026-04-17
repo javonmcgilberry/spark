@@ -36,8 +36,13 @@ export interface AccessIdentity {
 const HEADER = 'Cf-Access-Jwt-Assertion';
 const COOKIE = 'CF_Authorization';
 
-export function readAccessIdentity(request: Request): AccessIdentity | null {
-  const headerJwt = request.headers.get(HEADER);
+/**
+ * Accepts a Headers object so callers can pass either `request.headers`
+ * (route handlers) or the result of `await headers()` from
+ * `next/headers` (server components, session helpers).
+ */
+export function readAccessIdentity(headers: Headers): AccessIdentity | null {
+  const headerJwt = headers.get(HEADER);
   if (headerJwt) {
     const payload = decodeJwtPayload(headerJwt);
     if (payload?.email && payload.sub) {
@@ -50,7 +55,7 @@ export function readAccessIdentity(request: Request): AccessIdentity | null {
       };
     }
   }
-  const cookieJwt = readAccessCookie(request.headers.get('cookie'));
+  const cookieJwt = readAccessCookie(headers.get('cookie'));
   if (cookieJwt) {
     const payload = decodeJwtPayload(cookieJwt);
     if (payload?.email && payload.sub) {
@@ -71,9 +76,9 @@ export function readAccessIdentity(request: Request): AccessIdentity | null {
  * can surface the full picture — which headers exist, whether decode
  * failed, where the token came from. Not for session code.
  */
-export function inspectAccessRequest(request: Request) {
-  const headerJwt = request.headers.get(HEADER);
-  const cookieJwt = readAccessCookie(request.headers.get('cookie'));
+export function inspectAccessHeaders(headers: Headers) {
+  const headerJwt = headers.get(HEADER);
+  const cookieJwt = readAccessCookie(headers.get('cookie'));
   const jwt = headerJwt ?? cookieJwt;
   const source: AccessIdentity['source'] | null = headerJwt
     ? 'header'

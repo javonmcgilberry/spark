@@ -86,6 +86,8 @@ Browser → spark.wf.app (Next.js on Webflow Cloud / Cloudflare Workers)
         ├─ handlers/lookup/        Lookup handler logic
         ├─ slack/events.ts         Slack event dispatcher
         ├─ slack/handlers/         assistant, onboarding, home
+        ├─ auth/cloudflareAccess.ts  CF Access JWT → {email, sub}
+        ├─ session.ts              CF Access → cookie → env fallback
         └─ agents/                 Generator + Critique
 ```
 
@@ -93,6 +95,19 @@ Every handler, service, and tool takes a `HandlerCtx` — the DI
 backbone. Production builds `makeProdCtx(env)` which resolves real
 clients (D1, fetch-based Slack, Anthropic SDK). Tests build
 `makeTestCtx({...overrides})`. Sandbox uses recording mocks.
+
+### Who is the acting manager?
+
+Webflow Inside gates every app behind Okta via Cloudflare Access, which
+attaches a signed JWT with the authenticated user's email to every
+request (`Cf-Access-Jwt-Assertion` header + `CF_Authorization` cookie).
+`lib/session.ts` pulls the email off the JWT, resolves it to a Slack
+user id via `users.lookupByEmail`, and that's the manager session —
+zero env vars, zero login friction. Hit `/api/whoami` on any deploy to
+see what Cloudflare Access is passing through.
+
+Local dev doesn't have Cloudflare Access in front, so session falls
+back to `DEMO_MANAGER_SLACK_ID` in `.env`.
 
 ## Environment Variables (Webflow Cloud)
 
@@ -113,7 +128,9 @@ JIRA_API_TOKEN=...
 CONFLUENCE_API_TOKEN=...
 CONFLUENCE_BASE_URL=https://webflow.atlassian.net/wiki
 
-# Demo session (replace with Slack OAuth post-hackathon)
+# Local-dev session fallback. On Webflow Inside the manager is identified
+# automatically from the Cloudflare Access JWT (Okta SSO). This var is
+# only read when no CF Access identity is present.
 DEMO_MANAGER_SLACK_ID=U...
 
 # D1 binding is declared in wrangler.jsonc (not here). Webflow Cloud

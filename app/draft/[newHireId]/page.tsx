@@ -24,8 +24,8 @@ export default async function DraftPage({
   params: Promise<{newHireId: string}>;
 }) {
   const {newHireId} = await params;
-  const {ctx, env} = await buildRouteCtx();
-  const session = await requireManagerSession(env);
+  const {ctx} = await buildRouteCtx();
+  const session = await requireManagerSession(ctx);
 
   const pkg = await ctx.db.get(newHireId);
   if (!pkg) notFound();

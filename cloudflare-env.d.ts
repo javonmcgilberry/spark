@@ -48,8 +48,11 @@ declare global {
 
     // ---- Session --------------------------------------------------------
     /**
-     * Demo-mode fallback manager Slack id. Used when no session cookie is
-     * present. Replace with Slack OAuth post-hackathon.
+     * Dev-only fallback manager Slack id. On Webflow Inside the acting
+     * manager is identified automatically from the Cloudflare Access
+     * JWT (via Okta SSO) — this var is only read when no CF Access
+     * identity is present, e.g. running `npm run dev` locally. Must
+     * start with "U".
      */
     DEMO_MANAGER_SLACK_ID?: string;
 

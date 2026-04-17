@@ -33,8 +33,10 @@ export async function buildManagerCtx(): Promise<
   RouteCtx & {session: ManagerSession}
 > {
   const env = await resolveEnv();
-  const session = await requireManagerSession(env);
   const ctx = makeProdCtx(env);
+  // Built BEFORE session so the session resolver can use ctx.slack to
+  // translate the Cloudflare Access email into a Slack user id.
+  const session = await requireManagerSession(ctx);
   return {ctx, env, session};
 }
 
