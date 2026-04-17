@@ -38,17 +38,32 @@ declare global {
     /** Jira Cloud base URL (e.g. https://webflow.atlassian.net). */
     JIRA_BASE_URL?: string;
     /**
-     * Jira API token. Basic auth email is the viewer's Cloudflare
-     * Access identity, not an env var — so there is no JIRA_API_EMAIL.
+     * Optional override for the Atlassian Basic auth email. When unset,
+     * the viewer's email from the Cloudflare Access JWT is used. Kept
+     * as a testing/ops escape hatch and for environments without CF
+     * Access. Only consulted when the viewer has not completed the
+     * Atlassian OAuth connect flow (/api/auth/atlassian/start).
      */
+    JIRA_API_EMAIL?: string;
+    /** Jira API token (Basic auth fallback when OAuth isn't connected). */
     JIRA_API_TOKEN?: string;
     /** Confluence base URL (e.g. https://webflow.atlassian.net/wiki). */
     CONFLUENCE_BASE_URL?: string;
-    /**
-     * Confluence API token. Basic auth email comes from the viewer's
-     * CF Access identity — no separate CONFLUENCE_API_EMAIL.
-     */
+    /** Confluence API token (Basic auth fallback when OAuth isn't connected). */
     CONFLUENCE_API_TOKEN?: string;
+
+    /** Atlassian OAuth 2.0 (3LO) client id. */
+    ATLASSIAN_OAUTH_CLIENT_ID?: string;
+    /** Atlassian OAuth 2.0 (3LO) client secret. */
+    ATLASSIAN_OAUTH_CLIENT_SECRET?: string;
+    /**
+     * Override the app's public URL used to build the OAuth redirect_uri.
+     * Defaults to the request's own origin, which is what Webflow Cloud
+     * gives us automatically. Set manually when running behind a tunnel
+     * (e.g. `cloudflared tunnel run spark-dev`) so Atlassian knows where
+     * to send the user back.
+     */
+    ATLASSIAN_OAUTH_REDIRECT_BASE?: string;
 
     // ---- Session --------------------------------------------------------
     /**

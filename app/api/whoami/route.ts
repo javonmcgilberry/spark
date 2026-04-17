@@ -34,8 +34,11 @@ const SECRET_ENV_KEYS = [
   'SLACK_SIGNING_SECRET',
   'ANTHROPIC_API_KEY',
   'GITHUB_TOKEN',
+  'JIRA_API_EMAIL',
   'JIRA_API_TOKEN',
   'CONFLUENCE_API_TOKEN',
+  'ATLASSIAN_OAUTH_CLIENT_ID',
+  'ATLASSIAN_OAUTH_CLIENT_SECRET',
 ] as const;
 
 // Vars whose values are non-sensitive config — the probe shows them

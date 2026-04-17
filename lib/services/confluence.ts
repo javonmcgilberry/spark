@@ -39,6 +39,15 @@ export interface ConfluenceClientConfig {
    * via HandlerCtx.viewerEmail.
    */
   getAuthEmail: () => string | undefined;
+  /**
+   * Returns the viewer's Atlassian OAuth handle if they've connected.
+   * When present, we hit https://api.atlassian.com/ex/confluence/{cloudId}/wiki/...
+   * with a Bearer token; null means fall back to Basic auth.
+   */
+  getOAuthToken?: () => Promise<{
+    accessToken: string;
+    cloudId: string;
+  } | null>;
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -47,7 +56,7 @@ const REQUEST_TIMEOUT_MS = 8000;
 export function makeConfluenceClient(
   config: ConfluenceClientConfig
 ): ConfluenceClient {
-  const {env, logger, getAuthEmail} = config;
+  const {env, logger, getAuthEmail, getOAuthToken} = config;
   const envConfigured = Boolean(
     env.CONFLUENCE_API_TOKEN && env.CONFLUENCE_BASE_URL
   );
@@ -61,22 +70,42 @@ export function makeConfluenceClient(
       ? ensureTrailingSlash(env.CONFLUENCE_BASE_URL)
       : null;
 
-  const searchPhrase = async (
-    phrase: string,
-    summary: string,
-    authEmail: string
-  ): Promise<ConfluenceLink | undefined> => {
+  const resolveAuth = async (): Promise<
+    | {mode: 'oauth'; searchBase: string; authorization: string}
+    | {mode: 'basic'; searchBase: string; authorization: string}
+    | null
+  > => {
+    const oauth = await getOAuthToken?.();
+    if (oauth) {
+      return {
+        mode: 'oauth',
+        searchBase: `https://api.atlassian.com/ex/confluence/${oauth.cloudId}/wiki/`,
+        authorization: `Bearer ${oauth.accessToken}`,
+      };
+    }
+    const authEmail = getAuthEmail();
     if (
       !envConfigured ||
+      !authEmail ||
       !env.CONFLUENCE_BASE_URL ||
       !env.CONFLUENCE_API_TOKEN
     ) {
-      return undefined;
+      return null;
     }
-    const url = new URL(
-      'rest/api/content/search',
-      ensureTrailingSlash(env.CONFLUENCE_BASE_URL)
-    );
+    return {
+      mode: 'basic',
+      searchBase: ensureTrailingSlash(env.CONFLUENCE_BASE_URL),
+      authorization: `Basic ${base64Encode(`${authEmail}:${env.CONFLUENCE_API_TOKEN}`)}`,
+    };
+  };
+
+  const searchPhrase = async (
+    phrase: string,
+    summary: string
+  ): Promise<ConfluenceLink | undefined> => {
+    const auth = await resolveAuth();
+    if (!auth) return undefined;
+    const url = new URL('rest/api/content/search', auth.searchBase);
     url.searchParams.set(
       'cql',
       `type = page AND siteSearch ~ "\\\"${escapeCql(phrase)}\\\"" ORDER BY lastmodified DESC`
@@ -89,9 +118,7 @@ export function makeConfluenceClient(
       const res = await fetch(url, {
         headers: {
           Accept: 'application/json',
-          Authorization: `Basic ${base64Encode(
-            `${authEmail}:${env.CONFLUENCE_API_TOKEN}`
-          )}`,
+          Authorization: auth.authorization,
         },
         signal: controller.signal,
       });
@@ -138,7 +165,11 @@ export function makeConfluenceClient(
   };
 
   return {
-    isConfigured: () => envConfigured && Boolean(getAuthEmail()),
+    // OAuth path can authenticate without env — report true
+    // optimistically when OAuth is wired. searchFirst still bails
+    // cleanly via resolveAuth() when nothing resolves.
+    isConfigured: () =>
+      Boolean(getOAuthToken) || (envConfigured && Boolean(getAuthEmail())),
     baseUrl,
     urlForPageId(spaceKey, pageId) {
       const base = baseUrl();
@@ -146,10 +177,13 @@ export function makeConfluenceClient(
       return `${base}spaces/${spaceKey}/pages/${pageId}`;
     },
     async searchFirst(phrase, summary, options = {}) {
-      const authEmail = getAuthEmail();
-      if (!authEmail) return undefined;
       const exclude = options.excludeTitlePrefixes ?? [];
-      const cacheKey = `${authEmail}|${phrase}`.toLowerCase();
+      // Cache key needs an identity dimension so OAuth results from one
+      // viewer don't leak to a Basic-auth fallback for another. Prefer
+      // the viewer email; falling back to a static marker for pure
+      // OAuth-no-email case (rare, only if CF Access weren't present).
+      const identity = getAuthEmail() ?? '__oauth__';
+      const cacheKey = `${identity}|${phrase}`.toLowerCase();
       const cached = cache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
         if (cached.value && !isExcluded(cached.value, exclude)) {
@@ -157,7 +191,7 @@ export function makeConfluenceClient(
         }
         if (!cached.value) return undefined;
       }
-      const match = await searchPhrase(phrase, summary, authEmail);
+      const match = await searchPhrase(phrase, summary);
       cache.set(cacheKey, {
         value: match,
         expiresAt: Date.now() + CACHE_TTL_MS,

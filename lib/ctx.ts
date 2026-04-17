@@ -15,6 +15,7 @@
  * Slack event.
  */
 
+import {resolveAtlassianOAuth} from './auth/atlassianSession';
 import type {ConfluenceClient} from './services/confluence';
 import {makeConfluenceClient, makeStubConfluence} from './services/confluence';
 import type {GitHubClient} from './services/github';
@@ -133,15 +134,31 @@ export function makeProdCtx(
     waitUntil,
   };
 
+  // Email precedence for Atlassian Basic auth:
+  //   1. env.JIRA_API_EMAIL — explicit override (testing / service
+  //      accounts / envs without CF Access).
+  //   2. ctx.viewerEmail — populated from the Cloudflare Access JWT
+  //      after session resolution.
+  // Only consulted when OAuth isn't connected; otherwise the Bearer
+  // token carries identity on its own.
+  const jiraAuthEmail = () => env.JIRA_API_EMAIL ?? ctx.viewerEmail;
+  const confluenceAuthEmail = () => ctx.viewerEmail;
+  const oauthResolver = () =>
+    resolveAtlassianOAuth(ctx).then((handle) =>
+      handle ? {accessToken: handle.accessToken, cloudId: handle.cloudId} : null
+    );
+
   ctx.jira = makeJiraClient({
     env: env as Record<string, string>,
     logger,
-    getAuthEmail: () => ctx.viewerEmail,
+    getAuthEmail: jiraAuthEmail,
+    getOAuthToken: oauthResolver,
   });
   ctx.confluence = makeConfluenceClient({
     env: env as Record<string, string>,
     logger,
-    getAuthEmail: () => ctx.viewerEmail,
+    getAuthEmail: confluenceAuthEmail,
+    getOAuthToken: oauthResolver,
   });
 
   return ctx;

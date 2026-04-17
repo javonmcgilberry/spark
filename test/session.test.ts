@@ -192,6 +192,33 @@ describe('getSessionDetails diagnostic', () => {
     expect(result.access.slackLookup).toBe('user-not-found');
   });
 
+  it('surfaces slackLookup=api-error for non-users_not_found Slack errors', async () => {
+    headersRef.value = new Headers({
+      'Cf-Access-Jwt-Assertion': makeJwt({
+        email: 'javon@webflow.com',
+        sub: 'cf-javon',
+      }),
+    });
+    const ctx = makeTestCtx({
+      slack: {
+        usersLookupByEmail: {},
+      },
+    });
+    // Force the exact error we saw from Slack when the transport was wrong.
+    ctx.slack.users.lookupByEmail = async () => ({
+      ok: false,
+      error: 'invalid_arguments',
+    });
+
+    const {getSessionDetails} = await import('../lib/session');
+    const result = await getSessionDetails(ctx);
+
+    expect(result.session).toBeNull();
+    expect(result.access.email).toBe('javon@webflow.com');
+    expect(result.access.slackLookup).toBe('api-error');
+    expect(result.access.slackLookupError).toBe('invalid_arguments');
+  });
+
   it('surfaces slackLookup=ok and resolved session on the happy path', async () => {
     headersRef.value = new Headers({
       'Cf-Access-Jwt-Assertion': makeJwt({

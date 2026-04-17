@@ -235,6 +235,18 @@ export interface SlackClient {
 }
 
 const SLACK_API_BASE = 'https://slack.com/api';
+const FORM_ENCODED_METHODS = new Set([
+  'users.info',
+  'users.lookupByEmail',
+  'users.list',
+  'users.conversations',
+  'users.profile.get',
+  'team.profile.get',
+  'conversations.create',
+  'conversations.invite',
+  'conversations.info',
+  'conversations.replies',
+]);
 
 /**
  * Build a production Slack client backed by fetch. No @slack/web-api
@@ -246,13 +258,18 @@ export function makeSlackWebClient(token: string, logger: Logger): SlackClient {
     args: object = {}
   ): Promise<T> => {
     const url = `${SLACK_API_BASE}/${method}`;
+    const useFormEncoding = FORM_ENCODED_METHODS.has(method);
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Type': useFormEncoding
+          ? 'application/x-www-form-urlencoded; charset=utf-8'
+          : 'application/json; charset=utf-8',
       },
-      body: JSON.stringify(args),
+      body: useFormEncoding
+        ? encodeSlackFormArgs(args as Record<string, unknown>)
+        : JSON.stringify(args),
     });
     const json = (await res.json()) as {ok?: boolean; error?: string} & T;
     if (!json.ok) {
@@ -308,6 +325,25 @@ export function makeSlackWebClient(token: string, logger: Logger): SlackClient {
     apiCall: <T>(method: string, args?: Record<string, unknown>) =>
       call<T>(method, args ?? {}),
   };
+}
+
+function encodeSlackFormArgs(args: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(args)) {
+    if (value === undefined || value === null) continue;
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      params.set(key, String(value));
+      continue;
+    }
+    // Slack expects flat form fields on a number of read-ish endpoints.
+    // For the rare structured value on a form-encoded method, send JSON.
+    params.set(key, JSON.stringify(value));
+  }
+  return params.toString();
 }
 
 /**

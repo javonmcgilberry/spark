@@ -19,6 +19,8 @@ export interface JiraClient {
 
 export interface JiraEnv {
   JIRA_BASE_URL?: string;
+  /** Optional override for Basic auth email — see JiraClientConfig. */
+  JIRA_API_EMAIL?: string;
   JIRA_API_TOKEN?: string;
 }
 
@@ -33,20 +35,42 @@ export interface JiraClientConfig {
    * resolution without rebuilding the client.
    */
   getAuthEmail: () => string | undefined;
+  /**
+   * Returns the viewer's Atlassian OAuth handle if they've connected
+   * via the /api/auth/atlassian/start flow. When present, we hit the
+   * cloud-scoped API (https://api.atlassian.com/ex/jira/{cloudId}/...)
+   * with a Bearer token. Null means fall back to Basic auth against
+   * JIRA_BASE_URL.
+   */
+  getOAuthToken?: () => Promise<{
+    accessToken: string;
+    cloudId: string;
+  } | null>;
 }
 
 const JIRA_REQUEST_TIMEOUT_MS = 8000;
 const JIRA_CACHE_TTL_MS = 60 * 1000;
 
 export function makeJiraClient(config: JiraClientConfig): JiraClient {
-  const {env, logger, getAuthEmail} = config;
+  const {env, logger, getAuthEmail, getOAuthToken} = config;
   const envConfigured = Boolean(env.JIRA_BASE_URL && env.JIRA_API_TOKEN);
   const cache = new Map<string, {value: JiraIssue[]; expiresAt: number}>();
 
-  const runSearch = async (
-    jql: string,
-    limit: number
-  ): Promise<JiraIssue[]> => {
+  const resolveAuth = async (): Promise<
+    | {mode: 'oauth'; url: URL; authorization: string; base: string}
+    | {mode: 'basic'; url: URL; authorization: string; base: string}
+    | null
+  > => {
+    const oauth = await getOAuthToken?.();
+    if (oauth) {
+      const base = `https://api.atlassian.com/ex/jira/${oauth.cloudId}/`;
+      return {
+        mode: 'oauth',
+        url: new URL('rest/api/3/search', base),
+        authorization: `Bearer ${oauth.accessToken}`,
+        base,
+      };
+    }
     const authEmail = getAuthEmail();
     if (
       !envConfigured ||
@@ -54,11 +78,25 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
       !env.JIRA_BASE_URL ||
       !env.JIRA_API_TOKEN
     ) {
-      return [];
+      return null;
     }
-
     const base = ensureTrailingSlash(env.JIRA_BASE_URL);
-    const url = new URL('rest/api/3/search', base);
+    return {
+      mode: 'basic',
+      url: new URL('rest/api/3/search', base),
+      authorization: `Basic ${base64Encode(`${authEmail}:${env.JIRA_API_TOKEN}`)}`,
+      base,
+    };
+  };
+
+  const runSearch = async (
+    jql: string,
+    limit: number
+  ): Promise<JiraIssue[]> => {
+    const auth = await resolveAuth();
+    if (!auth) return [];
+
+    const url = new URL(auth.url);
     url.searchParams.set('jql', jql);
     url.searchParams.set('maxResults', String(limit));
     url.searchParams.set('fields', 'summary,status,priority,assignee,updated');
@@ -73,9 +111,7 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
       const response = await fetch(url, {
         headers: {
           Accept: 'application/json',
-          Authorization: `Basic ${base64Encode(
-            `${authEmail}:${env.JIRA_API_TOKEN}`
-          )}`,
+          Authorization: auth.authorization,
         },
         signal: controller.signal,
       });
@@ -86,8 +122,16 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
         return [];
       }
       const payload = (await response.json()) as {issues?: unknown[]};
+      // toJiraIssue builds the Jira UI URL. For OAuth-scoped calls the
+      // API origin is api.atlassian.com, but the user-facing URL still
+      // needs to be the site URL (env.JIRA_BASE_URL or the cloud.url
+      // picked up during connect). We prefer the env base because it's
+      // what's most likely to resolve when clicked.
+      const displayBase = env.JIRA_BASE_URL
+        ? ensureTrailingSlash(env.JIRA_BASE_URL)
+        : auth.base;
       return (payload.issues ?? [])
-        .map((issue) => toJiraIssue(issue as RawIssue, base))
+        .map((issue) => toJiraIssue(issue as RawIssue, displayBase))
         .filter((issue): issue is JiraIssue => issue !== null);
     } catch (error) {
       logger.warn('Jira request failed.', error);
@@ -115,7 +159,12 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
   };
 
   return {
-    isConfigured: () => envConfigured && Boolean(getAuthEmail()),
+    // OAuth path means we can always authenticate if the viewer has
+    // connected, even when the Basic auth env vars are unset. Report
+    // true optimistically when OAuth is wired; the actual calls still
+    // short-circuit cleanly via resolveAuth() if nothing resolves.
+    isConfigured: () =>
+      Boolean(getOAuthToken) || (envConfigured && Boolean(getAuthEmail())),
     async findAssignedToEmail(email, limit = 10) {
       if (!email) return [];
       const jql = `assignee = "${escapeJql(email)}" AND resolution = Unresolved ORDER BY updated DESC`;

@@ -155,11 +155,13 @@ async function resolveCloudflareAccess(
     ctx.logger.warn(
       `users.lookupByEmail for ${email} returned ok=false (${response.error ?? 'no-error-field'})`
     );
+    const isMissingUser =
+      response.error === undefined || response.error === 'users_not_found';
     return {
       diagnostic: {
         ...base,
         email,
-        slackLookup: 'user-not-found',
+        slackLookup: isMissingUser ? 'user-not-found' : 'api-error',
         slackLookupError: response.error ?? null,
       },
       slackId: null,
