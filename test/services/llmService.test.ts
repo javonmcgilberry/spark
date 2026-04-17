@@ -331,7 +331,18 @@ describe('LlmService', () => {
     });
 
     it('save_user_guide_answer routes parsed args to the intake sink and reports success', async () => {
-      const saveAnswer = vi.fn();
+      const saveAnswer = vi.fn().mockReturnValue({
+        answered: ['schedule'],
+        remaining: [
+          'style',
+          'values',
+          'pet-peeves',
+          'communication',
+          'help-me',
+          'feedback',
+          'decisions',
+        ],
+      });
       const finalize = vi.fn().mockReturnValue({markdown: '', missing: []});
       const svc = new LlmService('test-key', createTestLogger(), undefined, {
         userGuideIntake: {saveAnswer, finalize},
@@ -374,6 +385,109 @@ describe('LlmService', () => {
       };
       expect(parsed.saved).toBe(true);
       expect(parsed.sectionId).toBe('schedule');
+    });
+
+    it('save_user_guide_answer surfaces fresh progress so the agent does not re-ask the section it just saved', async () => {
+      // This is the regression test for the state bug where the agent
+      // asked the same section twice because the system prompt's
+      // "remaining" list was stale by the time save_user_guide_answer
+      // fired mid-turn. The tool result must expose nextRecommendedSection.
+      const saveAnswer = vi.fn().mockReturnValue({
+        answered: ['schedule', 'style', 'values'],
+        remaining: [
+          'pet-peeves',
+          'communication',
+          'help-me',
+          'feedback',
+          'decisions',
+        ],
+      });
+      const finalize = vi.fn().mockReturnValue({markdown: '', missing: []});
+      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+        userGuideIntake: {saveAnswer, finalize},
+      });
+
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([
+            toolUseBlock('t1', 'save_user_guide_answer', {
+              sectionId: 'values',
+              answer: 'Kindness, curiosity, creativity, and tenacity',
+            }),
+          ])
+        )
+        .mockResolvedValueOnce(toolResponse([textBlock('Got it.')]));
+
+      await svc.answerUser({question: 'ok', profile: buildProfile()});
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultContent = (
+        secondCall.messages[secondCall.messages.length - 1].content as Array<{
+          content: string;
+        }>
+      )[0].content;
+      const parsed = JSON.parse(toolResultContent) as {
+        saved: boolean;
+        sectionId: string;
+        answered: string[];
+        remaining: string[];
+        nextRecommendedSection: string | null;
+        allSectionsAnswered: boolean;
+      };
+      expect(parsed.nextRecommendedSection).toBe('pet-peeves');
+      expect(parsed.answered).toContain('values');
+      expect(parsed.remaining).not.toContain('values');
+      expect(parsed.allSectionsAnswered).toBe(false);
+    });
+
+    it('save_user_guide_answer reports allSectionsAnswered=true when the save completes the intake', async () => {
+      const saveAnswer = vi.fn().mockReturnValue({
+        answered: [
+          'schedule',
+          'style',
+          'values',
+          'pet-peeves',
+          'communication',
+          'help-me',
+          'feedback',
+          'decisions',
+        ],
+        remaining: [],
+      });
+      const finalize = vi.fn().mockReturnValue({markdown: '', missing: []});
+      const svc = new LlmService('test-key', createTestLogger(), undefined, {
+        userGuideIntake: {saveAnswer, finalize},
+      });
+
+      anthropicCreateMock
+        .mockResolvedValueOnce(
+          toolResponse([
+            toolUseBlock('t1', 'save_user_guide_answer', {
+              sectionId: 'decisions',
+              answer: 'collaborate then decide',
+            }),
+          ])
+        )
+        .mockResolvedValueOnce(toolResponse([textBlock('Done.')]));
+
+      await svc.answerUser({question: 'final', profile: buildProfile()});
+
+      const secondCall = anthropicCreateMock.mock.calls[1][0] as {
+        messages: MessageParam[];
+      };
+      const toolResultContent = (
+        secondCall.messages[secondCall.messages.length - 1].content as Array<{
+          content: string;
+        }>
+      )[0].content;
+      const parsed = JSON.parse(toolResultContent) as {
+        nextRecommendedSection: string | null;
+        allSectionsAnswered: boolean;
+      };
+      expect(parsed.nextRecommendedSection).toBeNull();
+      expect(parsed.allSectionsAnswered).toBe(true);
     });
 
     it('save_user_guide_answer returns a validation error for an unknown sectionId without calling the sink', async () => {

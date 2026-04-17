@@ -69,8 +69,11 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     {github, jira}
   );
   llm.setUserGuideIntake({
-    saveAnswer: (userId, sectionId, answer) =>
-      journey.saveUserGuideAnswer(userId, sectionId, answer),
+    saveAnswer: (userId, sectionId, answer) => {
+      journey.saveUserGuideAnswer(userId, sectionId, answer);
+      const {answered, remaining} = journey.getUserGuideProgress(userId);
+      return {answered, remaining};
+    },
     finalize: (profile) => journey.finalizeUserGuide(profile),
   });
 

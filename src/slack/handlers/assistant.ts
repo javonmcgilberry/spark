@@ -180,7 +180,7 @@ export async function pickPromptsForTurn(
   }
   const signals = await computeLiveSignals(ctx);
   return {
-    title: 'Spot checks',
+    title: 'Try one of these next',
     prompts: signals.map(({title, message}) => ({title, message})),
   };
 }

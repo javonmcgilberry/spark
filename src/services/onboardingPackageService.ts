@@ -20,6 +20,13 @@ export interface DraftPackageOptions {
   slackClient?: App['client'];
 }
 
+export interface DraftFieldPatch {
+  welcomeNote?: string | null;
+  buddyUserId?: string | null;
+  stakeholderUserIds?: string[];
+  customChecklistItems?: ChecklistItem[];
+}
+
 export type PublishPackageResult =
   | {ok: false; reason: 'not_found' | 'not_manager'}
   | {ok: true; pkg: OnboardingPackage};
@@ -53,6 +60,56 @@ export class OnboardingPackageService {
     return Array.from(this.packages.values()).filter(
       (pkg) => pkg.createdByUserId === userId || pkg.managerUserId === userId
     );
+  }
+
+  listDraftsForManager(managerUserId: string): OnboardingPackage[] {
+    return Array.from(this.packages.values()).filter(
+      (pkg) =>
+        pkg.status === 'draft' &&
+        (pkg.managerUserId === managerUserId ||
+          pkg.createdByUserId === managerUserId ||
+          pkg.reviewerUserIds.includes(managerUserId))
+    );
+  }
+
+  applyFieldPatch(
+    userId: string,
+    patch: DraftFieldPatch
+  ): OnboardingPackage | undefined {
+    const existing = this.packages.get(userId);
+    if (!existing || existing.status !== 'draft') {
+      return undefined;
+    }
+
+    if (patch.welcomeNote !== undefined) {
+      const next = patch.welcomeNote ?? undefined;
+      existing.welcomeNote = next;
+      existing.sections.welcome.personalizedNote = next;
+    }
+    if (patch.buddyUserId !== undefined) {
+      existing.buddyUserId = patch.buddyUserId ?? undefined;
+    }
+    if (patch.stakeholderUserIds) {
+      const baseIds = [
+        existing.createdByUserId,
+        existing.managerUserId,
+        existing.buddyUserId,
+        ...patch.stakeholderUserIds,
+      ].filter((value): value is string => Boolean(value));
+      existing.reviewerUserIds = Array.from(new Set(baseIds));
+    }
+    if (patch.customChecklistItems) {
+      existing.customChecklistItems = patch.customChecklistItems.map(
+        (item) => ({
+          ...item,
+        })
+      );
+    }
+    existing.updatedAt = new Date().toISOString();
+    this.logger.info(
+      `Patched onboarding draft for ${userId} (fields: ${Object.keys(patch).join(', ')})`
+    );
+    return existing;
   }
 
   async createDraftPackage(

@@ -102,7 +102,7 @@ async function computeUserGuideSignal(
     return buildSignal(
       'user-guide-start',
       'Draft my User Guide',
-      'Help me draft my Webflow User Guide — ask me one section at a time.',
+      'Help me draft my Webflow User Guide. First give me a quick intro to what these are and why they matter, then walk me through one section at a time.',
       9
     );
   }

@@ -27,6 +27,8 @@ const envSchema = z.object({
   jiraApiToken: z.string().optional(),
 
   webflowMonorepoPath: z.string().default(defaultMonorepoPath),
+
+  sparkApiToken: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -47,9 +49,8 @@ export function loadEnv(): EnvConfig {
     jiraApiEmail: process.env.JIRA_API_EMAIL || undefined,
     jiraApiToken: process.env.JIRA_API_TOKEN || undefined,
     webflowMonorepoPath: process.env.WEBFLOW_MONOREPO_PATH || undefined,
+    sparkApiToken: process.env.SPARK_API_TOKEN || undefined,
   };
-
-  console.log("ENV", raw)
 
   const result = envSchema.safeParse(raw);
 

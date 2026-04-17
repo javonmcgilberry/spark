@@ -5,6 +5,7 @@ import type {Services} from '../app/services.js';
 import {buildHomePendingView, buildHomeView} from '../onboarding/home/index.js';
 import {isJourneyStepId} from '../onboarding/types.js';
 import {publishHomeView} from '../slack/publishHome.js';
+import {createSparkApiRouter, requireSparkApiAuth} from './api.js';
 
 export function createHttpServer(
   env: EnvConfig,
@@ -18,10 +19,15 @@ export function createHttpServer(
       ok: true,
       pid: process.pid,
       slackConfigured: Boolean(env.slackAppToken && env.slackBotToken),
+      apiConfigured: Boolean(env.sparkApiToken),
     });
   });
 
   if (services) {
+    if (env.sparkApiToken) {
+      app.use('/api', requireSparkApiAuth(env));
+      app.use('/api', createSparkApiRouter(services, slackClient));
+    }
     registerTestHarness(app, services, slackClient);
   }
 

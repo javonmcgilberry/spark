@@ -131,3 +131,6 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Webflow CLI global telemetry file (landed here when CLI was run from spark/ instead of spark/web/)
+/webflow.json
