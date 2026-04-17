@@ -14,14 +14,21 @@ export async function handleRefreshInsights(
 ): Promise<Response> {
   const pkg = await ctx.db.get(userId);
   if (!pkg) return Response.json({error: 'draft not found'}, {status: 404});
+  const teamName = pkg.teamName ?? 'Engineering';
 
   await getInsightsForPeople(
     ctx,
     pkg.sections.peopleToMeet.people,
-    pkg.sections.peopleToMeet.title
+    teamName
   ).catch((error) => ctx.logger.warn('refresh-insights failed', error));
 
-  return Response.json({pkg: enrichPackageInsights(ctx, pkg)});
+  const enriched = enrichPackageInsights(ctx, pkg);
+  const persisted =
+    (await ctx.db.applyFieldPatch(userId, {
+      peopleToMeet: enriched.sections.peopleToMeet.people,
+    })) ?? enriched;
+
+  return Response.json({pkg: enrichPackageInsights(ctx, persisted)});
 }
 
 const retryBodySchema = z.object({
@@ -64,9 +71,15 @@ export async function handleRetryPersonInsights(
   await getInsightWithHints(
     ctx,
     person,
-    pkg.sections.peopleToMeet.title,
+    pkg.teamName ?? 'Engineering',
     parsed.data.hints ?? {}
   ).catch((error) => ctx.logger.warn('retry-insights failed', error));
 
-  return Response.json({pkg: enrichPackageInsights(ctx, pkg)});
+  const enriched = enrichPackageInsights(ctx, pkg);
+  const persisted =
+    (await ctx.db.applyFieldPatch(userId, {
+      peopleToMeet: enriched.sections.peopleToMeet.people,
+    })) ?? enriched;
+
+  return Response.json({pkg: enrichPackageInsights(ctx, persisted)});
 }

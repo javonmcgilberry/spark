@@ -71,7 +71,7 @@ export default function NewDraftPage() {
         <h1 style={headingStyle}>Tell {APP_NAME} about the new hire</h1>
         <p style={bodyStyle}>
           Search the Slack workspace to pick the new hire. {APP_NAME} uses their
-          profile to look up the team, pick candidates for buddy, draft the
+          profile to look up the team, pull the right people to meet, draft the
           welcome, and tune the checklist. You&apos;ll review before anything
           reaches Slack.
         </p>

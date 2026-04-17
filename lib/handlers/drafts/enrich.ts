@@ -17,6 +17,13 @@ export function enrichPackageInsights(
   const people = pkg.sections.peopleToMeet.people.map((person) => {
     const cached = getCachedInsight(ctx, person);
     if (!cached) {
+      if (
+        person.askMeAbout ||
+        person.insightsStatus ||
+        person.insightsAttempts?.length
+      ) {
+        return person;
+      }
       return {...person, insightsStatus: 'pending' as const};
     }
     const base = {

@@ -39,7 +39,7 @@ export function WelcomeNoteEditor({
             setLocalNote(event.target.value);
             onNoteChange(event.target.value);
           }}
-          placeholder="A paragraph from you — what the team works on, who their buddy is, why you're excited they joined."
+          placeholder="A paragraph from you — what the team works on, who they should meet first, and why you're excited they joined."
           rows={6}
           style={textareaStyle}
           aria-label="Welcome note from the manager"

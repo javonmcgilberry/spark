@@ -11,6 +11,7 @@ export interface UseDraftResult {
   lastError: string | null;
   patch: (patch: DraftFieldPatch, options?: {flush?: boolean}) => void;
   reload: () => Promise<void>;
+  replace: (pkg: OnboardingPackage) => void;
 }
 
 /**
@@ -110,13 +111,19 @@ export function useDraft(
     }
   }, [pkg.userId]);
 
+  const replace = useCallback((next: OnboardingPackage) => {
+    setPkg(next);
+    setStatus('idle');
+    setLastError(null);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);
 
-  return {pkg, status, lastError, patch, reload};
+  return {pkg, status, lastError, patch, reload, replace};
 }
 
 function mergePatch(a: DraftFieldPatch, b: DraftFieldPatch): DraftFieldPatch {

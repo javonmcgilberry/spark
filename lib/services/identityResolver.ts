@@ -20,9 +20,12 @@ import {getDocDefinitions, DOC_PAGE_IDS} from '../onboarding/catalog';
 import type {DocLink, OnboardingPerson, RoleTrack, TeamProfile} from '../types';
 import {findGitHubTeamSlug, suggestPathsForTeam} from './codeowners';
 import type {SlackProfileFieldValue, SlackUser} from './slack';
+import {listAllUsers, type SlackUserHit} from './slackUserDirectory';
 
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const SLACK_FIELD_IDS_TTL_MS = 60 * 60 * 1000;
+const SLACK_CUSTOM_FIELDS_TTL_MS = 10 * 60 * 1000;
+const ORG_LOOKUP_CONCURRENCY = 8;
 
 interface ProfileSeed {
   userId: string;
@@ -30,6 +33,7 @@ interface ProfileSeed {
   firstName?: string;
   avatarUrl?: string;
   email?: string;
+  title?: string;
   teamName?: string;
   pillarName?: string;
   manager?: OnboardingPerson;
@@ -44,7 +48,24 @@ interface SlackCustomFields {
 
 interface Caches {
   profile: Map<string, {profile: TeamProfile; expiresAt: number}>;
+  customFields: Map<
+    string,
+    {customFields: SlackCustomFields; expiresAt: number}
+  >;
   fieldIds: {fieldIds: Map<string, string>; expiresAt: number} | undefined;
+}
+
+interface OrgLookupOptions {
+  hireUserId: string;
+  hireTitle?: string;
+  teamName: string;
+  pillarName?: string;
+  managerUserId?: string;
+}
+
+interface OrgCandidate {
+  user: SlackUserHit;
+  customFields: SlackCustomFields;
 }
 
 function getCaches(ctx: HandlerCtx): Caches {
@@ -52,6 +73,7 @@ function getCaches(ctx: HandlerCtx): Caches {
   if (existing) return existing;
   const created: Caches = {
     profile: new Map(),
+    customFields: new Map(),
     fieldIds: undefined,
   };
   ctx.scratch.identityCaches = created;
@@ -129,6 +151,7 @@ async function buildProfile(
   ctx: HandlerCtx,
   seed: ProfileSeed
 ): Promise<TeamProfile> {
+  const caches = getCaches(ctx);
   const resolvedFirstName =
     firstNonEmpty(
       seed.firstName,
@@ -144,7 +167,18 @@ async function buildProfile(
     teamName,
     githubTeamSlug
   );
-  const people = await buildPeople(ctx, teamName, seed.manager);
+  const people = await buildPeople(
+    ctx,
+    caches,
+    {
+      hireUserId: seed.userId,
+      hireTitle: seed.title,
+      teamName,
+      pillarName: seed.pillarName,
+      managerUserId: seed.manager?.slackUserId,
+    },
+    seed.manager
+  );
 
   return {
     userId: seed.userId,
@@ -170,7 +204,8 @@ async function buildProfile(
 
 async function buildPeople(
   ctx: HandlerCtx,
-  teamName: string,
+  caches: Caches,
+  options: OrgLookupOptions,
   managerOverride: OnboardingPerson | undefined
 ): Promise<{
   manager: OnboardingPerson;
@@ -178,21 +213,32 @@ async function buildPeople(
   teammates: OnboardingPerson[];
 }> {
   const people = buildDefaultPeople();
+  const buddy = personalizePerson(people[1], options.teamName);
   const managerCandidate = managerOverride
     ? {
-        ...personalizePerson(people[0], teamName),
+        ...personalizePerson(people[0], options.teamName),
         ...managerOverride,
       }
-    : personalizePerson(people[0], teamName);
+    : personalizePerson(people[0], options.teamName);
   const manager =
     managerCandidate.slackUserId || managerCandidate.email
       ? await hydratePerson(ctx, managerCandidate).catch(() => managerCandidate)
       : managerCandidate;
+  const orgPeople = await lookupOrgPeople(ctx, caches, {
+    ...options,
+    managerUserId: manager.slackUserId ?? options.managerUserId,
+  }).catch(() => ({teammates: []}));
 
   return {
     manager,
-    buddy: personalizePerson(people[1], teamName),
-    teammates: [buildFallbackTeammate(teamName, people[2]), ...people.slice(3)],
+    buddy,
+    teammates:
+      orgPeople.teammates.length > 0
+        ? orgPeople.teammates
+        : [
+            buildFallbackTeammate(options.teamName, people[2]),
+            ...people.slice(3),
+          ],
   };
 }
 
@@ -247,18 +293,27 @@ async function lookupSlackCustomFields(
   caches: Caches,
   userId: string
 ): Promise<SlackCustomFields> {
+  const cached = caches.customFields.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.customFields;
+  }
   try {
     const [fieldIds, response] = await Promise.all([
       getSlackFieldIds(ctx, caches),
       ctx.slack.users.profile.get({user: userId}),
     ]);
     const fields = response.profile?.fields ?? {};
-    return {
+    const customFields = {
       division: readSlackField(fields, fieldIds, 'division'),
       team: readSlackField(fields, fieldIds, 'team'),
       department: readSlackField(fields, fieldIds, 'department'),
       manager: readSlackField(fields, fieldIds, 'manager'),
     };
+    caches.customFields.set(userId, {
+      customFields,
+      expiresAt: Date.now() + SLACK_CUSTOM_FIELDS_TTL_MS,
+    });
+    return customFields;
   } catch {
     return {};
   }
@@ -301,6 +356,196 @@ async function getCachedCodeowners(ctx: HandlerCtx): Promise<string> {
   return fetched;
 }
 
+async function lookupOrgPeople(
+  ctx: HandlerCtx,
+  caches: Caches,
+  options: OrgLookupOptions
+): Promise<{
+  teammates: OnboardingPerson[];
+}> {
+  const directory = await listAllUsers(ctx).catch(() => []);
+  if (directory.length === 0) return {teammates: []};
+
+  const templates = buildDefaultPeople();
+  const teammateTemplate = templates[2];
+  const pmTemplate = templates[3];
+  const designerTemplate = templates[4];
+  const directorTemplate = templates[5];
+  const peoplePartnerTemplate = templates[6];
+
+  const engineerCandidates = await enrichCandidates(
+    ctx,
+    caches,
+    directory.filter(
+      (user) =>
+        user.slackUserId !== options.hireUserId &&
+        user.slackUserId !== options.managerUserId &&
+        isEngineeringIcTitle(user.title)
+    )
+  );
+  const rankedEngineers = engineerCandidates
+    .map((candidate) => ({
+      candidate,
+      score: rankEngineerCandidate(candidate, options),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.candidate.user.name.localeCompare(
+        b.candidate.user.name,
+        undefined,
+        {
+          sensitivity: 'base',
+        }
+      );
+    })
+    .map((entry) => entry.candidate);
+
+  const teammates: OnboardingPerson[] = [];
+  for (const candidate of rankedEngineers.slice(0, 3)) {
+    pushUniquePerson(
+      teammates,
+      buildResolvedPerson(teammateTemplate, candidate)
+    );
+  }
+
+  const pmCandidate = await selectDivisionCandidate(
+    ctx,
+    caches,
+    directory.filter(
+      (user) =>
+        user.slackUserId !== options.hireUserId &&
+        isProductManagerTitle(user.title)
+    ),
+    options
+  );
+  if (pmCandidate) {
+    pushUniquePerson(teammates, buildResolvedPerson(pmTemplate, pmCandidate));
+  }
+
+  const designerCandidate = await selectDivisionCandidate(
+    ctx,
+    caches,
+    directory.filter(
+      (user) =>
+        user.slackUserId !== options.hireUserId && isDesignerTitle(user.title)
+    ),
+    options
+  );
+  if (designerCandidate) {
+    pushUniquePerson(
+      teammates,
+      buildResolvedPerson(designerTemplate, designerCandidate)
+    );
+  }
+
+  const directorCandidate = await resolveDirectorCandidate(
+    ctx,
+    caches,
+    directory,
+    options
+  );
+  if (directorCandidate) {
+    pushUniquePerson(
+      teammates,
+      buildResolvedPerson(directorTemplate, directorCandidate)
+    );
+  }
+
+  const peoplePartnerCandidate = directory
+    .filter(
+      (user) =>
+        user.slackUserId !== options.hireUserId &&
+        isPeoplePartnerTitle(user.title)
+    )
+    .sort((a, b) => {
+      const seniorityDelta = seniorityScore(b.title) - seniorityScore(a.title);
+      if (seniorityDelta !== 0) return seniorityDelta;
+      return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+    })[0];
+  if (peoplePartnerCandidate) {
+    pushUniquePerson(
+      teammates,
+      buildResolvedPerson(peoplePartnerTemplate, {
+        user: peoplePartnerCandidate,
+        customFields: {},
+      })
+    );
+  }
+
+  return {teammates};
+}
+
+async function enrichCandidates(
+  ctx: HandlerCtx,
+  caches: Caches,
+  users: SlackUserHit[]
+): Promise<OrgCandidate[]> {
+  const results: OrgCandidate[] = [];
+  let index = 0;
+  const workers = Array.from(
+    {length: Math.min(ORG_LOOKUP_CONCURRENCY, users.length)},
+    async () => {
+      while (index < users.length) {
+        const current = users[index++];
+        const customFields = await lookupSlackCustomFields(
+          ctx,
+          caches,
+          current.slackUserId
+        );
+        results.push({user: current, customFields});
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+async function selectDivisionCandidate(
+  ctx: HandlerCtx,
+  caches: Caches,
+  users: SlackUserHit[],
+  options: OrgLookupOptions
+): Promise<OrgCandidate | undefined> {
+  const candidates = await enrichCandidates(ctx, caches, users);
+  return (
+    candidates.find((candidate) =>
+      matchesDivision(candidate, options.pillarName)
+    ) ??
+    candidates.find((candidate) =>
+      matchesTeamName(candidate, options.teamName)
+    ) ??
+    candidates[0]
+  );
+}
+
+async function resolveDirectorCandidate(
+  ctx: HandlerCtx,
+  caches: Caches,
+  directory: SlackUserHit[],
+  options: OrgLookupOptions
+): Promise<OrgCandidate | undefined> {
+  const byId = new Map(directory.map((user) => [user.slackUserId, user]));
+  let currentId = options.managerUserId;
+  for (let depth = 0; depth < 4 && currentId; depth += 1) {
+    const user = byId.get(currentId);
+    if (!user) break;
+    const customFields = await lookupSlackCustomFields(ctx, caches, currentId);
+    const candidate = {user, customFields};
+    if (isEngineeringDirectorTitle(user.title)) {
+      return candidate;
+    }
+    currentId = managerUserIdFromFields(customFields);
+  }
+
+  return selectDivisionCandidate(
+    ctx,
+    caches,
+    directory.filter((user) => isEngineeringDirectorTitle(user.title)),
+    options
+  );
+}
+
 function getDocsForTrack(ctx: HandlerCtx, track: RoleTrack): DocLink[] {
   const baseUrl = ctx.confluence.baseUrl();
   return getDocDefinitions(track).map((doc) => ({
@@ -325,6 +570,7 @@ function mergeSeed(
     displayName: slackSeed?.displayName ?? fallbackDisplayName,
     avatarUrl: slackSeed?.avatarUrl,
     email: slackSeed?.email ?? email,
+    title: slackSeed?.title,
     teamName: slackSeed?.teamName,
     pillarName: slackSeed?.pillarName,
     manager: slackSeed?.manager,
@@ -381,6 +627,155 @@ function buildFallbackTeammate(
   };
 }
 
+function buildResolvedPerson(
+  template: OnboardingPerson,
+  candidate: OrgCandidate
+): OnboardingPerson {
+  return {
+    ...template,
+    name: candidate.user.name,
+    role: candidate.user.title?.trim() || template.role,
+    title: candidate.user.title?.trim() || undefined,
+    email: candidate.user.email,
+    slackUserId: candidate.user.slackUserId,
+    avatarUrl: candidate.user.avatarUrl,
+  };
+}
+
+function pushUniquePerson(
+  people: OnboardingPerson[],
+  person: OnboardingPerson
+): void {
+  const key = (person.slackUserId || person.email || person.name).toLowerCase();
+  if (
+    people.some(
+      (candidate) =>
+        (
+          candidate.slackUserId ||
+          candidate.email ||
+          candidate.name
+        ).toLowerCase() === key
+    )
+  ) {
+    return;
+  }
+  people.push(person);
+}
+
+function rankEngineerCandidate(
+  candidate: OrgCandidate,
+  options: OrgLookupOptions
+): number {
+  let score = 0;
+  const managerUserId = managerUserIdFromFields(candidate.customFields);
+  if (options.managerUserId && managerUserId === options.managerUserId) {
+    score += 100;
+  }
+  if (matchesDivision(candidate, options.pillarName)) {
+    score += 30;
+  }
+  if (matchesTeamName(candidate, options.teamName)) {
+    score += 20;
+  }
+  score += roleAffinityScore(options.hireTitle, candidate.user.title);
+  return score;
+}
+
+function matchesDivision(
+  candidate: OrgCandidate,
+  pillarName: string | undefined
+): boolean {
+  const expected = normalizeLabelValue(pillarName);
+  if (!expected) return false;
+  return (
+    normalizeLabelValue(slackFieldText(candidate.customFields.division)) ===
+    expected
+  );
+}
+
+function matchesTeamName(
+  candidate: OrgCandidate,
+  teamName: string | undefined
+): boolean {
+  const expected = normalizeLabelValue(teamName);
+  if (!expected) return false;
+  return (
+    normalizeLabelValue(
+      firstNonEmpty(
+        slackFieldText(candidate.customFields.team),
+        normalizeDepartmentTeamName(
+          slackFieldText(candidate.customFields.department)
+        )
+      )
+    ) === expected
+  );
+}
+
+function normalizeLabelValue(value: string | undefined): string | undefined {
+  const trimmed = value?.trim().toLowerCase();
+  return trimmed || undefined;
+}
+
+function managerUserIdFromFields(
+  customFields: SlackCustomFields
+): string | undefined {
+  return parseSlackUserId(customFields.manager?.value);
+}
+
+function roleAffinityScore(
+  hireTitle: string | undefined,
+  candidateTitle: string | undefined
+): number {
+  const hire = hireTitle?.toLowerCase() ?? '';
+  const candidate = candidateTitle?.toLowerCase() ?? '';
+  if (!hire || !candidate) return 0;
+  if (hire.includes('frontend') && candidate.includes('frontend')) return 20;
+  if (hire.includes('backend') && candidate.includes('backend')) return 20;
+  if (hire.includes('fullstack') && candidate.includes('fullstack')) return 15;
+  if (
+    hire.includes('software engineer') &&
+    candidate.includes('software engineer')
+  ) {
+    return 10;
+  }
+  return 0;
+}
+
+function isEngineeringIcTitle(title: string | undefined): boolean {
+  const normalized = title?.toLowerCase() ?? '';
+  if (!normalized) return false;
+  if (/(manager|director|product|designer|people partner)/.test(normalized)) {
+    return false;
+  }
+  return /(engineer|developer|frontend|backend|fullstack|architect)/.test(
+    normalized
+  );
+}
+
+function isProductManagerTitle(title: string | undefined): boolean {
+  return /product manager/i.test(title ?? '');
+}
+
+function isDesignerTitle(title: string | undefined): boolean {
+  return /designer/i.test(title ?? '');
+}
+
+function isEngineeringDirectorTitle(title: string | undefined): boolean {
+  const normalized = title?.toLowerCase() ?? '';
+  return normalized.includes('director') && normalized.includes('engineer');
+}
+
+function isPeoplePartnerTitle(title: string | undefined): boolean {
+  return /(people (business )?partner|business partner)/i.test(title ?? '');
+}
+
+function seniorityScore(title: string | undefined): number {
+  const normalized = title?.toLowerCase() ?? '';
+  if (normalized.includes('lead')) return 3;
+  if (normalized.includes('senior')) return 2;
+  return 1;
+}
+
 function buildSlackSeed(
   userId: string,
   user: SlackUser | undefined,
@@ -393,6 +788,7 @@ function buildSlackSeed(
     displayName: slackDisplayName(user) ?? 'New hire',
     avatarUrl: profile?.image_192 ?? profile?.image_72,
     email: profile?.email,
+    title: profile?.title?.trim() || undefined,
     teamName: firstNonEmpty(
       slackFieldText(customFields.team),
       normalizeDepartmentTeamName(slackFieldText(customFields.department))

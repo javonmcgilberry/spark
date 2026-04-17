@@ -215,6 +215,8 @@ export interface OnboardingPackage {
   reviewerUserIds: string[];
   newHireName?: string;
   newHireAvatarUrl?: string;
+  teamName?: string;
+  pillarName?: string;
   welcomeNote?: string;
   welcomeIntro?: string;
   buddyUserId?: string;

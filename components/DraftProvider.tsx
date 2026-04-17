@@ -135,18 +135,21 @@ export function DraftProvider({
 
   const insightsRefreshedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (insightsRefreshedFor.current === newHireId) return;
     const people = draft.pkg.sections.peopleToMeet.people;
     const anyPending = people.some((p) => p.insightsStatus === 'pending');
     if (!anyPending) return;
-    insightsRefreshedFor.current = newHireId;
+    const refreshKey = `${newHireId}:${draft.pkg.updatedAt}`;
+    if (insightsRefreshedFor.current === refreshKey) return;
+    insightsRefreshedFor.current = refreshKey;
     void (async () => {
       try {
-        await fetch(
+        const res = await fetch(
           `/api/drafts/${encodeURIComponent(newHireId)}/refresh-insights`,
           {method: 'POST'}
         );
-        await draft.reload();
+        if (!res.ok) return;
+        const body = (await res.json()) as {pkg: OnboardingPackage};
+        draft.replace(body.pkg);
       } catch {
         // Insights are best-effort — the template discussionPoints still render.
       }

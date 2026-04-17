@@ -143,6 +143,41 @@ describe('applyPatchInPlace', () => {
     );
   });
 
+  it('syncs buddyUserId from the assigned buddy slot in peopleToMeet', () => {
+    const pkg = samplePackage({
+      sections: {
+        ...samplePackage().sections,
+        peopleToMeet: {
+          title: 'People',
+          intro: '',
+          people: [
+            {
+              name: 'Your Onboarding Buddy',
+              role: 'Onboarding Buddy',
+              discussionPoints: '',
+              weekBucket: 'week1-2',
+              kind: 'buddy',
+            },
+          ],
+        },
+      },
+    });
+    applyPatchInPlace(pkg, {
+      peopleToMeet: [
+        {
+          name: 'Buddy One',
+          role: 'Senior Software Engineer',
+          discussionPoints: '',
+          weekBucket: 'week1-2',
+          kind: 'buddy',
+          slackUserId: 'UBUD002',
+        },
+      ],
+    });
+    expect(pkg.buddyUserId).toBe('UBUD002');
+    expect(pkg.reviewerUserIds).toContain('UBUD002');
+  });
+
   it('syncs checklistRows into section items', () => {
     const pkg = samplePackage({
       sections: {

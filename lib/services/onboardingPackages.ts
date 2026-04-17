@@ -222,6 +222,8 @@ async function buildPackage(
     reviewerUserIds,
     newHireName: profile.displayName || existing?.newHireName,
     newHireAvatarUrl: profile.avatarUrl ?? existing?.newHireAvatarUrl,
+    teamName: profile.teamName,
+    pillarName: profile.pillarName,
     welcomeNote: resolvedWelcomeNote,
     welcomeIntro: resolvedWelcomeIntro,
     buddyUserId: buddy.slackUserId ?? existing?.buddyUserId,

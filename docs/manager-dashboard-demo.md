@@ -1,9 +1,9 @@
 # Spark Manager Dashboard — Getting Started & Demo Runbook
 
-End-to-end: clone → local dev → Webflow Cloud deploy → 4-minute Loom.
+End-to-end: clone → local dev → deploy → 4-minute Loom.
 
-Spark runs as a single Next.js app on Webflow Cloud. One URL. One
-deploy. No sidecar process.
+Spark runs as a single Next.js app. Pick one base URL for the run you
+are about to demo and use that same URL in the browser and in Slack.
 
 ---
 
@@ -86,31 +86,45 @@ the Cloudflare Tunnel + dev Slack app setup.
 
 ## 4. Slack app configuration
 
-In https://api.slack.com/apps → **create new app** → From scratch.
-Name it "Spark". Install into `webflow-inside` (prod) or
-`webflow-inside-dev` (dev).
+Choose the base URL for this run before you touch the Slack app:
 
-1. **Socket Mode**: Disable.
-2. **Event Subscriptions** → Enable, Request URL:
-   `https://spark.wf.app/api/slack/events`
-3. **Subscribe to bot events**: `app_mention`, `message.im`,
-   `app_home_opened`, `assistant_thread_started`,
-   `assistant_thread_context_changed`, `member_joined_channel`.
-4. **Interactivity** → Request URL:
-   `https://spark.wf.app/api/slack/interactivity`
-5. **OAuth & Permissions** scopes: `chat:write`, `channels:history`,
-   `im:history`, `im:write`, `app_mentions:read`, `canvases:write`,
-   `users:read`, `users:read.email`.
-6. Copy the bot token and signing secret into Webflow Cloud env.
-7. Reinstall to workspace.
+- Webflow Cloud: `https://spark.wf.app`
+- Local preview with a public tunnel: `https://<random>.trycloudflare.com`
+
+In https://api.slack.com/apps:
+
+1. Open the Spark app in the workspace you are using for the demo.
+2. Open **Socket Mode** in the left nav and make sure it is disabled.
+3. Open **Event Subscriptions**.
+4. Turn **Enable Events** on.
+5. In the **Request URL** field, paste:
+   `<base-url>/api/slack/events`
+6. Wait for Slack to show the green verification state, then click
+   **Save Changes**.
+7. Under **Subscribe to bot events**, confirm these events are present:
+   `app_mention`, `message.im`, `app_home_opened`,
+   `assistant_thread_started`, `assistant_thread_context_changed`,
+   `member_joined_channel`.
+8. Open **Interactivity & Shortcuts**.
+9. Turn **Interactivity** on.
+10. In the **Request URL** field, paste:
+    `<base-url>/api/slack/interactivity`
+11. Click **Save Changes**.
+12. Open **OAuth & Permissions** and confirm these scopes are present:
+    `chat:write`, `channels:history`, `im:history`, `im:write`,
+    `app_mentions:read`, `canvases:write`, `users:read`,
+    `users:read.email`.
+13. If Slack shows **Reinstall to Workspace**, click it and finish the
+    reinstall flow.
+14. Copy the bot token and signing secret into the environment for the
+    app you are running.
 
 ---
 
-## 4.1 Emergency fallback — public tunnel
+## 4.1 Local public URL for Slack delivery
 
-If `spark.wf.app` is behind Okta / Cloudflare Access and Slack cannot
-reach the webhook URLs, use a local Worker preview plus a public tunnel
-for the demo:
+Use these steps when the demo is running from a local Worker preview and
+Slack needs a public URL:
 
 ```bash
 # terminal 1
@@ -123,15 +137,27 @@ cd ~/webflow/spark
 cloudflared tunnel --url http://localhost:8791 --no-autoupdate
 ```
 
-Then:
+After both commands are running:
 
-1. Copy the `https://<random>.trycloudflare.com` URL from `cloudflared`.
-2. Point Slack at:
-   - `https://<random>.trycloudflare.com/api/slack/events`
-   - `https://<random>.trycloudflare.com/api/slack/interactivity`
-3. Demo the UI from the same tunnel URL, not `spark.wf.app`, because
-   the local preview is using local D1 state.
-4. Keep the laptop awake and both processes running for the entire demo.
+1. In terminal 1, wait for:
+   `Ready on http://localhost:8791`
+2. In terminal 2, copy the full
+   `https://<random>.trycloudflare.com` URL from the `cloudflared`
+   output.
+3. Go back to the Slack app settings page.
+4. Open **Event Subscriptions** and paste:
+   `https://<random>.trycloudflare.com/api/slack/events`
+   into the **Request URL** field.
+5. Wait for the green verification state and click **Save Changes**.
+6. Open **Interactivity & Shortcuts** and paste:
+   `https://<random>.trycloudflare.com/api/slack/interactivity`
+   into the **Request URL** field.
+7. Click **Save Changes**.
+8. Open the same `https://<random>.trycloudflare.com` URL in the
+   browser and run the demo there. Use `/new` if you want to land
+   directly on the draft-creation page.
+9. Keep the laptop awake and keep both terminals running for the entire
+   demo. If either process stops, the public URL stops.
 
 ---
 
@@ -151,15 +177,21 @@ Before first deploy:
    and applies everything under `migrations/`. See [the storage
    docs](https://developers.webflow.com/webflow-cloud/storing-data/overview)
    for the auto-provisioning contract.
-3. Point the dev Slack app's Events URL at the preview URL to smoke
-   test.
-4. Merge to main → prod deploys → repoint production Slack app.
+3. Open the Slack app settings and update:
+   - **Event Subscriptions** → **Request URL** →
+     `<preview-url>/api/slack/events`
+   - **Interactivity & Shortcuts** → **Request URL** →
+     `<preview-url>/api/slack/interactivity`
+4. Wait for Slack to verify both URLs, save the changes, and reinstall
+   the app if Slack prompts for it.
+5. Merge to main so production deploys, then repeat the same Slack
+   update flow with the production base URL.
 
 ---
 
 ## 6. Demo flow (~4 min)
 
-1. Open `spark.wf.app`. Show the draft inbox.
+1. Open the same app URL you configured in Slack. Show the draft inbox.
 2. Click **Create onboarding plan**. Pick a new hire.
 3. Click **Ask Spark to draft**. Watch the agent timeline in the
    sidebar tick through `resolve_new_hire → fetch_team_roster →
@@ -174,8 +206,8 @@ tune_checklist → finalize_draft`. The welcome text renders live
    event the agent handles is replayable from there with a signed
    request and inline recorded outbound calls. "This is the debug
    tool, not Wireshark."
-7. Close with: **"Everything you just saw runs as one Worker on
-   Webflow Cloud. No bot process, no tunnel, no sidecar."**
+7. Close with: **"Everything you just saw came through one app: the
+   same routes handled the manager UI and the Slack delivery path."**
 
 ---
 

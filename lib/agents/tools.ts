@@ -79,7 +79,6 @@ export const resolveNewHireTool: ToolDescriptor = {
           pillarName: profile.pillarName,
           roleTrack: profile.roleTrack,
           manager: sanitizePerson(profile.manager),
-          buddy: profile.buddy ? sanitizePerson(profile.buddy) : undefined,
         };
       } catch (error) {
         return {
@@ -122,7 +121,7 @@ export const resolveTeamTool: ToolDescriptor = {
 export const fetchTeamRosterTool: ToolDescriptor = {
   name: 'fetch_team_roster',
   description:
-    "Fetch the roster of engineers on the new hire's team. Use to pick a buddy and teammates to meet.",
+    "Fetch the real roster around the new hire's team. Use this to ground people-to-meet and welcome copy in actual teammates.",
   input_schema: {
     type: 'object',
     properties: {
@@ -181,7 +180,7 @@ export const proposeBuddyTool: ToolDescriptor = {
 export const findStakeholdersTool: ToolDescriptor = {
   name: 'find_stakeholders',
   description:
-    "Look up Confluence user guides for the team's manager, buddy, and teammates.",
+    "Look up Confluence user guides for the team's manager and teammates.",
   input_schema: {
     type: 'object',
     required: ['email'],
@@ -191,7 +190,7 @@ export const findStakeholdersTool: ToolDescriptor = {
     const {email} = input as {email: string};
     return withTimeout(tctx, async () => {
       const profile = await resolveFromEmail(tctx.ctx, email);
-      const people = [profile.manager, profile.buddy, ...profile.teammates];
+      const people = [profile.manager, ...profile.teammates];
       const [refs, guides] = await Promise.all([
         findOnboardingReferences(tctx.ctx, profile),
         findPeopleGuides(tctx.ctx, profile, people),
@@ -311,7 +310,6 @@ export const GENERATOR_TOOLS: ToolDescriptor[] = [
   resolveNewHireTool,
   resolveTeamTool,
   fetchTeamRosterTool,
-  proposeBuddyTool,
   findStakeholdersTool,
   draftWelcomeNoteTool,
   tuneChecklistTool,

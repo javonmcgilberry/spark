@@ -270,7 +270,24 @@ export function applyPatchInPlace(
     existing.customChecklistItems = patch.customChecklistItems.map(cloneItem);
   }
   if (patch.peopleToMeet) {
-    existing.sections.peopleToMeet.people = patch.peopleToMeet.map(clonePerson);
+    const people = patch.peopleToMeet.map(clonePerson);
+    existing.sections.peopleToMeet.people = people;
+    const assignedBuddy = people.find(
+      (person) => person.kind === 'buddy' && person.slackUserId
+    )?.slackUserId;
+    existing.buddyUserId = assignedBuddy ?? undefined;
+    if (assignedBuddy) {
+      existing.reviewerUserIds = Array.from(
+        new Set(
+          [
+            ...existing.reviewerUserIds,
+            existing.createdByUserId,
+            existing.managerUserId,
+            assignedBuddy,
+          ].filter((value): value is string => Boolean(value))
+        )
+      );
+    }
   }
   if (patch.checklistRows) {
     existing.checklistRows = {

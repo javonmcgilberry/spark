@@ -70,6 +70,10 @@ export async function searchUsers(
   return scored.slice(0, limit).map((s) => s.hit);
 }
 
+export async function listAllUsers(ctx: HandlerCtx): Promise<SlackUserHit[]> {
+  return getAll(ctx);
+}
+
 async function getAll(ctx: HandlerCtx): Promise<SlackUserHit[]> {
   const cache = getCache(ctx);
   const now = Date.now();

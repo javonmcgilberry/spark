@@ -54,8 +54,9 @@ export function inferGithubUsername(
 
 export function makeGitHubClient(env: GitHubEnv, logger: Logger): GitHubClient {
   const configured = Boolean(env.GITHUB_TOKEN);
-  const org = env.GITHUB_ORG ?? 'webflow';
-  const codeownersRepo = env.GITHUB_CODEOWNERS_REPO ?? 'webflow/webflow';
+  const org = env.GITHUB_ORG?.trim() || 'webflow';
+  const codeownersRepo =
+    env.GITHUB_CODEOWNERS_REPO?.trim() || 'webflow/webflow';
   const cache = new Map<
     string,
     {value: GitHubPullRequest[]; expiresAt: number}

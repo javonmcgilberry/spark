@@ -64,8 +64,8 @@ export default async function HomePage() {
         </h1>
         <p style={bodyStyle}>
           Give the agent a new hire&apos;s name and team hint. It will look up
-          the team, pick a buddy, draft the welcome, tune the checklist, and
-          send a reviewable plan to Slack.
+          the team, pull the right people to meet, draft the welcome, tune the
+          checklist, and send a reviewable plan to Slack.
         </p>
         <Link
           href="/new"

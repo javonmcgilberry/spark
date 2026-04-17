@@ -66,7 +66,7 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
       const base = `https://api.atlassian.com/ex/jira/${oauth.cloudId}/`;
       return {
         mode: 'oauth',
-        url: new URL('rest/api/3/search', base),
+        url: new URL('rest/api/3/search/jql', base),
         authorization: `Bearer ${oauth.accessToken}`,
         base,
       };
@@ -83,7 +83,7 @@ export function makeJiraClient(config: JiraClientConfig): JiraClient {
     const base = ensureTrailingSlash(env.JIRA_BASE_URL);
     return {
       mode: 'basic',
-      url: new URL('rest/api/3/search', base),
+      url: new URL('rest/api/3/search/jql', base),
       authorization: `Basic ${base64Encode(`${authEmail}:${env.JIRA_API_TOKEN}`)}`,
       base,
     };
