@@ -37,6 +37,10 @@ export async function buildManagerCtx(): Promise<
   // Built BEFORE session so the session resolver can use ctx.slack to
   // translate the Cloudflare Access email into a Slack user id.
   const session = await requireManagerSession(ctx);
+  // Thread the viewer's email into ctx so Jira/Confluence can use it
+  // as their Basic auth identity. No JIRA_API_EMAIL env var needed —
+  // Okta SSO is the single source of truth.
+  ctx.viewerEmail = session.email;
   return {ctx, env, session};
 }
 

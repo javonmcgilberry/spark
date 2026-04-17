@@ -19,27 +19,39 @@ export interface JiraClient {
 
 export interface JiraEnv {
   JIRA_BASE_URL?: string;
-  JIRA_API_EMAIL?: string;
   JIRA_API_TOKEN?: string;
+}
+
+export interface JiraClientConfig {
+  env: JiraEnv;
+  logger: Logger;
+  /**
+   * Returns the Atlassian account email that owns JIRA_API_TOKEN for
+   * the current request. Populated from the Cloudflare Access JWT
+   * (Okta SSO) via HandlerCtx.viewerEmail. Reading at call time (not
+   * construction time) is what lets ctx populate it after session
+   * resolution without rebuilding the client.
+   */
+  getAuthEmail: () => string | undefined;
 }
 
 const JIRA_REQUEST_TIMEOUT_MS = 8000;
 const JIRA_CACHE_TTL_MS = 60 * 1000;
 
-export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
-  const configured = Boolean(
-    env.JIRA_BASE_URL && env.JIRA_API_EMAIL && env.JIRA_API_TOKEN
-  );
+export function makeJiraClient(config: JiraClientConfig): JiraClient {
+  const {env, logger, getAuthEmail} = config;
+  const envConfigured = Boolean(env.JIRA_BASE_URL && env.JIRA_API_TOKEN);
   const cache = new Map<string, {value: JiraIssue[]; expiresAt: number}>();
 
   const runSearch = async (
     jql: string,
     limit: number
   ): Promise<JiraIssue[]> => {
+    const authEmail = getAuthEmail();
     if (
-      !configured ||
+      !envConfigured ||
+      !authEmail ||
       !env.JIRA_BASE_URL ||
-      !env.JIRA_API_EMAIL ||
       !env.JIRA_API_TOKEN
     ) {
       return [];
@@ -62,7 +74,7 @@ export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
         headers: {
           Accept: 'application/json',
           Authorization: `Basic ${base64Encode(
-            `${env.JIRA_API_EMAIL}:${env.JIRA_API_TOKEN}`
+            `${authEmail}:${env.JIRA_API_TOKEN}`
           )}`,
         },
         signal: controller.signal,
@@ -103,19 +115,18 @@ export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
   };
 
   return {
-    isConfigured: () => configured,
+    isConfigured: () => envConfigured && Boolean(getAuthEmail()),
     async findAssignedToEmail(email, limit = 10) {
-      if (!configured || !email) return [];
+      if (!email) return [];
       const jql = `assignee = "${escapeJql(email)}" AND resolution = Unresolved ORDER BY updated DESC`;
       return searchCached(`assignee|${email}|${limit}`, jql, limit);
     },
     async findForTextQuery(query, limit = 8) {
-      if (!configured || !query.trim()) return [];
+      if (!query.trim()) return [];
       const jql = `text ~ "${escapeJql(query.trim())}" ORDER BY updated DESC`;
       return searchCached(`text|${query}|${limit}`, jql, limit);
     },
     async findByKey(key) {
-      if (!configured) return null;
       const normalized = key.trim().toUpperCase();
       if (!/^[A-Z][A-Z0-9]+-\d+$/.test(normalized)) return null;
       const jql = `issuekey = ${normalized}`;

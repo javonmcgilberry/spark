@@ -10,12 +10,13 @@ export interface ConfluenceClient {
   isConfigured(): boolean;
   /**
    * Search Confluence for a phrase, returning the first matching page.
-   * Returns undefined on miss, misconfig, or network failure.
+   * Returns undefined on miss, misconfig, or network failure. Basic
+   * auth uses the viewer's email (from CF Access) paired with
+   * CONFLUENCE_API_TOKEN — no per-call email argument.
    */
   searchFirst(
     phrase: string,
     fallbackSummary: string,
-    authEmail: string,
     options?: {excludeTitlePrefixes?: string[]}
   ): Promise<ConfluenceLink | undefined>;
   /** Build a canonical URL for a known page id. */
@@ -29,14 +30,25 @@ export interface ConfluenceEnv {
   CONFLUENCE_BASE_URL?: string;
 }
 
+export interface ConfluenceClientConfig {
+  env: ConfluenceEnv;
+  logger: Logger;
+  /**
+   * Returns the Atlassian account email that owns CONFLUENCE_API_TOKEN
+   * for the current request. Populated from the Cloudflare Access JWT
+   * via HandlerCtx.viewerEmail.
+   */
+  getAuthEmail: () => string | undefined;
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 8000;
 
 export function makeConfluenceClient(
-  env: ConfluenceEnv,
-  logger: Logger
+  config: ConfluenceClientConfig
 ): ConfluenceClient {
-  const configured = Boolean(
+  const {env, logger, getAuthEmail} = config;
+  const envConfigured = Boolean(
     env.CONFLUENCE_API_TOKEN && env.CONFLUENCE_BASE_URL
   );
   const cache = new Map<
@@ -54,7 +66,11 @@ export function makeConfluenceClient(
     summary: string,
     authEmail: string
   ): Promise<ConfluenceLink | undefined> => {
-    if (!configured || !env.CONFLUENCE_BASE_URL || !env.CONFLUENCE_API_TOKEN) {
+    if (
+      !envConfigured ||
+      !env.CONFLUENCE_BASE_URL ||
+      !env.CONFLUENCE_API_TOKEN
+    ) {
       return undefined;
     }
     const url = new URL(
@@ -122,14 +138,16 @@ export function makeConfluenceClient(
   };
 
   return {
-    isConfigured: () => configured,
+    isConfigured: () => envConfigured && Boolean(getAuthEmail()),
     baseUrl,
     urlForPageId(spaceKey, pageId) {
       const base = baseUrl();
       if (!base) return null;
       return `${base}spaces/${spaceKey}/pages/${pageId}`;
     },
-    async searchFirst(phrase, summary, authEmail, options = {}) {
+    async searchFirst(phrase, summary, options = {}) {
+      const authEmail = getAuthEmail();
+      if (!authEmail) return undefined;
       const exclude = options.excludeTitlePrefixes ?? [];
       const cacheKey = `${authEmail}|${phrase}`.toLowerCase();
       const cached = cache.get(cacheKey);

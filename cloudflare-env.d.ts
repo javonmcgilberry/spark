@@ -37,13 +37,17 @@ declare global {
     // ---- Atlassian ------------------------------------------------------
     /** Jira Cloud base URL (e.g. https://webflow.atlassian.net). */
     JIRA_BASE_URL?: string;
-    /** Email paired with JIRA_API_TOKEN for Basic auth. */
-    JIRA_API_EMAIL?: string;
-    /** Jira API token. All three JIRA_* are required together or Jira is skipped. */
+    /**
+     * Jira API token. Basic auth email is the viewer's Cloudflare
+     * Access identity, not an env var — so there is no JIRA_API_EMAIL.
+     */
     JIRA_API_TOKEN?: string;
     /** Confluence base URL (e.g. https://webflow.atlassian.net/wiki). */
     CONFLUENCE_BASE_URL?: string;
-    /** Confluence API token. Confluence uses the hire's email for Basic auth. */
+    /**
+     * Confluence API token. Basic auth email comes from the viewer's
+     * CF Access identity — no separate CONFLUENCE_API_EMAIL.
+     */
     CONFLUENCE_API_TOKEN?: string;
 
     // ---- Session --------------------------------------------------------

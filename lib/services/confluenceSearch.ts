@@ -16,13 +16,12 @@ export async function findOnboardingReferences(
   ctx: HandlerCtx,
   profile: TeamProfile
 ): Promise<OnboardingReferences> {
-  if (!ctx.confluence.isConfigured() || !profile.email) return {};
+  if (!ctx.confluence.isConfigured()) return {};
 
   const [teamPage, pillarPage, newHireGuide] = await Promise.all([
     ctx.confluence.searchFirst(
       `${profile.teamName} team home`,
       `Canonical team home for ${profile.teamName}.`,
-      profile.email,
       {
         excludeTitlePrefixes: ['tech spec', 'rfc', 'pia', 'post-mortem'],
       }
@@ -31,7 +30,6 @@ export async function findOnboardingReferences(
       ? ctx.confluence.searchFirst(
           `${profile.pillarName} pillar home`,
           `Canonical pillar home for ${profile.pillarName}.`,
-          profile.email,
           {
             excludeTitlePrefixes: ['tech spec', 'rfc', 'pia', 'post-mortem'],
           }
@@ -39,8 +37,7 @@ export async function findOnboardingReferences(
       : Promise.resolve(undefined),
     ctx.confluence.searchFirst(
       `${profile.displayName} user guide`,
-      `User guide for ${profile.displayName}.`,
-      profile.email
+      `User guide for ${profile.displayName}.`
     ),
   ]);
 
@@ -52,7 +49,7 @@ export async function findPeopleGuides(
   profile: TeamProfile,
   people: OnboardingPerson[]
 ): Promise<Record<string, ConfluenceLink>> {
-  if (!ctx.confluence.isConfigured() || !profile.email) return {};
+  if (!ctx.confluence.isConfigured()) return {};
 
   const relevantPeople = people
     .filter((person) => person.name && !person.name.startsWith('Your '))
@@ -62,8 +59,7 @@ export async function findPeopleGuides(
     relevantPeople.map(async (person) => {
       const guide = await ctx.confluence.searchFirst(
         `${person.name} user guide`,
-        `User guide for ${person.name}.`,
-        profile.email!
+        `User guide for ${person.name}.`
       );
       return guide ? [personKey(person), guide] : undefined;
     })

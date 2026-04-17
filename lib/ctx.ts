@@ -40,6 +40,14 @@ export interface HandlerCtx {
   logger: Logger;
   env: CloudflareEnv;
   /**
+   * Atlassian Basic auth email for this request. Populated after the
+   * manager session resolves (from the Cloudflare Access JWT) so Jira
+   * and Confluence can authenticate as the viewing user. Undefined
+   * outside of session-bearing routes; isConfigured() on jira and
+   * confluence returns false without it, so calls no-op safely.
+   */
+  viewerEmail?: string;
+  /**
    * Scratch space carried across tool calls in a single agent turn —
    * e.g. the resolved hire profile, cached roster. Keeps the LLM loop
    * from re-resolving identity on every tool call.
@@ -96,13 +104,7 @@ export function makeProdCtx(
         env.ANTHROPIC_MODEL ?? 'claude-3-5-haiku-latest'
       );
 
-  const jira = makeJiraClient(env as Record<string, string>, logger);
   const github = makeGitHubClient(env as Record<string, string>, logger);
-  const confluence = makeConfluenceClient(
-    env as Record<string, string>,
-    logger
-  );
-
   const db = resolveDraftStore(env, logger);
 
   const waitUntil =
@@ -113,18 +115,36 @@ export function makeProdCtx(
       );
     });
 
-  return {
+  // Build ctx first, then register Atlassian clients with a callback
+  // that reads ctx.viewerEmail at call time. routeCtx populates
+  // viewerEmail from the resolved session after this function returns,
+  // so the services pick it up without rebuilding.
+  const ctx: HandlerCtx = {
     slack,
     llm,
     db,
-    jira,
+    // Temporary placeholders — overwritten in the same tick below.
+    jira: undefined as unknown as JiraClient,
+    confluence: undefined as unknown as ConfluenceClient,
     github,
-    confluence,
     logger,
     env,
     scratch: {},
     waitUntil,
   };
+
+  ctx.jira = makeJiraClient({
+    env: env as Record<string, string>,
+    logger,
+    getAuthEmail: () => ctx.viewerEmail,
+  });
+  ctx.confluence = makeConfluenceClient({
+    env: env as Record<string, string>,
+    logger,
+    getAuthEmail: () => ctx.viewerEmail,
+  });
+
+  return ctx;
 }
 
 function resolveDraftStore(env: CloudflareEnv, logger: Logger): DraftStore {
