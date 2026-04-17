@@ -36,16 +36,23 @@ describe('runCritique', () => {
     expect(blocking).toEqual([]);
   });
 
-  it('flags a welcome note that is too short', async () => {
-    const pkg = fixturePackage({welcomeNote: 'Hi!'});
+  it('flags an empty welcome note', async () => {
+    const pkg = fixturePackage({welcomeNote: ''});
     const {findings} = await runCritique(pkg);
-    expect(findings.find((f) => f.id === 'welcome-short')).toBeDefined();
+    expect(findings.find((f) => f.id === 'welcome-empty')).toBeDefined();
   });
 
-  it('flags a welcome note that is too long', async () => {
-    const pkg = fixturePackage({welcomeNote: 'x'.repeat(700)});
-    const {findings} = await runCritique(pkg);
-    expect(findings.find((f) => f.id === 'welcome-long')).toBeDefined();
+  it('does not flag a short or long welcome note (no char caps)', async () => {
+    const shortPkg = fixturePackage({welcomeNote: 'Hi!'});
+    const longPkg = fixturePackage({welcomeNote: 'x'.repeat(2000)});
+    const shortRun = await runCritique(shortPkg);
+    const longRun = await runCritique(longPkg);
+    expect(
+      shortRun.findings.find((f) => f.field === 'welcomeNote')
+    ).toBeUndefined();
+    expect(
+      longRun.findings.find((f) => f.field === 'welcomeNote')
+    ).toBeUndefined();
   });
 
   it('flags missing buddy as critical', async () => {

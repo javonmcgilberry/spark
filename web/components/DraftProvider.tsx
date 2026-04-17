@@ -133,6 +133,26 @@ export function DraftProvider({
     void runGenerator();
   }, [generatorInput, newHireId, runGenerator]);
 
+  const insightsRefreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (insightsRefreshedFor.current === newHireId) return;
+    const people = draft.pkg.sections.peopleToMeet.people;
+    const anyPending = people.some((p) => p.insightsStatus === 'pending');
+    if (!anyPending) return;
+    insightsRefreshedFor.current = newHireId;
+    void (async () => {
+      try {
+        await fetch(
+          `/api/drafts/${encodeURIComponent(newHireId)}/refresh-insights`,
+          {method: 'POST'}
+        );
+        await draft.reload();
+      } catch {
+        // Insights are best-effort — the template discussionPoints still render.
+      }
+    })();
+  }, [newHireId, draft]);
+
   const runCritique = useCallback(async () => {
     setCritiqueStatus('running');
     setCritiqueError(null);

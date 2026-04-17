@@ -56,12 +56,18 @@ export const buddyProposalSchema = z.object({
  * to succeed. We only validate the fields the agent is expected to
  * populate — the bot will merge these with the existing draft shell
  * through PATCH, so sections already built from the catalog stay intact.
+ *
+ * Two voices: `welcomeIntro` is short and Spark-branded (the fun
+ * welcoming line); `welcomeNote` is the manager-voice paragraph that
+ * actually does the introducing. No upper bound on welcomeNote — a
+ * manager may want to write a page, and that's fine.
  */
 export const generatorFinalizeSchema = z.object({
-  welcomeNote: z.string().min(40).max(1200),
+  welcomeIntro: z.string().min(20).max(280),
+  welcomeNote: z.string().min(40),
   buddyUserId: z.string().optional(),
   stakeholderUserIds: z.array(z.string()).min(0).max(10),
-  peopleToMeet: z.array(onboardingPersonSchema).min(1).max(12),
+  peopleToMeet: z.array(onboardingPersonSchema).min(0).max(12),
   customChecklistItems: z.array(checklistItemSchema).min(0).max(20),
   summary: z.string().max(600),
 });

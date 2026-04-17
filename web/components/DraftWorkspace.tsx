@@ -3,30 +3,31 @@
 import {useMemo} from 'react';
 import type {CSSProperties} from 'react';
 import {useDraftContext} from './DraftContext';
-import {DraftPreview} from './DraftPreview';
 import {AgentTimeline} from './AgentTimeline';
 import {WelcomeNoteEditor} from './WelcomeNoteEditor';
-import {ChecklistEditor} from './ChecklistEditor';
+import {PeopleEditor} from './PeopleEditor';
+import {ChecklistGrid} from './ChecklistGrid';
 import {CritiquePanel} from './CritiquePanel';
 import {SendToSlackButton} from './SendToSlackButton';
 import {SaveIndicator} from './SaveIndicator';
+import {Avatar} from './Avatar';
 
 export function DraftWorkspaceHeader() {
   const {state, meta} = useDraftContext();
+  const displayName = state.pkg.newHireName ?? meta.newHireId;
   return (
     <header style={headerStyle}>
-      <div style={{display: 'grid', gap: 4}}>
-        <p style={eyebrowStyle}>
-          Onboarding plan for{' '}
-          <strong style={{color: '#e2e8f0'}}>{meta.newHireId}</strong>
-        </p>
-        <h1 style={{margin: 0, fontSize: 28, lineHeight: 1.15}}>
-          {state.pkg.sections.welcome.title}
-        </h1>
-        <p style={{margin: 0, color: '#64748b', fontSize: 13}}>
-          Manager {meta.managerSlackId} · updated{' '}
-          {new Date(state.pkg.updatedAt).toLocaleString()}
-        </p>
+      <div style={{display: 'flex', gap: 16, alignItems: 'center'}}>
+        <Avatar name={displayName} src={state.pkg.newHireAvatarUrl} size={48} />
+        <div style={{display: 'grid', gap: 4}}>
+          <p style={eyebrowStyle}>Onboarding plan for</p>
+          <h1 style={{margin: 0, fontSize: 28, lineHeight: 1.15}}>
+            {displayName}
+          </h1>
+          <p style={{margin: 0, color: '#64748b', fontSize: 13}}>
+            Updated {new Date(state.pkg.updatedAt).toLocaleString()}
+          </p>
+        </div>
       </div>
       <SaveIndicator status={state.saveStatus} error={state.saveError} />
     </header>
@@ -49,33 +50,43 @@ export function DraftWorkspaceWelcomeNote() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
-      <h2 style={sectionHeadingStyle}>Welcome note</h2>
+      <h2 style={sectionHeadingStyle}>Welcome</h2>
       <WelcomeNoteEditor
-        value={state.pkg.welcomeNote}
-        onChange={(next) => actions.patch({welcomeNote: next})}
+        intro={state.pkg.welcomeIntro ?? state.pkg.sections.welcome.intro}
+        note={state.pkg.welcomeNote}
+        onIntroChange={(next) => actions.patch({welcomeIntro: next})}
+        onNoteChange={(next) => actions.patch({welcomeNote: next})}
       />
     </section>
   );
 }
 
-export function DraftWorkspaceChecklist() {
+export function DraftWorkspacePeople() {
   const {state, actions} = useDraftContext();
   return (
     <section style={sectionStyle}>
-      <h2 style={sectionHeadingStyle}>Custom checklist items</h2>
-      <ChecklistEditor
-        items={state.pkg.customChecklistItems ?? []}
-        onChange={(next) =>
-          actions.patch({customChecklistItems: next}, {flush: true})
+      <h2 style={sectionHeadingStyle}>People to meet</h2>
+      <PeopleEditor
+        people={state.pkg.sections.peopleToMeet.people}
+        onChange={(next) => actions.patch({peopleToMeet: next}, {flush: true})}
+      />
+    </section>
+  );
+}
+
+export function DraftWorkspaceChecklistGrid() {
+  const {state, actions} = useDraftContext();
+  return (
+    <section style={sectionStyle}>
+      <h2 style={sectionHeadingStyle}>Onboarding checklist</h2>
+      <ChecklistGrid
+        pkg={state.pkg}
+        onColumnChange={(sectionId, items) =>
+          actions.patch({checklistRows: {[sectionId]: items}}, {flush: true})
         }
       />
     </section>
   );
-}
-
-export function DraftWorkspacePreview() {
-  const {state} = useDraftContext();
-  return <DraftPreview pkg={state.pkg} />;
 }
 
 export function DraftWorkspaceAgentTimeline() {

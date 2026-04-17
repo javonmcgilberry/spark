@@ -137,7 +137,7 @@ export function SlackUserPicker({
       />
       {value ? (
         <div style={badgeStyle}>
-          <span>{value.slackUserId}</span>
+          <span>{value.displayName || value.name || value.slackUserId}</span>
           <button
             type="button"
             onClick={() => {

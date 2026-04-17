@@ -15,11 +15,40 @@ const checklistItemSchema = z.object({
   sectionId: z.string().optional(),
 });
 
+const personPatchSchema = z.object({
+  name: z.string().min(1),
+  role: z.string().min(1),
+  discussionPoints: z.string(),
+  weekBucket: z.enum(['week1-2', 'week2-3', 'week3+']),
+  kind: z
+    .enum([
+      'manager',
+      'buddy',
+      'teammate',
+      'pm',
+      'designer',
+      'director',
+      'people-partner',
+      'custom',
+    ])
+    .optional(),
+  title: z.string().optional(),
+  notes: z.string().optional(),
+  editableBy: z.enum(['spark', 'manager', 'buddy', 'team']).optional(),
+  email: z.string().optional(),
+  slackUserId: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  askMeAbout: z.string().optional(),
+});
+
 const patchBodySchema = z.object({
   welcomeNote: z.string().nullable().optional(),
+  welcomeIntro: z.string().nullable().optional(),
   buddyUserId: z.string().nullable().optional(),
   stakeholderUserIds: z.array(z.string()).optional(),
   customChecklistItems: z.array(checklistItemSchema).optional(),
+  peopleToMeet: z.array(personPatchSchema).optional(),
+  checklistRows: z.record(z.string(), z.array(checklistItemSchema)).optional(),
 });
 
 const createBodySchema = z.object({
@@ -186,7 +215,27 @@ export function createSparkApiRouter(
         res.status(404).json({error: 'draft not found'});
         return;
       }
-      res.json({pkg});
+      res.json({pkg: enrichPackageInsights(pkg, peopleInsights)});
+    })
+  );
+
+  router.post(
+    '/drafts/:userId/refresh-insights',
+    wrap(async (req, res) => {
+      const userId = paramValue(req, 'userId');
+      const pkg = onboardingPackages.getPackageForUser(userId);
+      if (!pkg) {
+        res.status(404).json({error: 'draft not found'});
+        return;
+      }
+      const people = pkg.sections.peopleToMeet.people;
+      const teamName = pkg.sections.peopleToMeet.title;
+      await peopleInsights
+        .getInsightsForPeople(people, teamName)
+        .catch((error) => {
+          logger.warn('refresh-insights failed', error);
+        });
+      res.json({pkg: enrichPackageInsights(pkg, peopleInsights)});
     })
   );
 
@@ -445,4 +494,41 @@ function stringQuery(req: express.Request, key: string): string | undefined {
 function paramValue(req: express.Request, key: string): string {
   const raw = (req.params as Record<string, unknown>)[key];
   return typeof raw === 'string' ? raw : '';
+}
+
+type PeopleInsightsLike = Pick<Services['peopleInsights'], 'getCachedInsight'>;
+
+function enrichPackageInsights<
+  T extends {
+    sections: {
+      peopleToMeet: {
+        people: Array<{insightsStatus?: string; askMeAbout?: string}>;
+      };
+    };
+  },
+>(pkg: T, insights: PeopleInsightsLike): T {
+  const people = pkg.sections.peopleToMeet.people.map((person) => {
+    const cached = insights.getCachedInsight(person as never);
+    if (cached?.askMeAbout) {
+      return {
+        ...person,
+        askMeAbout: cached.askMeAbout,
+        insightsStatus: 'ready' as const,
+      };
+    }
+    if (cached) {
+      return {...person, insightsStatus: 'ready' as const};
+    }
+    return {...person, insightsStatus: 'pending' as const};
+  });
+  return {
+    ...pkg,
+    sections: {
+      ...pkg.sections,
+      peopleToMeet: {
+        ...pkg.sections.peopleToMeet,
+        people,
+      },
+    },
+  };
 }

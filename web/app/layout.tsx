@@ -2,14 +2,28 @@ import type {Metadata} from 'next';
 import type {ReactNode} from 'react';
 
 export const metadata: Metadata = {
-  title: 'Spark · Manager dashboard',
+  title: 'Spark — Onboarding assistant',
   description:
-    'Generate, review, and send onboarding plans to Slack with an AI teammate.',
+    'Plan onboarding drafts with Spark, your AI co-pilot. Generate, review, and send to Slack.',
 };
+
+const GLOBAL_STYLE = `
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; }
+  @keyframes spark-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.35; }
+    100% { opacity: 1; }
+  }
+  .spark-pulse { animation: spark-pulse 1.4s ease-in-out infinite; }
+`;
 
 export default function RootLayout({children}: {children: ReactNode}) {
   return (
     <html lang="en">
+      <head>
+        <style dangerouslySetInnerHTML={{__html: GLOBAL_STYLE}} />
+      </head>
       <body
         style={{
           margin: 0,
@@ -42,11 +56,11 @@ export default function RootLayout({children}: {children: ReactNode}) {
             />
             <strong style={{fontSize: 16, letterSpacing: 0.3}}>Spark</strong>
             <span style={{color: '#94a3b8', fontSize: 13}}>
-              Manager dashboard
+              Onboarding assistant
             </span>
           </div>
           <a
-            href="/spark-manager/new"
+            href="/new"
             style={{
               color: '#38bdf8',
               textDecoration: 'none',

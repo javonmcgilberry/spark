@@ -64,6 +64,8 @@ export interface OnboardingPerson {
   email?: string;
   slackUserId?: string;
   avatarUrl?: string;
+  askMeAbout?: string;
+  insightsStatus?: 'pending' | 'ready' | 'error';
 }
 
 export interface ContributionTask {
@@ -85,6 +87,7 @@ export interface TeamProfile {
   userId: string;
   firstName: string;
   displayName: string;
+  avatarUrl?: string;
   email?: string;
   teamName: string;
   pillarName?: string;
@@ -144,7 +147,10 @@ export interface OnboardingPackage {
   createdByUserId: string;
   managerUserId?: string;
   reviewerUserIds: string[];
+  newHireName?: string;
+  newHireAvatarUrl?: string;
   welcomeNote?: string;
+  welcomeIntro?: string;
   buddyUserId?: string;
   draftChannelId?: string;
   draftChannelName?: string;
@@ -153,6 +159,7 @@ export interface OnboardingPackage {
   publishedAt?: string;
   publishedByUserId?: string;
   customChecklistItems?: ChecklistItem[];
+  checklistRows?: Record<string, ChecklistItem[]>;
   createdAt: string;
   updatedAt: string;
   sections: {
@@ -179,9 +186,12 @@ export interface OnboardingPackage {
 
 export interface DraftFieldPatch {
   welcomeNote?: string | null;
+  welcomeIntro?: string | null;
   buddyUserId?: string | null;
   stakeholderUserIds?: string[];
   customChecklistItems?: ChecklistItem[];
+  peopleToMeet?: OnboardingPerson[];
+  checklistRows?: Record<string, ChecklistItem[]>;
 }
 
 export interface CreateDraftBody {

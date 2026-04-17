@@ -37,6 +37,7 @@ interface ProfileSeed {
   userId: string;
   displayName: string;
   firstName?: string;
+  avatarUrl?: string;
   email?: string;
   teamName?: string;
   pillarName?: string;
@@ -148,6 +149,7 @@ export class IdentityResolver {
       userId: seed.userId,
       firstName: resolvedFirstName,
       displayName: seed.displayName,
+      avatarUrl: seed.avatarUrl,
       email: seed.email,
       teamName,
       pillarName: seed.pillarName,
@@ -224,6 +226,7 @@ export class IdentityResolver {
       firstName: slackSeed?.firstName ?? firstNameFromValue(dx?.displayName),
       displayName:
         slackSeed?.displayName ?? dx?.displayName ?? fallbackDisplayName,
+      avatarUrl: slackSeed?.avatarUrl,
       email: slackSeed?.email ?? dx?.email ?? email,
       teamName: slackSeed?.teamName ?? dx?.teamName,
       pillarName: slackSeed?.pillarName ?? dx?.pillarName,
@@ -548,6 +551,7 @@ function buildSlackSeed(
     userId,
     firstName: slackFirstName(user),
     displayName: slackDisplayName(user) ?? 'New hire',
+    avatarUrl: profile?.image_192 ?? profile?.image_72,
     email: profile?.email,
     teamName: slackFieldText(customFields.team),
     pillarName: slackFieldText(customFields.division),

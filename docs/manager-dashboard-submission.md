@@ -1,4 +1,4 @@
-# Hackathon Submission — Spark: Manager Dashboard + Draft Generator Agent
+# Hackathon Submission — Spark: Onboarding Assistant + Draft Generator Agent
 
 **Team:** Javon McGilberry (+ collaborators)
 
@@ -21,29 +21,34 @@ moment_.
 
 ## Solution
 
-A Next.js 15 manager dashboard on Webflow Cloud with two AI teammates:
+A Next.js 15 onboarding assistant on Webflow Cloud with two AI teammates:
 
-1. **Generator agent.** Takes a sentence from the manager ("Maria,
-   backend, joining Commerce on May 1, cares about reliability") and
-   autonomously runs a 9-tool loop — looks up the team in DX warehouse,
-   fetches the roster, ranks 3 buddy candidates, drafts the welcome
-   note, tunes the week-3 contribution task to the team's codebase,
-   and hands back a Zod-validated draft in ~20 seconds.
+1. **Generator agent.** Takes the new hire's Slack profile + a sentence
+   of context from the manager ("Maria, backend, joining Commerce on May
+   1, cares about reliability") and autonomously runs a 9-tool loop —
+   looks up the team in DX warehouse, fetches the roster, ranks 3 buddy
+   candidates, drafts **two** welcome messages (a short Spark-voice
+   intro and a longer manager-voice note), tunes the week-3 contribution
+   task to the team's codebase, and hands back a Zod-validated draft in
+   ~20 seconds.
 
-2. **Critique agent.** Runs on every save and on demand. Seven
-   deterministic rules flag weak welcome notes, missing buddies,
-   thin people-to-meet lists, uniform task difficulty, and dead
-   resource links. Each finding has a one-click Apply Fix.
+2. **Critique agent.** Runs on every save and on demand. Structural
+   rules flag missing welcome notes, missing buddies, thin people-to-meet
+   lists, uniform task difficulty, and dead resource links. Each finding
+   has a one-click Apply Fix.
 
-After editing, the manager clicks "Publish to Slack" and the existing
-Spark bot materializes the draft channel + canvas and notifies the
-reviewers, so all the async collaboration stays where it already works.
+The editor IS the preview: the manager edits the welcome, the
+people-to-meet list (with real Slack avatars and Jira/GitHub-sourced
+"ask me about" blurbs), and a 4-column Week 1 / Week 2 / Week 3 / Week 4
+checklist grid — then clicks "Publish to Slack". The existing Spark bot
+materializes the draft channel + canvas and notifies the reviewers, so
+all the async collaboration stays where it already works.
 
 ## What we built (links)
 
 - Code: <github link>
 - Loom demo (4 min): <loom link>
-- Webflow Cloud preview: <webflow url>/spark-manager
+- Webflow Cloud preview: <webflow-cloud-url>
 
 ## Architecture at a glance
 
@@ -51,7 +56,7 @@ reviewers, so all the async collaboration stays where it already works.
 Manager browser
   → Webflow Cloud (Next.js 15 edge, Cloudflare Workers)
     → Anthropic API (tool-use loop, claude-3-5-haiku)
-    → Spark bot HTTP API (bearer auth, CORS-locked)
+    → Spark bot HTTP API (bearer auth, server-to-server only)
       → DX warehouse, GitHub, Confluence, Webflow monorepo, Slack Web API
 ```
 
@@ -90,8 +95,8 @@ architectural surprise.
 - Setup instructions: see `spark/README.md` and
   `spark/web/README.md`
 - Demo steps: see `spark/docs/manager-dashboard-demo.md`
-- Required env vars documented in `spark/.env.example` and
-  `spark/web/.env.local.example`
+- Required env vars documented in `spark/.env.example` (the web app
+  reads the same file via symlinks `.env.local` + `.dev.vars`)
 - Security pre-submission checklist
   (`spark/HACKATHON.md`): ggshield clean, no hardcoded secrets,
   Anthropic spending limit set, no PII sent to LLMs beyond Slack

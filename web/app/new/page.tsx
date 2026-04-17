@@ -109,8 +109,8 @@ export default function NewDraftPage() {
             />
           </Field>
           <Field
-            label="One sentence of intent"
-            hint="Anything the agent should know that isn't in the org chart"
+            label="Context for Spark"
+            hint="Anything Spark should know that isn't in Slack or the org chart — what they care about, recent life context, specific worries. Optional."
           >
             <textarea
               value={intent}

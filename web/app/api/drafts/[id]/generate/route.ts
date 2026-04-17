@@ -53,6 +53,7 @@ export async function POST(request: Request, {params}: RouteParams) {
           if (event.type === 'draft_ready') {
             try {
               const pkg = await patchDraft(sparkCtx, id, {
+                welcomeIntro: event.draft.welcomeIntro,
                 welcomeNote: event.draft.welcomeNote,
                 buddyUserId: event.draft.buddyUserId ?? null,
                 stakeholderUserIds: event.draft.stakeholderUserIds,

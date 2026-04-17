@@ -77,6 +77,21 @@ export class PeopleInsightsService {
     return insight;
   }
 
+  hasCachedInsight(person: OnboardingPerson): boolean {
+    const cacheKey = personCacheKey(person);
+    const cached = this.cache.get(cacheKey);
+    return Boolean(cached && cached.expiresAt > Date.now());
+  }
+
+  getCachedInsight(person: OnboardingPerson): PersonInsight | undefined {
+    const cacheKey = personCacheKey(person);
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+    return undefined;
+  }
+
   async getInsightsForPeople(
     people: OnboardingPerson[],
     teamName: string

@@ -1,9 +1,9 @@
-# Spark Manager Dashboard
+# Spark Onboarding Assistant
 
-Next.js 15 manager-facing dashboard that runs on Webflow Cloud (Cloudflare
-Workers). Generates onboarding drafts via the Generator agent, edits them
-inline, runs the Critique agent, and hands off to the Spark Slack bot for
-review and publish.
+Next.js 15 dashboard that runs on Webflow Cloud (Cloudflare Workers). Spark
+generates onboarding drafts via the Generator agent, lets the manager edit
+them inline — welcome note, people to meet, weekly checklist — then hands
+off to the Slack bot for publish.
 
 The full getting-started runbook lives at
 [../docs/manager-dashboard-demo.md](../docs/manager-dashboard-demo.md) —
@@ -30,7 +30,7 @@ npm install
 
 # 3) Two terminals
 cd spark        && npm run dev      # bot on :8787
-cd spark/web    && npm run dev      # UI on http://localhost:3000/spark-manager
+cd spark/web    && npm run dev      # UI on http://localhost:3000
 ```
 
 Both symlinks are gitignored (`.env*.local`, `.dev.vars` in
@@ -45,7 +45,7 @@ Webflow Cloud actually runs, use OpenNext preview — it compiles to
 
 ```bash
 npm run preview       # listens on :8788 (bot is on :8787)
-curl http://localhost:8788/spark-manager/healthz
+curl http://localhost:8788/healthz
 ```
 
 The preview catches OpenNext/Workers-specific issues (edge-runtime-split
@@ -58,39 +58,41 @@ for every prompt and dashboard click. Short version:
 
 ```bash
 cd spark/web
-webflow cloud init      # mount path: /spark-manager
-# Connect the spark repo to Webflow Cloud → set env vars in the UI
-# Start the tunnel
+# Create the Webflow Cloud project via the dashboard (CLI OAuth doesn't
+# work from Webflow Inside — see the runbook). Deploy to a new domain.
+# Set env vars in the Webflow Cloud UI.
+# Start the tunnel so the edge bundle can reach the local bot:
 cd ../ && ./scripts/tunnel.sh
 # Push to the connected branch → auto-deploy
 ```
 
-The mount path `/spark-manager` is wired in [next.config.ts](next.config.ts)
-as `basePath` and `assetPrefix`. If you change the mount path in Webflow
-Cloud, change those two values to match.
+The app deploys at the Webflow Cloud new-domain URL root (no `basePath`).
 
 ## Layout
 
 ```
 app/
-  layout.tsx              Dashboard chrome (dark theme)
+  layout.tsx              Dashboard chrome + global CSS reset (dark theme)
   page.tsx                Manager home — open drafts + published
   new/page.tsx            Intake form (feeds the Generator agent)
-  draft/[newHireId]/      Draft detail shell (DraftWorkspace compound)
+  draft/[newHireId]/      Draft detail (Welcome + People + Checklist grid)
   api/drafts/             Routes that proxy to the bot
   healthz/                Health check for deploy verification
 components/
   DraftContext.ts         React 19 context: {state, actions, meta}
   DraftProvider.tsx       Owns draft state, agent streaming, critique
-  DraftWorkspace.tsx      Compound namespace: Root/Header/Body/Sidebar/...
-  DraftPreview.tsx        Pure renderer of the full OnboardingPackage
-  *Editor.tsx, *Panel.tsx Pure leaves used by the compound subcomponents
+  DraftWorkspace.tsx      Named subcomponents (Header/Body/Welcome/People/...)
+  WelcomeNoteEditor.tsx   Two stacked voices: Spark intro + manager note
+  PeopleEditor.tsx        Editable rows; avatars; add-teammate via Slack picker
+  ChecklistGrid.tsx       Week 1 | Week 2 | Week 3 | Week 4 columns
+  AgentTimeline.tsx       Per-tool collapsible step cards + progress pill
+  Avatar.tsx              Image or initials fallback
 lib/
   types.ts                Shared shape with the bot's OnboardingPackage
   sparkApi.ts             Typed fetch wrapper (bearer + manager header)
   session.ts              Demo session cookie + env fallback
   useDraft.ts             Debounced-PATCH + optimistic update hook
-  agents/                 Generator (9-tool loop) + Critique (7 rules)
+  agents/                 Generator (9-tool loop) + Critique (structural rules)
 ```
 
 ## What the bot expects

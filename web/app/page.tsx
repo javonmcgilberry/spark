@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {getManagerSession, getSparkApiEnv} from '../lib/session';
 import {listDrafts, getMe, SparkApiError} from '../lib/sparkApi';
+import {Avatar} from '../components/Avatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export default async function HomePage() {
     return (
       <EmptyState
         title="No manager session"
-        body="Set the DEMO_MANAGER_SLACK_ID environment variable (or visit /spark-manager/sign-in when OAuth lands) to continue."
+        body="Set the DEMO_MANAGER_SLACK_ID environment variable to continue. (OAuth sign-in is post-hackathon.)"
       />
     );
   }
@@ -148,9 +149,16 @@ function DraftRow({
   pkg,
   variant,
 }: {
-  pkg: {userId: string; updatedAt: string; welcomeNote?: string};
+  pkg: {
+    userId: string;
+    updatedAt: string;
+    welcomeNote?: string;
+    newHireName?: string;
+    newHireAvatarUrl?: string;
+  };
   variant: 'draft' | 'published';
 }) {
+  const displayName = pkg.newHireName ?? pkg.userId;
   return (
     <Link
       href={`/draft/${encodeURIComponent(pkg.userId)}`}
@@ -172,7 +180,26 @@ function DraftRow({
           gap: 12,
         }}
       >
-        <strong style={{fontSize: 15}}>{pkg.userId}</strong>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            minWidth: 0,
+          }}
+        >
+          <Avatar name={displayName} src={pkg.newHireAvatarUrl} size={36} />
+          <strong
+            style={{
+              fontSize: 15,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {displayName}
+          </strong>
+        </div>
         <span style={pillStyle(variant)}>
           {variant === 'draft' ? 'Draft' : 'Published'}
         </span>

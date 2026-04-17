@@ -73,12 +73,14 @@ Spark intentionally does **not** use an LLM for everything.
 
 The spreadsheet-to-product mapping is documented in [docs/spreadsheet-mapping.md](docs/spreadsheet-mapping.md).
 
-## Manager Dashboard (Webflow Cloud)
+## Onboarding assistant (Webflow Cloud)
 
 Spark also ships a manager-facing drafting UI on Webflow Cloud that
-composes with this Slack bot: managers generate a full onboarding plan
-via an autonomous multi-tool agent, review/edit inline, and publish to
-Slack where async collaboration happens. The UI lives in
+composes with this Slack bot. Managers generate a full onboarding plan
+via an autonomous multi-tool agent and then edit it inline — two welcome
+voices (Spark + manager), an editable People-to-meet list with real
+avatars, and a Week 1 / Week 2 / Week 3 / Week 4 checklist grid — before
+publishing to Slack where async collaboration happens. The UI lives in
 [`web/`](web/). It talks to this bot through the productized `/api/*`
 surface protected by `SPARK_API_TOKEN` (bearer) and a per-request
 `X-Spark-Manager-Slack-Id` header (server-to-server from Webflow Cloud).

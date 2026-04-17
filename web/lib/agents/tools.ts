@@ -278,6 +278,7 @@ export const finalizeDraftTool: ToolDescriptor = {
   input_schema: {
     type: 'object',
     required: [
+      'welcomeIntro',
       'welcomeNote',
       'stakeholderUserIds',
       'peopleToMeet',
@@ -285,6 +286,7 @@ export const finalizeDraftTool: ToolDescriptor = {
       'summary',
     ],
     properties: {
+      welcomeIntro: {type: 'string'},
       welcomeNote: {type: 'string'},
       buddyUserId: {type: 'string'},
       stakeholderUserIds: {type: 'array', items: {type: 'string'}},

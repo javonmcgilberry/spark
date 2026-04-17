@@ -129,17 +129,36 @@ function applyLocal(
 ): OnboardingPackage {
   const next: OnboardingPackage = {
     ...pkg,
-    sections: {...pkg.sections, welcome: {...pkg.sections.welcome}},
+    sections: {
+      ...pkg.sections,
+      welcome: {...pkg.sections.welcome},
+      peopleToMeet: {...pkg.sections.peopleToMeet},
+    },
   };
   if (patch.welcomeNote !== undefined) {
     next.welcomeNote = patch.welcomeNote ?? undefined;
     next.sections.welcome.personalizedNote = patch.welcomeNote ?? undefined;
+  }
+  if (patch.welcomeIntro !== undefined) {
+    next.welcomeIntro = patch.welcomeIntro ?? undefined;
+    if (patch.welcomeIntro) {
+      next.sections.welcome.intro = patch.welcomeIntro;
+    }
   }
   if (patch.buddyUserId !== undefined) {
     next.buddyUserId = patch.buddyUserId ?? undefined;
   }
   if (patch.customChecklistItems !== undefined) {
     next.customChecklistItems = [...patch.customChecklistItems];
+  }
+  if (patch.peopleToMeet !== undefined) {
+    next.sections.peopleToMeet.people = [...patch.peopleToMeet];
+  }
+  if (patch.checklistRows !== undefined) {
+    next.checklistRows = {
+      ...(pkg.checklistRows ?? {}),
+      ...patch.checklistRows,
+    };
   }
   return next;
 }

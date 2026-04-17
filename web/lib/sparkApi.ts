@@ -116,6 +116,19 @@ export async function patchDraft(
   return body.pkg;
 }
 
+export async function refreshInsights(
+  ctx: SparkApiContext,
+  userId: string
+): Promise<OnboardingPackage> {
+  const res = await sparkFetch(
+    ctx,
+    `/api/drafts/${encodeURIComponent(userId)}/refresh-insights`,
+    {method: 'POST'}
+  );
+  const body = await sparkJson<{pkg: OnboardingPackage}>(res);
+  return body.pkg;
+}
+
 export async function publishDraft(
   ctx: SparkApiContext,
   userId: string

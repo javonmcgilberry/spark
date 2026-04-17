@@ -111,6 +111,8 @@ export interface OnboardingPerson {
   email?: string;
   slackUserId?: string;
   avatarUrl?: string;
+  askMeAbout?: string;
+  insightsStatus?: 'pending' | 'ready' | 'error';
 }
 
 /**
@@ -140,6 +142,7 @@ export interface TeamProfile {
   userId: string;
   firstName: string;
   displayName: string;
+  avatarUrl?: string;
   email?: string;
   teamName: string;
   pillarName?: string;
@@ -233,7 +236,10 @@ export interface OnboardingPackage {
   createdByUserId: string;
   managerUserId?: string;
   reviewerUserIds: string[];
+  newHireName?: string;
+  newHireAvatarUrl?: string;
   welcomeNote?: string;
+  welcomeIntro?: string;
   buddyUserId?: string;
   draftChannelId?: string;
   draftChannelName?: string;
@@ -242,6 +248,7 @@ export interface OnboardingPackage {
   publishedAt?: string;
   publishedByUserId?: string;
   customChecklistItems?: ChecklistItem[];
+  checklistRows?: Record<string, ChecklistItem[]>;
   createdAt: string;
   updatedAt: string;
   sections: {

@@ -15,6 +15,7 @@ export interface DraftPackageOptions {
   profile: TeamProfile;
   createdByUserId: string;
   welcomeNote?: string | null;
+  welcomeIntro?: string | null;
   buddyUserId?: string | null;
   stakeholderUserIds?: string[];
   slackClient?: App['client'];
@@ -22,9 +23,12 @@ export interface DraftPackageOptions {
 
 export interface DraftFieldPatch {
   welcomeNote?: string | null;
+  welcomeIntro?: string | null;
   buddyUserId?: string | null;
   stakeholderUserIds?: string[];
   customChecklistItems?: ChecklistItem[];
+  peopleToMeet?: OnboardingPerson[];
+  checklistRows?: Record<string, ChecklistItem[]>;
 }
 
 export type PublishPackageResult =
@@ -86,6 +90,11 @@ export class OnboardingPackageService {
       existing.welcomeNote = next;
       existing.sections.welcome.personalizedNote = next;
     }
+    if (patch.welcomeIntro !== undefined) {
+      const next = patch.welcomeIntro ?? undefined;
+      existing.welcomeIntro = next;
+      existing.sections.welcome.intro = next ?? existing.sections.welcome.intro;
+    }
     if (patch.buddyUserId !== undefined) {
       existing.buddyUserId = patch.buddyUserId ?? undefined;
     }
@@ -105,6 +114,22 @@ export class OnboardingPackageService {
         })
       );
     }
+    if (patch.peopleToMeet) {
+      existing.sections.peopleToMeet.people = patch.peopleToMeet.map(
+        (person) => ({...person})
+      );
+    }
+    if (patch.checklistRows) {
+      existing.checklistRows = {
+        ...(existing.checklistRows ?? {}),
+        ...Object.fromEntries(
+          Object.entries(patch.checklistRows).map(([key, items]) => [
+            key,
+            items.map((item) => ({...item})),
+          ])
+        ),
+      };
+    }
     existing.updatedAt = new Date().toISOString();
     this.logger.info(
       `Patched onboarding draft for ${userId} (fields: ${Object.keys(patch).join(', ')})`
@@ -121,6 +146,7 @@ export class OnboardingPackageService {
       createdByUserId: options.createdByUserId,
       status: 'draft',
       welcomeNote: options.welcomeNote,
+      welcomeIntro: options.welcomeIntro,
       buddyUserId: options.buddyUserId,
       stakeholderUserIds: options.stakeholderUserIds,
       slackClient: options.slackClient,
@@ -162,6 +188,7 @@ export class OnboardingPackageService {
       createdByUserId: existing.createdByUserId,
       status: existing.status,
       welcomeNote: options.welcomeNote,
+      welcomeIntro: options.welcomeIntro,
       buddyUserId: options.buddyUserId,
       stakeholderUserIds: options.stakeholderUserIds,
       slackClient: options.slackClient,
@@ -220,6 +247,7 @@ export class OnboardingPackageService {
     createdByUserId: string;
     status: OnboardingPackage['status'];
     welcomeNote?: string | null;
+    welcomeIntro?: string | null;
     buddyUserId?: string | null;
     stakeholderUserIds?: string[];
     slackClient?: App['client'];
@@ -231,6 +259,7 @@ export class OnboardingPackageService {
       createdByUserId,
       status,
       welcomeNote,
+      welcomeIntro,
       buddyUserId,
       stakeholderUserIds = [],
       slackClient,
@@ -242,6 +271,10 @@ export class OnboardingPackageService {
       welcomeNote === undefined
         ? existing?.welcomeNote
         : welcomeNote || undefined;
+    const resolvedWelcomeIntro =
+      welcomeIntro === undefined
+        ? existing?.welcomeIntro
+        : welcomeIntro || undefined;
     const buddy =
       buddyUserId && slackClient
         ? await this.lookupSlackPerson(
@@ -302,7 +335,10 @@ export class OnboardingPackageService {
         existing?.managerUserId ??
         createdByUserId,
       reviewerUserIds,
+      newHireName: profile.displayName || existing?.newHireName,
+      newHireAvatarUrl: profile.avatarUrl ?? existing?.newHireAvatarUrl,
       welcomeNote: resolvedWelcomeNote,
+      welcomeIntro: resolvedWelcomeIntro,
       buddyUserId: buddy.slackUserId ?? existing?.buddyUserId,
       draftChannelId: existing?.draftChannelId,
       draftChannelName: existing?.draftChannelName,
@@ -322,6 +358,7 @@ export class OnboardingPackageService {
         people: peopleWithGuides,
         tasks: existing?.sections.initialEngineeringTasks.tasks ?? [],
         welcomeNote: resolvedWelcomeNote,
+        welcomeIntro: resolvedWelcomeIntro,
         customChecklistItems,
       }),
     };

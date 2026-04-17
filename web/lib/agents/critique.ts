@@ -19,13 +19,12 @@ export interface CritiqueOptions {
   signal?: AbortSignal;
 }
 
-const WELCOME_MIN = 140;
-const WELCOME_MAX = 600;
 const HEAD_TIMEOUT_MS = 3000;
 
 /**
- * Deterministic Critique agent. Seven rules, no LLM call — we can run
- * fast on every edit without burning tokens.
+ * Deterministic Critique agent. Structural rules, no LLM call — we can
+ * run fast on every edit without burning tokens. No welcome-length
+ * checks: managers can write as much or as little as fits the hire.
  */
 export async function runCritique(
   pkg: OnboardingPackage,
@@ -33,20 +32,13 @@ export async function runCritique(
 ): Promise<{findings: Finding[]}> {
   const findings: Finding[] = [];
 
-  const note = pkg.welcomeNote?.trim() ?? '';
-  if (note.length > 0 && note.length < WELCOME_MIN) {
+  if (!pkg.welcomeNote?.trim()) {
     findings.push({
-      id: 'welcome-short',
+      id: 'welcome-empty',
       severity: 'warn',
       field: 'welcomeNote',
-      issue: `Welcome note is ${note.length} characters; aim for at least ${WELCOME_MIN}.`,
-    });
-  } else if (note.length > WELCOME_MAX) {
-    findings.push({
-      id: 'welcome-long',
-      severity: 'warn',
-      field: 'welcomeNote',
-      issue: `Welcome note is ${note.length} characters; aim for at most ${WELCOME_MAX}.`,
+      issue:
+        'No welcome note from the manager. A personal paragraph goes a long way.',
     });
   }
 

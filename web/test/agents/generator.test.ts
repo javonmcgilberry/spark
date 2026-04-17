@@ -142,6 +142,8 @@ async function runOnce(
 }
 
 const VALID_DRAFT = {
+  welcomeIntro:
+    "Welcome aboard! I've mapped out your first few weeks — people, a PR, and the rooms that matter.",
   welcomeNote:
     'Welcome to Webflow and to the Commerce Sprint team. Your first few weeks will focus on learning our checkout flow and pairing on a small feature. Glad to have you.',
   buddyUserId: 'UTM1',

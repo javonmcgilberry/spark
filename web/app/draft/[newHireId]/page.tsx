@@ -7,8 +7,8 @@ import {
   DraftWorkspaceHeader,
   DraftWorkspaceBody,
   DraftWorkspaceWelcomeNote,
-  DraftWorkspaceChecklist,
-  DraftWorkspacePreview,
+  DraftWorkspacePeople,
+  DraftWorkspaceChecklistGrid,
   DraftWorkspaceSidebar,
   DraftWorkspaceAgentTimeline,
   DraftWorkspaceCritiquePanel,
@@ -49,8 +49,8 @@ export default async function DraftPage({
         <div style={layoutGrid}>
           <DraftWorkspaceBody>
             <DraftWorkspaceWelcomeNote />
-            <DraftWorkspaceChecklist />
-            <DraftWorkspacePreview />
+            <DraftWorkspacePeople />
+            <DraftWorkspaceChecklistGrid />
           </DraftWorkspaceBody>
           <DraftWorkspaceSidebar>
             <DraftWorkspaceAgentTimeline />
