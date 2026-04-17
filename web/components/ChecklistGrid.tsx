@@ -2,19 +2,7 @@
 
 import {useState} from 'react';
 import type {CSSProperties} from 'react';
-import type {
-  ChecklistItem,
-  ChecklistItemKind,
-  OnboardingPackage,
-} from '../lib/types';
-
-const KIND_LABELS: Record<ChecklistItemKind, string> = {
-  task: 'Task',
-  'live-training': 'Live training',
-  workramp: 'WorkRamp',
-  reading: 'Reading',
-  recording: 'Recording',
-};
+import type {ChecklistItem, OnboardingPackage} from '../lib/types';
 
 export function ChecklistGrid({
   pkg,
@@ -155,8 +143,6 @@ function AddItemControl({
     </div>
   );
 }
-
-export {KIND_LABELS};
 
 const gridStyle: CSSProperties = {
   display: 'grid',
