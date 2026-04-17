@@ -79,46 +79,78 @@ export async function GET(request: Request) {
   );
 }
 
+interface SourcedPresence {
+  processEnv: boolean;
+  cfContextEnv: boolean;
+}
+
 interface WorkerEnvReport {
   cloudflareContextAvailable: boolean;
   cloudflareContextError: string | null;
-  secrets: Record<string, {set: boolean; length: number}>;
-  values: Record<string, {set: boolean; value: string | null}>;
+  /**
+   * Per-key presence from both sources Webflow Cloud might populate:
+   *   - process.env — the pattern the "bring your own app" doc tells
+   *     Next.js apps to use (process.env.VARIABLE_NAME).
+   *   - cfContextEnv — what @opennextjs/cloudflare's getCloudflareContext
+   *     exposes (bindings live here; regular vars often mirror).
+   * If a key is in exactly one source, resolveEnv needs to merge them.
+   */
+  secrets: Record<string, SourcedPresence & {length: number}>;
+  values: Record<string, SourcedPresence & {value: string | null}>;
   bindings: Record<string, {present: boolean; kind: string}>;
 }
 
 async function collectWorkerEnv(): Promise<WorkerEnvReport> {
-  let env: CloudflareEnv | null = null;
+  let cfEnv: Record<string, unknown> = {};
   let contextError: string | null = null;
+  let contextAvailable = false;
   try {
     const cfCtx = await getCloudflareContext({async: true});
-    env = cfCtx.env;
+    cfEnv = cfCtx.env as unknown as Record<string, unknown>;
+    contextAvailable = true;
   } catch (error: unknown) {
     contextError = error instanceof Error ? error.message : String(error);
   }
 
-  const record = (env ?? {}) as Record<string, unknown>;
+  const procEnv = process.env as unknown as Record<string, unknown>;
+
+  const isPopulatedString = (value: unknown): value is string =>
+    typeof value === 'string' && value.length > 0;
 
   const secrets: WorkerEnvReport['secrets'] = {};
   for (const key of SECRET_ENV_KEYS) {
-    const value = record[key];
-    secrets[key] =
-      typeof value === 'string' && value.length > 0
-        ? {set: true, length: value.length}
-        : {set: false, length: 0};
+    const procVal = procEnv[key];
+    const cfVal = cfEnv[key];
+    const winningLength = isPopulatedString(cfVal)
+      ? cfVal.length
+      : isPopulatedString(procVal)
+        ? procVal.length
+        : 0;
+    secrets[key] = {
+      processEnv: isPopulatedString(procVal),
+      cfContextEnv: isPopulatedString(cfVal),
+      length: winningLength,
+    };
   }
 
   const values: WorkerEnvReport['values'] = {};
   for (const key of VISIBLE_ENV_KEYS) {
-    const value = record[key];
-    values[key] =
-      typeof value === 'string' && value.length > 0
-        ? {set: true, value}
-        : {set: false, value: null};
+    const procVal = procEnv[key];
+    const cfVal = cfEnv[key];
+    const winning = isPopulatedString(cfVal)
+      ? cfVal
+      : isPopulatedString(procVal)
+        ? procVal
+        : null;
+    values[key] = {
+      processEnv: isPopulatedString(procVal),
+      cfContextEnv: isPopulatedString(cfVal),
+      value: winning,
+    };
   }
 
   const bindings: WorkerEnvReport['bindings'] = {};
-  const draftsDb = record.DRAFTS_DB;
+  const draftsDb = cfEnv.DRAFTS_DB;
   bindings.DRAFTS_DB = {
     present:
       typeof draftsDb === 'object' &&
@@ -128,7 +160,7 @@ async function collectWorkerEnv(): Promise<WorkerEnvReport> {
   };
 
   return {
-    cloudflareContextAvailable: env !== null,
+    cloudflareContextAvailable: contextAvailable,
     cloudflareContextError: contextError,
     secrets,
     values,

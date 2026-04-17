@@ -41,13 +41,21 @@ export async function buildManagerCtx(): Promise<
 }
 
 async function resolveEnv(): Promise<CloudflareEnv> {
+  // Webflow Cloud's docs (bring-your-own-app §4) say plain Next.js env
+  // vars live on `process.env.X`. Cloudflare Workers bindings (D1, KV,
+  // R2) come through `getCloudflareContext().env`. We merge both so
+  // either convention works — bindings win on key collision because
+  // they're live objects, not strings.
+  let bindings: Record<string, unknown> = {};
   try {
     const cfCtx = await getCloudflareContext({async: true});
-    return cfCtx.env;
+    bindings = cfCtx.env as unknown as Record<string, unknown>;
   } catch {
-    // Fallback for plain `next dev` without the opennext preview harness.
-    return process.env as unknown as CloudflareEnv;
+    // getCloudflareContext throws in plain `next dev` without the
+    // opennext preview harness. Fine — bindings stay empty, strings
+    // come from process.env.
   }
+  return {...process.env, ...bindings} as unknown as CloudflareEnv;
 }
 
 /**

@@ -97,22 +97,29 @@ describe('GET /api/whoami', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('reports workerEnv presence without leaking secret values', async () => {
+  it('reports workerEnv presence from both process.env and getCloudflareContext without leaking secret values', async () => {
     const {GET} = await import('../../app/api/whoami/route');
     const res = await GET(new Request('https://spark.wf.app/api/whoami'));
     const body = (await res.json()) as {
       workerEnv: {
         cloudflareContextAvailable: boolean;
         cloudflareContextError: string | null;
-        secrets: Record<string, {set: boolean; length: number}>;
-        values: Record<string, {set: boolean; value: string | null}>;
+        secrets: Record<
+          string,
+          {processEnv: boolean; cfContextEnv: boolean; length: number}
+        >;
+        values: Record<
+          string,
+          {processEnv: boolean; cfContextEnv: boolean; value: string | null}
+        >;
         bindings: Record<string, {present: boolean; kind: string}>;
       };
     };
     expect(body.workerEnv).toBeDefined();
     expect(body.workerEnv.secrets).toHaveProperty('SLACK_BOT_TOKEN');
     expect(body.workerEnv.secrets.SLACK_BOT_TOKEN).toMatchObject({
-      set: expect.any(Boolean) as boolean,
+      processEnv: expect.any(Boolean) as boolean,
+      cfContextEnv: expect.any(Boolean) as boolean,
       length: expect.any(Number) as number,
     });
     // Critical: no 'value' field on secrets — would be a leak.
