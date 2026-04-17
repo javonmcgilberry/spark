@@ -566,16 +566,10 @@ function enrichPackageInsights<
     const base = {
       ...person,
       insightsAttempts: cached.attempts,
+      ...(cached.askMeAbout ? {askMeAbout: cached.askMeAbout} : {}),
     };
     if (cached.dataStarved) {
       return {...base, insightsStatus: 'data-starved' as const};
-    }
-    if (cached.askMeAbout) {
-      return {
-        ...base,
-        askMeAbout: cached.askMeAbout,
-        insightsStatus: 'ready' as const,
-      };
     }
     return {...base, insightsStatus: 'ready' as const};
   });

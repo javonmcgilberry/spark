@@ -109,7 +109,6 @@ function PersonRow({
     person.insightsStatus === 'pending' &&
     !person.askMeAbout &&
     !person.discussionPoints;
-  const isStarved = person.insightsStatus === 'data-starved';
   const canRetry = Boolean(onRetryPerson && person.slackUserId);
   const blurb = person.askMeAbout ?? person.discussionPoints ?? '';
 
@@ -165,7 +164,7 @@ function PersonRow({
           aria-label={`Discussion points for ${person.name}`}
         />
       )}
-      {isStarved && canRetry ? (
+      {canRetry ? (
         <TroubleshootPanel person={person} onRetryPerson={onRetryPerson!} />
       ) : null}
     </div>
@@ -190,13 +189,15 @@ function TroubleshootPanel({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        style={helpButtonStyle}
-      >
-        Help Spark find this person
-      </button>
+      <div style={{display: 'flex', justifyContent: 'flex-end'}}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          style={helpLinkStyle}
+        >
+          Not quite right? Retry with hints
+        </button>
+      </div>
     );
   }
 
@@ -452,16 +453,16 @@ const skeletonStyle: CSSProperties = {
   backgroundSize: '200% 100%',
 };
 
-const helpButtonStyle: CSSProperties = {
-  padding: '8px 12px',
+const helpLinkStyle: CSSProperties = {
+  padding: 0,
   background: 'transparent',
-  color: '#fde68a',
-  border: '1px dashed rgba(250, 204, 21, 0.45)',
-  borderRadius: 8,
+  color: '#64748b',
+  border: 'none',
   cursor: 'pointer',
-  fontSize: 12,
-  fontWeight: 600,
-  textAlign: 'left' as const,
+  fontSize: 11,
+  fontFamily: 'inherit',
+  textDecoration: 'underline dotted',
+  textUnderlineOffset: 3,
 };
 
 const troubleshootStyle: CSSProperties = {
