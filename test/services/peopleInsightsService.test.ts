@@ -29,6 +29,7 @@ interface Harness {
   jira: {
     isConfigured: ReturnType<typeof vi.fn>;
     findAssignedToEmail: ReturnType<typeof vi.fn>;
+    findByKey: ReturnType<typeof vi.fn>;
   };
   github: {
     isConfigured: ReturnType<typeof vi.fn>;
@@ -48,6 +49,7 @@ function buildHarness(
   const jira = {
     isConfigured: vi.fn().mockReturnValue(overrides.jiraConfigured ?? true),
     findAssignedToEmail: vi.fn().mockResolvedValue([]),
+    findByKey: vi.fn().mockResolvedValue(null),
   };
   const github = {
     isConfigured: vi.fn().mockReturnValue(overrides.githubConfigured ?? true),
@@ -172,5 +174,75 @@ describe('PeopleInsightsService', () => {
       expect.stringContaining('Jira lookup failed'),
       expect.any(Error)
     );
+  });
+
+  it('flags insights as data-starved when both Jira and GitHub return nothing', async () => {
+    const {service} = buildHarness();
+
+    const insight = await service.getInsight(
+      buildPerson(),
+      'Frontend Engineering'
+    );
+
+    expect(insight.dataStarved).toBe(true);
+    expect(insight.attempts).toEqual([
+      expect.objectContaining({kind: 'jira', count: 0}),
+      expect.objectContaining({kind: 'github', count: 0}),
+    ]);
+  });
+
+  it('getInsightWithHints applies overrides and bypasses the cache', async () => {
+    const {service, jira, github} = buildHarness();
+
+    await service.getInsight(buildPerson(), 'Frontend Engineering');
+    jira.findAssignedToEmail.mockClear();
+    github.findOpenPullRequestsForUser.mockClear();
+
+    jira.findAssignedToEmail.mockResolvedValueOnce([
+      {
+        key: 'ABC-2',
+        summary: 'Hinted ticket',
+        status: 'In Progress',
+        url: 'https://jira/ABC-2',
+      },
+    ]);
+    github.findOpenPullRequestsForUser.mockResolvedValueOnce([
+      {
+        number: 202,
+        title: 'Hinted PR',
+        url: 'https://github/202',
+        state: 'open',
+        author: 'override-handle',
+        repository: 'webflow/webflow',
+        updatedAt: '2026-04-14T00:00:00Z',
+        draft: false,
+      },
+    ]);
+    jira.findByKey.mockResolvedValueOnce({
+      key: 'PLAT-1234',
+      summary: 'Manager-supplied ticket',
+      status: 'Done',
+      url: 'https://jira/PLAT-1234',
+    });
+
+    const insight = await service.getInsightWithHints(
+      buildPerson(),
+      'Frontend Engineering',
+      {
+        email: 'override@webflow.com',
+        githubUsername: 'override-handle',
+        jiraTicketKey: 'PLAT-1234',
+      }
+    );
+
+    expect(jira.findAssignedToEmail).toHaveBeenCalledWith(
+      'override@webflow.com'
+    );
+    expect(github.findOpenPullRequestsForUser).toHaveBeenCalledWith(
+      'override-handle'
+    );
+    expect(jira.findByKey).toHaveBeenCalledWith('PLAT-1234');
+    expect(insight.recentTickets[0]?.key).toBe('PLAT-1234');
+    expect(insight.dataStarved).toBe(false);
   });
 });

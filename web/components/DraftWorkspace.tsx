@@ -62,13 +62,30 @@ export function DraftWorkspaceWelcomeNote() {
 }
 
 export function DraftWorkspacePeople() {
-  const {state, actions} = useDraftContext();
+  const {state, actions, meta} = useDraftContext();
   return (
     <section style={sectionStyle}>
       <h2 style={sectionHeadingStyle}>People to meet</h2>
       <PeopleEditor
         people={state.pkg.sections.peopleToMeet.people}
         onChange={(next) => actions.patch({peopleToMeet: next}, {flush: true})}
+        onRetryPerson={async (slackUserId, hints) => {
+          const res = await fetch(
+            `/api/drafts/${encodeURIComponent(meta.newHireId)}/people-insights/retry`,
+            {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({slackUserId, hints}),
+            }
+          );
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            throw new Error(body?.error ?? `retry failed (${res.status})`);
+          }
+          await actions.reload();
+        }}
       />
     </section>
   );

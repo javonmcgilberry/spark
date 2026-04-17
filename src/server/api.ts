@@ -61,6 +61,17 @@ const createBodySchema = z.object({
 
 const slackIdHeaderSchema = z.string().regex(/^[A-Z0-9]+$/);
 
+const retryInsightsBodySchema = z.object({
+  slackUserId: z.string().min(1),
+  hints: z
+    .object({
+      email: z.string().optional(),
+      githubUsername: z.string().optional(),
+      jiraTicketKey: z.string().optional(),
+    })
+    .optional(),
+});
+
 interface AuthedRequest extends express.Request {
   managerSlackId: string;
   requestId: string;
@@ -234,6 +245,42 @@ export function createSparkApiRouter(
         .getInsightsForPeople(people, teamName)
         .catch((error) => {
           logger.warn('refresh-insights failed', error);
+        });
+      res.json({pkg: enrichPackageInsights(pkg, peopleInsights)});
+    })
+  );
+
+  router.post(
+    '/drafts/:userId/people-insights/retry',
+    wrap(async (req, res) => {
+      const userId = paramValue(req, 'userId');
+      const pkg = onboardingPackages.getPackageForUser(userId);
+      if (!pkg) {
+        res.status(404).json({error: 'draft not found'});
+        return;
+      }
+      const parsed = retryInsightsBodySchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res
+          .status(400)
+          .json({error: 'invalid body', issues: parsed.error.issues});
+        return;
+      }
+      const person = pkg.sections.peopleToMeet.people.find(
+        (p) => p.slackUserId === parsed.data.slackUserId
+      );
+      if (!person) {
+        res.status(404).json({error: 'person not found in this draft'});
+        return;
+      }
+      await peopleInsights
+        .getInsightWithHints(
+          person,
+          pkg.sections.peopleToMeet.title,
+          parsed.data.hints ?? {}
+        )
+        .catch((error) => {
+          logger.warn('retry-insights failed', error);
         });
       res.json({pkg: enrichPackageInsights(pkg, peopleInsights)});
     })
@@ -502,24 +549,35 @@ function enrichPackageInsights<
   T extends {
     sections: {
       peopleToMeet: {
-        people: Array<{insightsStatus?: string; askMeAbout?: string}>;
+        people: Array<{
+          insightsStatus?: string;
+          askMeAbout?: string;
+          insightsAttempts?: unknown;
+        }>;
       };
     };
   },
 >(pkg: T, insights: PeopleInsightsLike): T {
   const people = pkg.sections.peopleToMeet.people.map((person) => {
     const cached = insights.getCachedInsight(person as never);
-    if (cached?.askMeAbout) {
+    if (!cached) {
+      return {...person, insightsStatus: 'pending' as const};
+    }
+    const base = {
+      ...person,
+      insightsAttempts: cached.attempts,
+    };
+    if (cached.dataStarved) {
+      return {...base, insightsStatus: 'data-starved' as const};
+    }
+    if (cached.askMeAbout) {
       return {
-        ...person,
+        ...base,
         askMeAbout: cached.askMeAbout,
         insightsStatus: 'ready' as const,
       };
     }
-    if (cached) {
-      return {...person, insightsStatus: 'ready' as const};
-    }
-    return {...person, insightsStatus: 'pending' as const};
+    return {...base, insightsStatus: 'ready' as const};
   });
   return {
     ...pkg,

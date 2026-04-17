@@ -65,7 +65,15 @@ export interface OnboardingPerson {
   slackUserId?: string;
   avatarUrl?: string;
   askMeAbout?: string;
-  insightsStatus?: 'pending' | 'ready' | 'error';
+  insightsStatus?: 'pending' | 'ready' | 'error' | 'data-starved';
+  insightsAttempts?: InsightAttempt[];
+}
+
+export interface InsightAttempt {
+  kind: 'jira' | 'github';
+  input: string;
+  count: number;
+  reason?: 'no_email' | 'not_configured' | 'lookup_failed';
 }
 
 export interface ContributionTask {

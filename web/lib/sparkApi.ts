@@ -129,6 +129,30 @@ export async function refreshInsights(
   return body.pkg;
 }
 
+export interface InsightHints {
+  email?: string;
+  githubUsername?: string;
+  jiraTicketKey?: string;
+}
+
+export async function retryPersonInsights(
+  ctx: SparkApiContext,
+  userId: string,
+  slackUserId: string,
+  hints: InsightHints
+): Promise<OnboardingPackage> {
+  const res = await sparkFetch(
+    ctx,
+    `/api/drafts/${encodeURIComponent(userId)}/people-insights/retry`,
+    {
+      method: 'POST',
+      body: JSON.stringify({slackUserId, hints}),
+    }
+  );
+  const body = await sparkJson<{pkg: OnboardingPackage}>(res);
+  return body.pkg;
+}
+
 export async function publishDraft(
   ctx: SparkApiContext,
   userId: string
