@@ -315,10 +315,7 @@ async function callLlmWithRetry(
       });
     } catch (error) {
       lastError = error;
-      if (
-        error instanceof Anthropic.APIError &&
-        (error.status === 429 || error.status === 529)
-      ) {
+      if (shouldRetryLlmError(error)) {
         await sleep(500 * Math.pow(2, attempt));
         continue;
       }
@@ -326,6 +323,20 @@ async function callLlmWithRetry(
     }
   }
   throw lastError ?? new Error('anthropic call failed after retries');
+}
+
+function shouldRetryLlmError(error: unknown): boolean {
+  if (
+    error instanceof Anthropic.APIError &&
+    (error.status === 429 || error.status === 529)
+  ) {
+    return true;
+  }
+  return (
+    error instanceof Error &&
+    (error.name === 'APIConnectionError' ||
+      error.name === 'APIConnectionTimeoutError')
+  );
 }
 
 function sleep(ms: number): Promise<void> {

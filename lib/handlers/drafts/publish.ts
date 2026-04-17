@@ -2,7 +2,11 @@ import type {HandlerCtx} from '../../ctx';
 import type {ManagerSession} from '../../session';
 import {hydrateSlackWorkspace} from '../../services/onboardingPackages';
 import {publishWorkspace} from '../../services/canvas';
-import {resolveFromSlack} from '../../services/identityResolver';
+import {
+  resolveFromEmail,
+  resolveFromSlack,
+} from '../../services/identityResolver';
+import type {OnboardingPackage, TeamProfile} from '../../types';
 import {enrichPackageInsights} from './enrich';
 
 export async function handlePublishDraft(
@@ -20,7 +24,7 @@ export async function handlePublishDraft(
     return Response.json({error: 'draft not found'}, {status: 404});
   }
 
-  const hire = await resolveFromSlack(ctx, userId).catch(() => null);
+  const hire = await resolveHireProfile(ctx, existing, userId);
 
   // Hydrate first (idempotent) so the draft channel exists.
   if (hire) {
@@ -54,4 +58,26 @@ export async function handlePublishDraft(
   }
 
   return Response.json({pkg: enrichPackageInsights(ctx, result.pkg)});
+}
+
+async function resolveHireProfile(
+  ctx: HandlerCtx,
+  pkg: OnboardingPackage,
+  routeUserId: string
+): Promise<TeamProfile | null> {
+  if (looksLikeSlackUserId(routeUserId)) {
+    return resolveFromSlack(ctx, routeUserId).catch(() => null);
+  }
+  if (looksLikeEmail(pkg.userId)) {
+    return resolveFromEmail(ctx, pkg.userId).catch(() => null);
+  }
+  return null;
+}
+
+function looksLikeSlackUserId(value: string): boolean {
+  return /^[A-Z][A-Z0-9]+$/.test(value);
+}
+
+function looksLikeEmail(value: string): boolean {
+  return value.includes('@');
 }

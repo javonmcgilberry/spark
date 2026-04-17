@@ -85,6 +85,42 @@ describe('identityResolver', () => {
     expect(profile.firstName).toBe('unknown');
   });
 
+  it('prefers the resolved Slack user id when email lookup succeeds', async () => {
+    const ctx = makeTestCtx({
+      slack: {
+        usersLookupByEmail: {
+          'alice@webflow.com': {
+            id: 'UHIRE001',
+            real_name: 'Alice Adams',
+            profile: {
+              first_name: 'Alice',
+              display_name: 'alice',
+              email: 'alice@webflow.com',
+              title: 'Software Engineer',
+            },
+          },
+        },
+        usersInfo: {
+          UHIRE001: {
+            id: 'UHIRE001',
+            real_name: 'Alice Adams',
+            profile: {
+              first_name: 'Alice',
+              display_name: 'alice',
+              email: 'alice@webflow.com',
+            },
+          },
+        },
+      },
+      github: {configured: false, codeowners: null},
+    });
+
+    const profile = await resolveFromEmail(ctx, 'alice@webflow.com');
+
+    expect(profile.userId).toBe('UHIRE001');
+    expect(profile.email).toBe('alice@webflow.com');
+  });
+
   it('caches by Slack id across back-to-back calls', async () => {
     const ctx = makeTestCtx({
       slack: {

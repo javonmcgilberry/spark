@@ -51,6 +51,7 @@ CONFLUENCE_API_TOKEN=...
 
 # Demo session
 DEMO_MANAGER_SLACK_ID=U01...
+DEMO_MANAGER_EMAIL=you@webflow.com
 ```
 
 ---
@@ -72,6 +73,11 @@ npm run dev
 # visit http://localhost:3000
 # visit http://localhost:3000/dev/slack-sandbox for Slack event replay
 ```
+
+For Worker preview (`npm run preview`), `scripts/setup.mjs` points
+`.dev.vars` at `.env.dev` when that file exists, otherwise `.env`. Keep
+your preview-only overrides in `.env.dev` if you want them to win
+without editing `.env`.
 
 When you need a real Slack round-trip, see `docs/dev-setup.md` for
 the Cloudflare Tunnel + dev Slack app setup.

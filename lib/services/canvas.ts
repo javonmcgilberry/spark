@@ -94,7 +94,7 @@ export async function publishWorkspace(
   profile: TeamProfile
 ): Promise<void> {
   if (pkg.draftChannelId) {
-    await inviteUserToWorkspace(ctx, pkg.draftChannelId, pkg.userId);
+    await inviteUserToWorkspace(ctx, pkg.draftChannelId, profile.userId);
   }
   if (!pkg.draftCanvasId) return;
   try {
@@ -570,7 +570,7 @@ function buildPublishedWorkspaceStatusMarkdown(
     '## Workspace status',
     '',
     'This is the shared onboarding workspace for the new hire, manager, and onboarding buddy.',
-    `- New hire: ${formatCanvasUser(pkg.userId, profile.displayName)}`,
+    `- New hire: ${formatCanvasUser(profile.userId, profile.displayName)}`,
     `- Manager: ${formatCanvasUser(pkg.managerUserId, profile.manager.name)}`,
     ...(pkg.buddyUserId
       ? [

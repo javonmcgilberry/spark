@@ -3,7 +3,11 @@ import type Anthropic from '@anthropic-ai/sdk';
 import {buildUserMessage, runGenerator} from '../../lib/agents/generator';
 import type {GeneratorEvent} from '../../lib/agents/generator';
 import {makeTestCtx} from '../helpers/makeTestCtx';
-import {makeStubTextMessage, makeStubLlm} from '../../lib/services/llm';
+import {
+  makeStubTextMessage,
+  makeStubLlm,
+  type LlmClient,
+} from '../../lib/services/llm';
 import type {HandlerCtx} from '../../lib/ctx';
 
 // ---- Mocks & helpers ---------------------------------------------------
@@ -153,6 +157,38 @@ describe('runGenerator — happy path', () => {
     );
     expect(draftReady?.draft.buddyUserId).toBe('UTM1');
     expect(draftReady?.draft.peopleToMeet).toHaveLength(2);
+  });
+});
+
+describe('runGenerator — retry behavior', () => {
+  it('retries connection errors before failing the turn', async () => {
+    const message = vi
+      .fn<LlmClient['message']>()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Connection error.'), {
+          name: 'APIConnectionError',
+        })
+      )
+      .mockResolvedValueOnce(
+        mockMessage({
+          content: [toolUse('finalize_draft', VALID_DRAFT)],
+          stop_reason: 'tool_use',
+        })
+      );
+    const ctx = makeTestCtx({
+      llm: {
+        isConfigured: () => true,
+        message,
+        generate: async () => 'ok',
+      },
+    });
+
+    const events = await collect(
+      runGenerator({newHireName: 'Maria'}, {ctx, maxIterations: 10})
+    );
+
+    expect(message).toHaveBeenCalledTimes(2);
+    expect(events.find((event) => event.type === 'draft_ready')).toBeDefined();
   });
 });
 

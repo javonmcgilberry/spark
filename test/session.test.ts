@@ -118,6 +118,27 @@ describe('getManagerSession', () => {
     expect(session).toEqual({managerSlackId: 'UCOOKIE1', source: 'cookie'});
   });
 
+  it('adds a local viewer email to cookie sessions when configured', async () => {
+    cookieStore.set('spark_manager_slack_id', {
+      name: 'spark_manager_slack_id',
+      value: 'UCOOKIE1',
+    });
+    const ctx = makeTestCtx({
+      env: {
+        DEMO_MANAGER_EMAIL: 'local-manager@webflow.com',
+      },
+    });
+
+    const {getManagerSession} = await import('../lib/session');
+    const session = await getManagerSession(ctx);
+
+    expect(session).toEqual({
+      managerSlackId: 'UCOOKIE1',
+      email: 'local-manager@webflow.com',
+      source: 'cookie',
+    });
+  });
+
   it('falls back to DEMO_MANAGER_SLACK_ID when no JWT and no cookie', async () => {
     const ctx = makeTestCtx({env: {DEMO_MANAGER_SLACK_ID: 'UENV01'}});
 
@@ -125,6 +146,35 @@ describe('getManagerSession', () => {
     const session = await getManagerSession(ctx);
 
     expect(session).toEqual({managerSlackId: 'UENV01', source: 'env'});
+  });
+
+  it('uses DEMO_MANAGER_EMAIL for local env sessions and falls back to JIRA_API_EMAIL', async () => {
+    const ctx = makeTestCtx({
+      env: {
+        DEMO_MANAGER_SLACK_ID: 'UENV01',
+        DEMO_MANAGER_EMAIL: 'manager-local@webflow.com',
+      },
+    });
+
+    const {getManagerSession} = await import('../lib/session');
+    const session = await getManagerSession(ctx);
+
+    expect(session).toEqual({
+      managerSlackId: 'UENV01',
+      email: 'manager-local@webflow.com',
+      source: 'env',
+    });
+
+    (ctx.env as Record<string, unknown>).DEMO_MANAGER_EMAIL = undefined;
+    (ctx.env as Record<string, unknown>).JIRA_API_EMAIL =
+      'jira-override@webflow.com';
+
+    const fallbackSession = await getManagerSession(ctx);
+    expect(fallbackSession).toEqual({
+      managerSlackId: 'UENV01',
+      email: 'jira-override@webflow.com',
+      source: 'env',
+    });
   });
 
   it('returns null when no source produces a usable id', async () => {

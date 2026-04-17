@@ -84,8 +84,12 @@ export function AtlassianConnectBanner() {
   }
 
   const reason = status && !status.connected ? status.reason : null;
-  if (reason === 'oauth-not-configured') {
-    return <NotConfiguredNote />;
+  if (reason === 'oauth-not-configured' || reason === 'storage-unavailable') {
+    // When OAuth can't run (missing ATLASSIAN_OAUTH_CLIENT_ID or no D1
+    // token store), the Basic-auth fallback via JIRA_API_TOKEN /
+    // CONFLUENCE_API_TOKEN still produces the plan. Render nothing
+    // rather than surface a CTA the viewer can't act on.
+    return null;
   }
 
   return <ConnectCta loading={loading} />;

@@ -17,7 +17,9 @@ import type {HandlerCtx} from './ctx';
  *      for the dev sandbox.
  *
  *   3. `DEMO_MANAGER_SLACK_ID` env — local-dev escape hatch when no CF
- *      Access proxy sits in front of the Worker.
+ *      Access proxy sits in front of the Worker. Pair with
+ *      `DEMO_MANAGER_EMAIL` (or `JIRA_API_EMAIL` as a fallback) when
+ *      local flows need a viewer email too, e.g. Atlassian connect.
  */
 
 export const SESSION_COOKIE_NAME = 'spark_manager_slack_id';
@@ -62,6 +64,7 @@ export async function getSessionDetails(
 ): Promise<SessionDetails> {
   let access: AccessDiagnostic = EMPTY_ACCESS;
   let resolvedSlackId: string | null = null;
+  const env = ctx?.env ?? (process.env as unknown as CloudflareEnv);
   if (ctx) {
     const resolution = await resolveCloudflareAccess(ctx);
     access = resolution.diagnostic;
@@ -85,10 +88,9 @@ export async function getSessionDetails(
     return {session: null, access};
   }
 
-  const cookieSession = await tryCookie();
+  const cookieSession = await tryCookie(env);
   if (cookieSession) return {session: cookieSession, access};
 
-  const env = ctx?.env ?? (process.env as unknown as CloudflareEnv);
   return {session: tryEnvFallback(env), access};
 }
 
@@ -181,11 +183,17 @@ async function resolveCloudflareAccess(
   }
 }
 
-async function tryCookie(): Promise<ManagerSession | null> {
+async function tryCookie(
+  env: CloudflareEnv | undefined
+): Promise<ManagerSession | null> {
   const store = await cookies();
   const cookieValue = store.get(SESSION_COOKIE_NAME)?.value?.trim();
   if (cookieValue && isValidSlackId(cookieValue)) {
-    return {managerSlackId: cookieValue, source: 'cookie'};
+    return {
+      managerSlackId: cookieValue,
+      email: resolveLocalViewerEmail(env),
+      source: 'cookie',
+    };
   }
   return null;
 }
@@ -193,11 +201,21 @@ async function tryCookie(): Promise<ManagerSession | null> {
 function tryEnvFallback(env: CloudflareEnv | undefined): ManagerSession | null {
   const raw = env?.DEMO_MANAGER_SLACK_ID?.trim();
   if (raw && isValidSlackId(raw)) {
-    return {managerSlackId: raw, source: 'env'};
+    return {
+      managerSlackId: raw,
+      email: resolveLocalViewerEmail(env),
+      source: 'env',
+    };
   }
   return null;
 }
 
 function isValidSlackId(value: string): boolean {
   return /^[A-Z0-9]+$/.test(value);
+}
+
+function resolveLocalViewerEmail(
+  env: CloudflareEnv | undefined
+): string | undefined {
+  return env?.DEMO_MANAGER_EMAIL?.trim() || env?.JIRA_API_EMAIL?.trim();
 }

@@ -153,4 +153,8 @@ CONFLUENCE_BASE_URL=https://webflow.atlassian.net/wiki
 
 # Demo session
 DEMO_MANAGER_SLACK_ID=U...
+DEMO_MANAGER_EMAIL=you@webflow.com
 ```
+
+`npm run preview` prefers `.env.dev` when it exists by repointing
+`.dev.vars` during `npm run setup`; otherwise it keeps using `.env`.

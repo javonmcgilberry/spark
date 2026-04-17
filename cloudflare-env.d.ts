@@ -74,6 +74,12 @@ declare global {
      * start with "U".
      */
     DEMO_MANAGER_SLACK_ID?: string;
+    /**
+     * Optional local-dev email paired with DEMO_MANAGER_SLACK_ID / the
+     * cookie override so Atlassian auth can key tokens without CF
+     * Access headers. Falls back to JIRA_API_EMAIL when unset.
+     */
+    DEMO_MANAGER_EMAIL?: string;
 
     // ---- Bindings (wrangler.jsonc, not .env) ---------------------------
     /** D1 binding for draft persistence. Configure in wrangler.jsonc. */

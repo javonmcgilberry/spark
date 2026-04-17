@@ -25,7 +25,11 @@ export async function handleAppHomeOpened(
   if (event.tab !== 'home') return;
   const profile = await resolveFromSlack(ctx, event.user).catch(() => null);
   const firstName = profile?.firstName ?? 'there';
-  const pkg = await ctx.db.get(event.user).catch(() => undefined);
+  const pkg =
+    (await ctx.db.get(event.user).catch(() => undefined)) ??
+    (profile?.email
+      ? await ctx.db.get(profile.email).catch(() => undefined)
+      : undefined);
 
   const blocks: unknown[] = [
     {

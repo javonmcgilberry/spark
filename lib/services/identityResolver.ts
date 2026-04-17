@@ -86,14 +86,19 @@ export async function resolveFromEmail(
   if (cached && cached.expiresAt > Date.now()) return cached.profile;
 
   const slackSeed = await lookupSlackSeedByEmail(ctx, caches, email);
+  const canonicalUserId = slackSeed?.userId ?? email;
   const profile = await buildProfile(
     ctx,
-    mergeSeed(email, email.split('@')[0], slackSeed, email)
+    mergeSeed(canonicalUserId, email.split('@')[0], slackSeed, email)
   );
-  caches.profile.set(email, {
+  const cacheEntry = {
     profile,
     expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
-  });
+  };
+  caches.profile.set(email, cacheEntry);
+  if (canonicalUserId !== email) {
+    caches.profile.set(canonicalUserId, cacheEntry);
+  }
   return profile;
 }
 

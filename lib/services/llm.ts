@@ -49,7 +49,15 @@ export function makeAnthropicClient(
       'Anthropic API key missing; LLM calls will throw. Set ANTHROPIC_MOCK_MODE=1 for local dev.'
     );
   }
-  const client = apiKey ? new Anthropic({apiKey}) : null;
+  const client = apiKey
+    ? new Anthropic({
+        apiKey,
+        // OpenNext/Workers can otherwise bundle Anthropic onto a Node-style
+        // transport that reaches for https.request. Pinning the runtime fetch
+        // keeps the client on the Worker-safe path in Webflow Cloud.
+        fetch: (input, init) => globalThis.fetch(input, init),
+      })
+    : null;
 
   return {
     isConfigured: () => client !== null,

@@ -131,7 +131,10 @@ Two authentication paths, tried in this order on every request:
    auth against the site's REST API using `JIRA_API_TOKEN` +
    `CONFLUENCE_API_TOKEN`. The paired email is the viewer's CF Access
    identity, or the explicit `JIRA_API_EMAIL` override if that's set
-   (useful for testing and service-account scenarios).
+   (useful for testing and service-account scenarios). For local dev
+   without CF Access, set `DEMO_MANAGER_EMAIL` to give the demo manager
+   session an email too; if you skip it, `JIRA_API_EMAIL` is still used
+   as the local fallback.
 
 The `AtlassianConnectBanner` on the `/new` page polls
 `/api/auth/atlassian/status` on mount. Before generation it shows a
@@ -177,6 +180,7 @@ CONFLUENCE_BASE_URL=https://webflow.atlassian.net/wiki
 # automatically from the Cloudflare Access JWT (Okta SSO). This var is
 # only read when no CF Access identity is present.
 DEMO_MANAGER_SLACK_ID=U...
+DEMO_MANAGER_EMAIL=you@webflow.com
 
 # D1 binding is declared in wrangler.jsonc (not here). Webflow Cloud
 # auto-provisions the database on deploy and runs migrations — no env
