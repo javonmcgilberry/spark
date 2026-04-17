@@ -12,17 +12,17 @@
  * Slack doesn't retry).
  */
 
-import type { HandlerCtx } from "../ctx";
-import { handleAppHomeOpened } from "./handlers/home";
+import type {HandlerCtx} from '../ctx';
+import {handleAppHomeOpened} from './handlers/home';
 import {
   handleAppMention,
   handleMessageIm,
   handleMemberJoinedChannel,
-} from "./handlers/onboarding";
+} from './handlers/onboarding';
 import {
   handleAssistantThreadStarted,
   handleAssistantThreadContextChanged,
-} from "./handlers/assistant";
+} from './handlers/assistant';
 
 export interface SlackEventEnvelope {
   type?: string;
@@ -49,17 +49,17 @@ export interface DispatchOutcome {
 
 export async function dispatchSlackEvent(
   envelope: SlackEventEnvelope,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<DispatchOutcome> {
   // URL verification handshake — Slack sends this once when you
   // save the Events Request URL. Echo the challenge back in the
   // body verbatim.
-  if (envelope.type === "url_verification" && envelope.challenge) {
-    return { body: { challenge: envelope.challenge } };
+  if (envelope.type === 'url_verification' && envelope.challenge) {
+    return {body: {challenge: envelope.challenge}};
   }
 
-  if (envelope.type !== "event_callback" || !envelope.event) {
-    return { body: { ok: true, skipped: "not an event_callback" } };
+  if (envelope.type !== 'event_callback' || !envelope.event) {
+    return {body: {ok: true, skipped: 'not an event_callback'}};
   }
 
   const background: Array<Promise<unknown>> = [];
@@ -75,48 +75,48 @@ export async function dispatchSlackEvent(
   const ev = event as unknown;
   try {
     switch (eventType) {
-      case "app_home_opened":
+      case 'app_home_opened':
         background.push(
           handleAppHomeOpened(
             ev as Parameters<typeof handleAppHomeOpened>[0],
-            ctx,
-          ),
+            ctx
+          )
         );
         break;
-      case "app_mention":
+      case 'app_mention':
         background.push(
-          handleAppMention(ev as Parameters<typeof handleAppMention>[0], ctx),
+          handleAppMention(ev as Parameters<typeof handleAppMention>[0], ctx)
         );
         break;
-      case "message":
-        if ((event as { channel_type?: string }).channel_type === "im") {
+      case 'message':
+        if ((event as {channel_type?: string}).channel_type === 'im') {
           background.push(
-            handleMessageIm(ev as Parameters<typeof handleMessageIm>[0], ctx),
+            handleMessageIm(ev as Parameters<typeof handleMessageIm>[0], ctx)
           );
         }
         break;
-      case "member_joined_channel":
+      case 'member_joined_channel':
         background.push(
           handleMemberJoinedChannel(
             ev as Parameters<typeof handleMemberJoinedChannel>[0],
-            ctx,
-          ),
+            ctx
+          )
         );
         break;
-      case "assistant_thread_started":
+      case 'assistant_thread_started':
         background.push(
           handleAssistantThreadStarted(
             ev as Parameters<typeof handleAssistantThreadStarted>[0],
-            ctx,
-          ),
+            ctx
+          )
         );
         break;
-      case "assistant_thread_context_changed":
+      case 'assistant_thread_context_changed':
         background.push(
           handleAssistantThreadContextChanged(
             ev as Parameters<typeof handleAssistantThreadContextChanged>[0],
-            ctx,
-          ),
+            ctx
+          )
         );
         break;
       default:
@@ -126,7 +126,7 @@ export async function dispatchSlackEvent(
     ctx.logger.error(`dispatcher sync threw for ${eventType}`, error);
   }
 
-  return { body: { ok: true }, background };
+  return {body: {ok: true}, background};
 }
 
 /**
@@ -134,39 +134,38 @@ export async function dispatchSlackEvent(
  * url-form-encoded as `payload=<JSON>`.
  */
 export interface InteractivityPayload {
-  type?: "block_actions" | "view_submission" | string;
+  type?: 'block_actions' | 'view_submission' | string;
   actions?: Array<{
     action_id?: string;
     block_id?: string;
     value?: string;
     type?: string;
   }>;
-  user?: { id?: string };
-  team?: { id?: string };
-  view?: { id?: string; callback_id?: string };
+  user?: {id?: string};
+  team?: {id?: string};
+  view?: {id?: string; callback_id?: string};
   response_url?: string;
   trigger_id?: string;
 }
 
 export async function dispatchInteractivity(
   payload: InteractivityPayload,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<DispatchOutcome> {
   const background: Array<Promise<unknown>> = [];
   const firstAction = payload.actions?.[0];
-  if (payload.type === "block_actions" && firstAction) {
+  if (payload.type === 'block_actions' && firstAction) {
     ctx.logger.info(
-      `Slack interactivity: action=${firstAction.action_id} user=${payload.user?.id}`,
+      `Slack interactivity: action=${firstAction.action_id} user=${payload.user?.id}`
     );
-    // For the hackathon we acknowledge but don't mutate state —
-    // interactivity UI actions (mark-complete, etc.) can reconnect
-    // via ctx.db in a follow-up. This keeps the round-trip green
-    // so Slack doesn't show "didn't work" in the UI.
+    // Acknowledge without mutating state. Interactivity handlers
+    // (mark-complete, etc.) reconnect via ctx.db when we wire each
+    // action; the 200 keeps the Slack UI from flashing "didn't work".
     background.push(Promise.resolve());
   } else {
     ctx.logger.warn(
-      `Slack interactivity: unhandled payload type=${payload.type}`,
+      `Slack interactivity: unhandled payload type=${payload.type}`
     );
   }
-  return { body: { ok: true }, background };
+  return {body: {ok: true}, background};
 }

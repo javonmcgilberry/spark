@@ -1,10 +1,6 @@
 /**
  * identityResolver — builds a TeamProfile from a Slack user id or
- * email. Ported from spark/src/services/identityResolver.ts.
- *
- * Scope reduction from the Node bot: the DX data warehouse path is
- * gone. `pg` is not Workers-compatible and provisioning Hyperdrive
- * for a hackathon is overkill. The primary sources of truth are now:
+ * email. Sources of truth:
  *   1. Slack user profile + custom fields (team, pillar, manager)
  *   2. CODEOWNERS heuristics for team → GitHub slug + keyPaths
  *

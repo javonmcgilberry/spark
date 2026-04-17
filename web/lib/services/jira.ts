@@ -1,4 +1,4 @@
-import type { Logger } from "../logger";
+import type {Logger} from '../logger';
 
 export interface JiraIssue {
   key: string;
@@ -28,13 +28,13 @@ const JIRA_CACHE_TTL_MS = 60 * 1000;
 
 export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
   const configured = Boolean(
-    env.JIRA_BASE_URL && env.JIRA_API_EMAIL && env.JIRA_API_TOKEN,
+    env.JIRA_BASE_URL && env.JIRA_API_EMAIL && env.JIRA_API_TOKEN
   );
-  const cache = new Map<string, { value: JiraIssue[]; expiresAt: number }>();
+  const cache = new Map<string, {value: JiraIssue[]; expiresAt: number}>();
 
   const runSearch = async (
     jql: string,
-    limit: number,
+    limit: number
   ): Promise<JiraIssue[]> => {
     if (
       !configured ||
@@ -46,39 +46,39 @@ export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
     }
 
     const base = ensureTrailingSlash(env.JIRA_BASE_URL);
-    const url = new URL("rest/api/3/search", base);
-    url.searchParams.set("jql", jql);
-    url.searchParams.set("maxResults", String(limit));
-    url.searchParams.set("fields", "summary,status,priority,assignee,updated");
+    const url = new URL('rest/api/3/search', base);
+    url.searchParams.set('jql', jql);
+    url.searchParams.set('maxResults', String(limit));
+    url.searchParams.set('fields', 'summary,status,priority,assignee,updated');
 
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      JIRA_REQUEST_TIMEOUT_MS,
+      JIRA_REQUEST_TIMEOUT_MS
     );
 
     try {
       const response = await fetch(url, {
         headers: {
-          Accept: "application/json",
+          Accept: 'application/json',
           Authorization: `Basic ${base64Encode(
-            `${env.JIRA_API_EMAIL}:${env.JIRA_API_TOKEN}`,
+            `${env.JIRA_API_EMAIL}:${env.JIRA_API_TOKEN}`
           )}`,
         },
         signal: controller.signal,
       });
       if (!response.ok) {
         logger.warn(
-          `Jira search failed with HTTP ${response.status} for jql "${jql}".`,
+          `Jira search failed with HTTP ${response.status} for jql "${jql}".`
         );
         return [];
       }
-      const payload = (await response.json()) as { issues?: unknown[] };
+      const payload = (await response.json()) as {issues?: unknown[]};
       return (payload.issues ?? [])
         .map((issue) => toJiraIssue(issue as RawIssue, base))
         .filter((issue): issue is JiraIssue => issue !== null);
     } catch (error) {
-      logger.warn("Jira request failed.", error);
+      logger.warn('Jira request failed.', error);
       return [];
     } finally {
       clearTimeout(timeout);
@@ -88,7 +88,7 @@ export function makeJiraClient(env: JiraEnv, logger: Logger): JiraClient {
   const searchCached = async (
     cacheKey: string,
     jql: string,
-    limit: number,
+    limit: number
   ): Promise<JiraIssue[]> => {
     const cached = cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
@@ -151,9 +151,9 @@ interface RawIssue {
   key?: string;
   fields?: {
     summary?: string;
-    status?: { name?: string };
-    priority?: { name?: string };
-    assignee?: { displayName?: string };
+    status?: {name?: string};
+    priority?: {name?: string};
+    assignee?: {displayName?: string};
     updated?: string;
   };
 }
@@ -163,7 +163,7 @@ function toJiraIssue(raw: RawIssue, baseUrl: string): JiraIssue | null {
   return {
     key: raw.key,
     summary: raw.fields.summary,
-    status: raw.fields.status?.name ?? "Unknown",
+    status: raw.fields.status?.name ?? 'Unknown',
     url: `${baseUrl}browse/${raw.key}`,
     priority: raw.fields.priority?.name,
     assignee: raw.fields.assignee?.displayName,
@@ -172,11 +172,11 @@ function toJiraIssue(raw: RawIssue, baseUrl: string): JiraIssue | null {
 }
 
 function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
+  return value.endsWith('/') ? value : `${value}/`;
 }
 
 function escapeJql(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }
 
 /**
@@ -184,11 +184,11 @@ function escapeJql(value: string): string {
  * and in modern Node (>=20) runtimes.
  */
 function base64Encode(value: string): string {
-  if (typeof btoa !== "undefined") return btoa(value);
+  if (typeof btoa !== 'undefined') return btoa(value);
   // Fallback for environments without btoa (rare on Next + Workers).
   const g = globalThis as unknown as {
-    Buffer?: { from: (v: string) => { toString: (enc: string) => string } };
+    Buffer?: {from: (v: string) => {toString: (enc: string) => string}};
   };
-  if (g.Buffer) return g.Buffer.from(value).toString("base64");
-  throw new Error("No base64 encoder available");
+  if (g.Buffer) return g.Buffer.from(value).toString('base64');
+  throw new Error('No base64 encoder available');
 }

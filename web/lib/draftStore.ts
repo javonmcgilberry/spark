@@ -17,7 +17,7 @@ import type {
   DraftFieldPatch,
   OnboardingPackage,
   OnboardingPerson,
-} from "./types";
+} from './types';
 
 export interface DraftStore {
   get(userId: string): Promise<OnboardingPackage | undefined>;
@@ -27,14 +27,14 @@ export interface DraftStore {
   update(pkg: OnboardingPackage): Promise<OnboardingPackage>;
   applyFieldPatch(
     userId: string,
-    patch: DraftFieldPatch,
+    patch: DraftFieldPatch
   ): Promise<OnboardingPackage | undefined>;
   publish(
     userId: string,
-    publishedByUserId: string,
+    publishedByUserId: string
   ): Promise<
-    | { ok: true; pkg: OnboardingPackage }
-    | { ok: false; reason: "not_found" | "not_manager" }
+    | {ok: true; pkg: OnboardingPackage}
+    | {ok: false; reason: 'not_found' | 'not_manager'}
   >;
 }
 
@@ -46,7 +46,7 @@ export interface D1DatabaseLike {
 export interface D1PreparedStatementLike {
   bind(...values: unknown[]): D1PreparedStatementLike;
   first<T = unknown>(): Promise<T | null>;
-  all<T = unknown>(): Promise<{ results: T[] }>;
+  all<T = unknown>(): Promise<{results: T[]}>;
   run(): Promise<unknown>;
 }
 
@@ -71,10 +71,10 @@ export function makeMemoryDraftStore(): DraftStore {
       return Array.from(packages.values())
         .filter(
           (pkg) =>
-            pkg.status === "draft" &&
+            pkg.status === 'draft' &&
             (pkg.managerUserId === managerUserId ||
               pkg.createdByUserId === managerUserId ||
-              pkg.reviewerUserIds.includes(managerUserId)),
+              pkg.reviewerUserIds.includes(managerUserId))
         )
         .map(clone);
     },
@@ -83,7 +83,7 @@ export function makeMemoryDraftStore(): DraftStore {
         .filter(
           (pkg) =>
             pkg.createdByUserId === managerUserId ||
-            pkg.managerUserId === managerUserId,
+            pkg.managerUserId === managerUserId
         )
         .map(clone);
     },
@@ -97,24 +97,24 @@ export function makeMemoryDraftStore(): DraftStore {
     },
     async applyFieldPatch(userId, patch) {
       const existing = packages.get(userId);
-      if (!existing || existing.status !== "draft") return undefined;
+      if (!existing || existing.status !== 'draft') return undefined;
       const next = applyPatchInPlace(clone(existing), patch);
       packages.set(userId, next);
       return clone(next);
     },
     async publish(userId, publishedByUserId) {
       const pkg = packages.get(userId);
-      if (!pkg) return { ok: false, reason: "not_found" };
+      if (!pkg) return {ok: false, reason: 'not_found'};
       const isManager =
         !pkg.managerUserId || pkg.managerUserId === publishedByUserId;
       const isCreator = pkg.createdByUserId === publishedByUserId;
-      if (!isManager && !isCreator) return { ok: false, reason: "not_manager" };
-      pkg.status = "published";
+      if (!isManager && !isCreator) return {ok: false, reason: 'not_manager'};
+      pkg.status = 'published';
       pkg.publishedAt = new Date().toISOString();
       pkg.publishedByUserId = publishedByUserId;
       pkg.updatedAt = pkg.publishedAt;
       packages.set(userId, pkg);
-      return { ok: true, pkg: clone(pkg) };
+      return {ok: true, pkg: clone(pkg)};
     },
   };
 }
@@ -140,7 +140,7 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
            created_by = excluded.created_by,
            status = excluded.status,
            data = excluded.data,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at`
       )
       .bind(
         pkg.userId,
@@ -149,7 +149,7 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
         pkg.status,
         data,
         pkg.createdAt,
-        pkg.updatedAt,
+        pkg.updatedAt
       )
       .run();
   };
@@ -157,16 +157,16 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
   return {
     async get(userId) {
       const row = await db
-        .prepare("SELECT * FROM drafts WHERE user_id = ?")
+        .prepare('SELECT * FROM drafts WHERE user_id = ?')
         .bind(userId)
         .first<DraftRow>();
       return parseRow(row);
     },
     async listDraftsForManager(managerUserId) {
-      const { results } = await db
+      const {results} = await db
         .prepare(
           `SELECT * FROM drafts WHERE status = 'draft' AND manager_id = ?
-           ORDER BY updated_at DESC`,
+           ORDER BY updated_at DESC`
         )
         .bind(managerUserId)
         .all<DraftRow>();
@@ -185,10 +185,10 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
       return out;
     },
     async listPackagesManagedBy(managerUserId) {
-      const { results } = await db
+      const {results} = await db
         .prepare(
           `SELECT * FROM drafts WHERE manager_id = ? OR created_by = ?
-           ORDER BY updated_at DESC`,
+           ORDER BY updated_at DESC`
         )
         .bind(managerUserId, managerUserId)
         .all<DraftRow>();
@@ -206,32 +206,32 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
     },
     async applyFieldPatch(userId, patch) {
       const row = await db
-        .prepare("SELECT * FROM drafts WHERE user_id = ?")
+        .prepare('SELECT * FROM drafts WHERE user_id = ?')
         .bind(userId)
         .first<DraftRow>();
       const existing = parseRow(row);
-      if (!existing || existing.status !== "draft") return undefined;
+      if (!existing || existing.status !== 'draft') return undefined;
       const next = applyPatchInPlace(existing, patch);
       await writeRow(next);
       return next;
     },
     async publish(userId, publishedByUserId) {
       const row = await db
-        .prepare("SELECT * FROM drafts WHERE user_id = ?")
+        .prepare('SELECT * FROM drafts WHERE user_id = ?')
         .bind(userId)
         .first<DraftRow>();
       const pkg = parseRow(row);
-      if (!pkg) return { ok: false, reason: "not_found" };
+      if (!pkg) return {ok: false, reason: 'not_found'};
       const isManager =
         !pkg.managerUserId || pkg.managerUserId === publishedByUserId;
       const isCreator = pkg.createdByUserId === publishedByUserId;
-      if (!isManager && !isCreator) return { ok: false, reason: "not_manager" };
-      pkg.status = "published";
+      if (!isManager && !isCreator) return {ok: false, reason: 'not_manager'};
+      pkg.status = 'published';
       pkg.publishedAt = new Date().toISOString();
       pkg.publishedByUserId = publishedByUserId;
       pkg.updatedAt = pkg.publishedAt;
       await writeRow(pkg);
-      return { ok: true, pkg };
+      return {ok: true, pkg};
     },
   };
 }
@@ -242,7 +242,7 @@ export function makeD1DraftStore(db: D1DatabaseLike): DraftStore {
  */
 export function applyPatchInPlace(
   existing: OnboardingPackage,
-  patch: DraftFieldPatch,
+  patch: DraftFieldPatch
 ): OnboardingPackage {
   if (patch.welcomeNote !== undefined) {
     const next = patch.welcomeNote ?? undefined;
@@ -279,7 +279,7 @@ export function applyPatchInPlace(
         Object.entries(patch.checklistRows).map(([key, items]) => [
           key,
           items.map(cloneItem),
-        ]),
+        ])
       ),
     };
     // Mirror overrides into the rendered section items so canvas publish
@@ -301,9 +301,9 @@ function clone<T>(value: T): T {
 }
 
 function cloneItem(item: ChecklistItem): ChecklistItem {
-  return { ...item };
+  return {...item};
 }
 
 function clonePerson(person: OnboardingPerson): OnboardingPerson {
-  return { ...person };
+  return {...person};
 }

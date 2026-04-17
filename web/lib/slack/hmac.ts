@@ -13,20 +13,20 @@ const encoder = new TextEncoder();
 export async function computeSlackSignatureBase(
   timestamp: string,
   body: string,
-  signingSecret: string,
+  signingSecret: string
 ): Promise<string> {
   const key = await crypto.subtle.importKey(
-    "raw",
+    'raw',
     encoder.encode(signingSecret),
-    { name: "HMAC", hash: "SHA-256" },
+    {name: 'HMAC', hash: 'SHA-256'},
     false,
-    ["sign"],
+    ['sign']
   );
   const basestring = `v0:${timestamp}:${body}`;
   const signature = await crypto.subtle.sign(
-    "HMAC",
+    'HMAC',
     key,
-    encoder.encode(basestring),
+    encoder.encode(basestring)
   );
   return `v0=${bufferToHex(signature)}`;
 }
@@ -47,28 +47,28 @@ export async function verifySlackSignature(
   signature: string | null,
   timestamp: string | null,
   signingSecret: string,
-  options: VerifyOptions = {},
+  options: VerifyOptions = {}
 ): Promise<null | string> {
-  if (!signature || !timestamp) return "missing signature or timestamp";
+  if (!signature || !timestamp) return 'missing signature or timestamp';
   const now = (options.now ?? Date.now)();
   const maxSkew = (options.maxSkewSeconds ?? 300) * 1000;
   const ts = Number(timestamp);
-  if (!Number.isFinite(ts)) return "invalid timestamp";
-  if (Math.abs(now - ts * 1000) > maxSkew) return "timestamp outside skew";
+  if (!Number.isFinite(ts)) return 'invalid timestamp';
+  if (Math.abs(now - ts * 1000) > maxSkew) return 'timestamp outside skew';
   const expected = await computeSlackSignatureBase(
     timestamp,
     body,
-    signingSecret,
+    signingSecret
   );
-  if (!constantTimeEqual(expected, signature)) return "signature mismatch";
+  if (!constantTimeEqual(expected, signature)) return 'signature mismatch';
   return null;
 }
 
 function bufferToHex(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
-  let out = "";
+  let out = '';
   for (const byte of bytes) {
-    out += byte.toString(16).padStart(2, "0");
+    out += byte.toString(16).padStart(2, '0');
   }
   return out;
 }

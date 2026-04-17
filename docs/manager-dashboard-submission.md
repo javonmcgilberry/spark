@@ -83,19 +83,6 @@ sandbox at `/dev/slack-sandbox` uses the same plumbing with a
 recording Slack mock so every event fixture Spark handles is
 replayable inline.
 
-## What changed vs the pre-migration build
-
-| Before                               | After                              |
-| ------------------------------------ | ---------------------------------- |
-| Node bot (spark/src) + web proxy     | One Next.js app on Webflow Cloud   |
-| Socket Mode via @slack/bolt          | HTTP Events API with HMAC verify   |
-| In-memory draft Map                  | D1 DraftStore + memory in tests    |
-| DX warehouse via `pg`                | Dropped; codeowners + Slack covers |
-| Monorepo filesystem scanner          | Dropped; `find_contribution_tasks` |
-| SPARK_API_BASE_URL / SPARK_API_TOKEN | Removed; routes are native         |
-| SlackApp `client` passed everywhere  | Narrow SlackClient via HandlerCtx  |
-| LlmService class                     | LlmClient interface + stub + real  |
-
 ## Pitch line
 
 **Spark is a Slack agent built on Webflow Cloud. Entire system on

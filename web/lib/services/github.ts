@@ -1,4 +1,4 @@
-import type { Logger } from "../logger";
+import type {Logger} from '../logger';
 
 export interface GitHubPullRequest {
   number: number;
@@ -15,15 +15,15 @@ export interface GitHubClient {
   isConfigured(): boolean;
   findOpenPullRequestsForUser(
     githubUsername: string,
-    limit?: number,
+    limit?: number
   ): Promise<GitHubPullRequest[]>;
   findPullRequestsAwaitingReview(
     githubUsername: string,
-    limit?: number,
+    limit?: number
   ): Promise<GitHubPullRequest[]>;
   findRecentPullRequestsForTeam(
     teamSlug: string,
-    limit?: number,
+    limit?: number
   ): Promise<GitHubPullRequest[]>;
   fetchCodeowners(): Promise<string | null>;
 }
@@ -38,60 +38,60 @@ export interface GitHubEnv {
 
 const GITHUB_CACHE_TTL_MS = 60 * 1000;
 const GITHUB_REQUEST_TIMEOUT_MS = 8000;
-const REPO_API_PREFIX = "https://api.github.com/repos/";
+const REPO_API_PREFIX = 'https://api.github.com/repos/';
 
 /**
  * Best-guess mapping from a Webflow email to a GitHub handle. The local
  * part of the email becomes the handle, with dots turned into dashes.
  */
 export function inferGithubUsername(
-  email: string | undefined,
+  email: string | undefined
 ): string | undefined {
   if (!email) return undefined;
-  const local = email.split("@")[0];
-  return local ? local.replace(/\./g, "-").toLowerCase() : undefined;
+  const local = email.split('@')[0];
+  return local ? local.replace(/\./g, '-').toLowerCase() : undefined;
 }
 
 export function makeGitHubClient(env: GitHubEnv, logger: Logger): GitHubClient {
   const configured = Boolean(env.GITHUB_TOKEN);
-  const org = env.GITHUB_ORG ?? "webflow";
-  const codeownersRepo = env.GITHUB_CODEOWNERS_REPO ?? "webflow/webflow";
+  const org = env.GITHUB_ORG ?? 'webflow';
+  const codeownersRepo = env.GITHUB_CODEOWNERS_REPO ?? 'webflow/webflow';
   const cache = new Map<
     string,
-    { value: GitHubPullRequest[]; expiresAt: number }
+    {value: GitHubPullRequest[]; expiresAt: number}
   >();
 
   const searchIssues = async (
     query: string,
-    limit: number,
+    limit: number
   ): Promise<GitHubPullRequest[]> => {
     if (!configured) return [];
-    const url = new URL("https://api.github.com/search/issues");
-    url.searchParams.set("q", query);
-    url.searchParams.set("per_page", String(limit));
-    url.searchParams.set("sort", "updated");
-    url.searchParams.set("order", "desc");
+    const url = new URL('https://api.github.com/search/issues');
+    url.searchParams.set('q', query);
+    url.searchParams.set('per_page', String(limit));
+    url.searchParams.set('sort', 'updated');
+    url.searchParams.set('order', 'desc');
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      GITHUB_REQUEST_TIMEOUT_MS,
+      GITHUB_REQUEST_TIMEOUT_MS
     );
     try {
       const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
         signal: controller.signal,
       });
       if (!res.ok) {
         logger.warn(
-          `GitHub search failed with HTTP ${res.status} for query "${query}".`,
+          `GitHub search failed with HTTP ${res.status} for query "${query}".`
         );
         return [];
       }
-      const body = (await res.json()) as { items?: unknown[] };
+      const body = (await res.json()) as {items?: unknown[]};
       return (body.items ?? []).map((raw) => toPr(raw as RawIssue));
     } catch (error) {
       logger.warn(`GitHub search failed for query "${query}".`, error);
@@ -104,7 +104,7 @@ export function makeGitHubClient(env: GitHubEnv, logger: Logger): GitHubClient {
   const searchCached = async (
     cacheKey: string,
     query: string,
-    limit: number,
+    limit: number
   ): Promise<GitHubPullRequest[]> => {
     const cached = cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -140,18 +140,18 @@ export function makeGitHubClient(env: GitHubEnv, logger: Logger): GitHubClient {
         const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-            Accept: "application/vnd.github.raw",
+            Accept: 'application/vnd.github.raw',
           },
         });
         if (!res.ok) {
           logger.warn(
-            `CODEOWNERS fetch failed with HTTP ${res.status} for ${codeownersRepo}`,
+            `CODEOWNERS fetch failed with HTTP ${res.status} for ${codeownersRepo}`
           );
           return null;
         }
         return await res.text();
       } catch (error) {
-        logger.warn("CODEOWNERS fetch failed.", error);
+        logger.warn('CODEOWNERS fetch failed.', error);
         return null;
       }
     },
@@ -167,7 +167,7 @@ export interface GitHubStubOverrides {
 }
 
 export function makeStubGitHub(
-  overrides: GitHubStubOverrides = {},
+  overrides: GitHubStubOverrides = {}
 ): GitHubClient {
   return {
     isConfigured: () => overrides.configured ?? false,
@@ -191,7 +191,7 @@ interface RawIssue {
   title?: string;
   html_url?: string;
   state?: string;
-  user?: { login?: string };
+  user?: {login?: string};
   repository_url?: string;
   updated_at?: string;
   draft?: boolean;
@@ -200,12 +200,12 @@ interface RawIssue {
 function toPr(raw: RawIssue): GitHubPullRequest {
   return {
     number: raw.number ?? 0,
-    title: raw.title ?? "",
-    url: raw.html_url ?? "",
-    state: raw.state ?? "open",
-    author: raw.user?.login ?? "unknown",
-    repository: extractRepo(raw.repository_url ?? ""),
-    updatedAt: raw.updated_at ?? "",
+    title: raw.title ?? '',
+    url: raw.html_url ?? '',
+    state: raw.state ?? 'open',
+    author: raw.user?.login ?? 'unknown',
+    repository: extractRepo(raw.repository_url ?? ''),
+    updatedAt: raw.updated_at ?? '',
     draft: Boolean(raw.draft),
   };
 }

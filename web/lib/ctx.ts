@@ -2,9 +2,8 @@
  * HandlerCtx — the single dependency container threaded through every
  * route handler, Slack handler, agent tool, and service in Spark.
  *
- * This is the DI backbone of the Webflow Cloud migration. Every service
- * takes HandlerCtx as its first argument; none import Slack, Anthropic,
- * D1, or any client directly. That makes:
+ * Every service takes HandlerCtx as its first argument; none import
+ * Slack, Anthropic, D1, or any client directly. That makes:
  *
  *   - `makeProdCtx(env)` the only place real clients are constructed
  *   - `makeTestCtx(overrides)` sub-second vitest helper (in test/helpers)
@@ -16,23 +15,20 @@
  * Slack event.
  */
 
-import type { ConfluenceClient } from "./services/confluence";
-import {
-  makeConfluenceClient,
-  makeStubConfluence,
-} from "./services/confluence";
-import type { GitHubClient } from "./services/github";
-import { makeGitHubClient, makeStubGitHub } from "./services/github";
-import type { JiraClient } from "./services/jira";
-import { makeJiraClient, makeStubJira } from "./services/jira";
-import type { LlmClient } from "./services/llm";
-import { makeAnthropicClient, makeStubLlm } from "./services/llm";
-import type { SlackClient } from "./services/slack";
-import { makeRecordingSlackClient, makeSlackWebClient } from "./services/slack";
-import type { DraftStore } from "./draftStore";
-import { makeD1DraftStore, makeMemoryDraftStore } from "./draftStore";
-import type { Logger } from "./logger";
-import { createConsoleLogger, createSilentLogger } from "./logger";
+import type {ConfluenceClient} from './services/confluence';
+import {makeConfluenceClient, makeStubConfluence} from './services/confluence';
+import type {GitHubClient} from './services/github';
+import {makeGitHubClient, makeStubGitHub} from './services/github';
+import type {JiraClient} from './services/jira';
+import {makeJiraClient, makeStubJira} from './services/jira';
+import type {LlmClient} from './services/llm';
+import {makeAnthropicClient, makeStubLlm} from './services/llm';
+import type {SlackClient} from './services/slack';
+import {makeRecordingSlackClient, makeSlackWebClient} from './services/slack';
+import type {DraftStore} from './draftStore';
+import {makeD1DraftStore, makeMemoryDraftStore} from './draftStore';
+import type {Logger} from './logger';
+import {createConsoleLogger, createSilentLogger} from './logger';
 
 export interface HandlerCtx {
   slack: SlackClient;
@@ -61,12 +57,12 @@ export interface HandlerCtx {
 
 export function slackMockModeEnabled(env: CloudflareEnv): boolean {
   const flag = (env as Record<string, unknown>).SLACK_MOCK_MODE;
-  return flag === "1" || flag === "true";
+  return flag === '1' || flag === 'true';
 }
 
 export function anthropicMockModeEnabled(env: CloudflareEnv): boolean {
   const flag = (env as Record<string, unknown>).ANTHROPIC_MOCK_MODE;
-  return flag === "1" || flag === "true";
+  return flag === '1' || flag === 'true';
 }
 
 export interface MakeProdCtxOptions {
@@ -79,32 +75,32 @@ export interface MakeProdCtxOptions {
 
 export function makeProdCtx(
   env: CloudflareEnv,
-  options: MakeProdCtxOptions = {},
+  options: MakeProdCtxOptions = {}
 ): HandlerCtx {
-  const logger = options.logger ?? createConsoleLogger("spark");
+  const logger = options.logger ?? createConsoleLogger('spark');
 
   const slack = slackMockModeEnabled(env)
     ? makeRecordingSlackClient()
     : makeSlackWebClient(
-        (env as Record<string, string>).SLACK_BOT_TOKEN ?? "",
-        logger,
+        (env as Record<string, string>).SLACK_BOT_TOKEN ?? '',
+        logger
       );
 
   const llm = anthropicMockModeEnabled(env)
     ? makeStubLlm({
-        defaultText: "mocked anthropic response (ANTHROPIC_MOCK_MODE=1)",
+        defaultText: 'mocked anthropic response (ANTHROPIC_MOCK_MODE=1)',
       })
     : makeAnthropicClient(
         env.ANTHROPIC_API_KEY,
         logger,
-        env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest",
+        env.ANTHROPIC_MODEL ?? 'claude-3-5-haiku-latest'
       );
 
   const jira = makeJiraClient(env as Record<string, string>, logger);
   const github = makeGitHubClient(env as Record<string, string>, logger);
   const confluence = makeConfluenceClient(
     env as Record<string, string>,
-    logger,
+    logger
   );
 
   const db = resolveDraftStore(env, logger);
@@ -113,7 +109,7 @@ export function makeProdCtx(
     options.waitUntil ??
     ((p: Promise<unknown>) => {
       p.catch((error) =>
-        logger.warn("waitUntil: fire-and-forget task failed", error),
+        logger.warn('waitUntil: fire-and-forget task failed', error)
       );
     });
 
@@ -132,19 +128,19 @@ export function makeProdCtx(
 }
 
 function resolveDraftStore(env: CloudflareEnv, logger: Logger): DraftStore {
-  const candidate = (env as unknown as { DRAFTS_DB?: unknown }).DRAFTS_DB;
+  const candidate = (env as unknown as {DRAFTS_DB?: unknown}).DRAFTS_DB;
   if (
     candidate &&
-    typeof candidate === "object" &&
-    typeof (candidate as { prepare?: unknown }).prepare === "function"
+    typeof candidate === 'object' &&
+    typeof (candidate as {prepare?: unknown}).prepare === 'function'
   ) {
     return makeD1DraftStore(
-      candidate as Parameters<typeof makeD1DraftStore>[0],
+      candidate as Parameters<typeof makeD1DraftStore>[0]
     );
   }
   logger.warn(
-    "DRAFTS_DB binding missing; falling back to in-memory draft store. " +
-      "Drafts will not persist across Worker invocations. Configure the D1 binding in wrangler.jsonc for production.",
+    'DRAFTS_DB binding missing; falling back to in-memory draft store. ' +
+      'Drafts will not persist across Worker invocations. Configure the D1 binding in wrangler.jsonc for production.'
   );
   return makeMemoryDraftStore();
 }
@@ -154,12 +150,12 @@ function resolveDraftStore(env: CloudflareEnv, logger: Logger): DraftStore {
  * via `{...TEST_ENV, FOO: 'bar'}`.
  */
 export const TEST_ENV: CloudflareEnv = {
-  ANTHROPIC_API_KEY: "test-anthropic-key",
-  SLACK_BOT_TOKEN: "xoxb-test",
-  SLACK_SIGNING_SECRET: "test-signing-secret",
-  SLACK_MOCK_MODE: "1",
-  ANTHROPIC_MOCK_MODE: "1",
-  DEMO_MANAGER_SLACK_ID: "UMANAGER1",
+  ANTHROPIC_API_KEY: 'test-anthropic-key',
+  SLACK_BOT_TOKEN: 'xoxb-test',
+  SLACK_SIGNING_SECRET: 'test-signing-secret',
+  SLACK_MOCK_MODE: '1',
+  ANTHROPIC_MOCK_MODE: '1',
+  DEMO_MANAGER_SLACK_ID: 'UMANAGER1',
 } as unknown as CloudflareEnv;
 
 /**

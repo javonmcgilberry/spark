@@ -14,9 +14,9 @@
  * requiring `opennextjs-cloudflare preview`.
  */
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { makeProdCtx, type HandlerCtx } from "./ctx";
-import { requireManagerSession, type ManagerSession } from "./session";
+import {getCloudflareContext} from '@opennextjs/cloudflare';
+import {makeProdCtx, type HandlerCtx} from './ctx';
+import {requireManagerSession, type ManagerSession} from './session';
 
 export interface RouteCtx {
   ctx: HandlerCtx;
@@ -26,21 +26,21 @@ export interface RouteCtx {
 export async function buildRouteCtx(): Promise<RouteCtx> {
   const env = await resolveEnv();
   const ctx = makeProdCtx(env);
-  return { ctx, env };
+  return {ctx, env};
 }
 
 export async function buildManagerCtx(): Promise<
-  RouteCtx & { session: ManagerSession }
+  RouteCtx & {session: ManagerSession}
 > {
   const env = await resolveEnv();
   const session = await requireManagerSession(env);
   const ctx = makeProdCtx(env);
-  return { ctx, env, session };
+  return {ctx, env, session};
 }
 
 async function resolveEnv(): Promise<CloudflareEnv> {
   try {
-    const cfCtx = await getCloudflareContext({ async: true });
+    const cfCtx = await getCloudflareContext({async: true});
     return cfCtx.env;
   } catch {
     // Fallback for plain `next dev` without the opennext preview harness.
@@ -55,9 +55,9 @@ async function resolveEnv(): Promise<CloudflareEnv> {
  */
 export function handleRouteError(error: unknown): Response {
   if (error instanceof Response) return error;
-  const message = error instanceof Error ? error.message : "internal error";
-  return new Response(JSON.stringify({ error: message }), {
+  const message = error instanceof Error ? error.message : 'internal error';
+  return new Response(JSON.stringify({error: message}), {
     status: 500,
-    headers: { "Content-Type": "application/json" },
+    headers: {'Content-Type': 'application/json'},
   });
 }

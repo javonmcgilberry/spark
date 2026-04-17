@@ -10,7 +10,7 @@
  * recording mock captures every call so tests can assert against them.
  */
 
-import type { Logger } from "../logger";
+import type {Logger} from '../logger';
 
 export interface SlackUser {
   id?: string;
@@ -48,7 +48,7 @@ export interface SlackConversation {
   id?: string;
   name?: string;
   is_private?: boolean;
-  properties?: { canvas?: { canvas_id?: string } };
+  properties?: {canvas?: {canvas_id?: string}};
 }
 
 export interface SlackResponseMetadata {
@@ -102,7 +102,7 @@ export interface UsersProfileGetResponse {
 
 export interface TeamProfileGetResponse {
   ok: boolean;
-  profile?: { fields?: SlackTeamProfileField[] };
+  profile?: {fields?: SlackTeamProfileField[]};
   error?: string;
 }
 
@@ -154,7 +154,7 @@ export interface AssistantThreadsSetArgs {
   thread_ts: string;
   status?: string;
   title?: string;
-  prompts?: Array<{ title: string; message: string }>;
+  prompts?: Array<{title: string; message: string}>;
 }
 
 export interface SlackCall {
@@ -171,12 +171,9 @@ export interface SlackClient {
     publish(args: ViewsPublishArgs): Promise<ViewsPublishResponse>;
   };
   users: {
-    info(args: { user: string }): Promise<UsersInfoResponse>;
-    lookupByEmail(args: { email: string }): Promise<UsersLookupByEmailResponse>;
-    list(args?: {
-      limit?: number;
-      cursor?: string;
-    }): Promise<UsersListResponse>;
+    info(args: {user: string}): Promise<UsersInfoResponse>;
+    lookupByEmail(args: {email: string}): Promise<UsersLookupByEmailResponse>;
+    list(args?: {limit?: number; cursor?: string}): Promise<UsersListResponse>;
     conversations(args: {
       user: string;
       types?: string;
@@ -185,7 +182,7 @@ export interface SlackClient {
       cursor?: string;
     }): Promise<UsersConversationsResponse>;
     profile: {
-      get(args: { user: string }): Promise<UsersProfileGetResponse>;
+      get(args: {user: string}): Promise<UsersProfileGetResponse>;
     };
   };
   team: {
@@ -215,11 +212,11 @@ export interface SlackClient {
   };
   assistant: {
     threads: {
-      setStatus(args: AssistantThreadsSetArgs): Promise<{ ok: boolean }>;
-      setTitle(args: AssistantThreadsSetArgs): Promise<{ ok: boolean }>;
+      setStatus(args: AssistantThreadsSetArgs): Promise<{ok: boolean}>;
+      setTitle(args: AssistantThreadsSetArgs): Promise<{ok: boolean}>;
       setSuggestedPrompts(
-        args: AssistantThreadsSetArgs,
-      ): Promise<{ ok: boolean }>;
+        args: AssistantThreadsSetArgs
+      ): Promise<{ok: boolean}>;
     };
   };
   /**
@@ -228,7 +225,7 @@ export interface SlackClient {
    */
   apiCall<T = unknown>(
     method: string,
-    args?: Record<string, unknown>,
+    args?: Record<string, unknown>
   ): Promise<T>;
   /**
    * Test-only: inspect recorded calls. Only present on the recording
@@ -237,7 +234,7 @@ export interface SlackClient {
   _calls?: SlackCall[];
 }
 
-const SLACK_API_BASE = "https://slack.com/api";
+const SLACK_API_BASE = 'https://slack.com/api';
 
 /**
  * Build a production Slack client backed by fetch. No @slack/web-api
@@ -246,21 +243,21 @@ const SLACK_API_BASE = "https://slack.com/api";
 export function makeSlackWebClient(token: string, logger: Logger): SlackClient {
   const call = async <T = unknown>(
     method: string,
-    args: object = {},
+    args: object = {}
   ): Promise<T> => {
     const url = `${SLACK_API_BASE}/${method}`;
     const res = await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json; charset=utf-8",
+        'Content-Type': 'application/json; charset=utf-8',
       },
       body: JSON.stringify(args),
     });
-    const json = (await res.json()) as { ok?: boolean; error?: string } & T;
+    const json = (await res.json()) as {ok?: boolean; error?: string} & T;
     if (!json.ok) {
       logger.warn(
-        `Slack API ${method} failed: ${json.error ?? res.statusText}`,
+        `Slack API ${method} failed: ${json.error ?? res.statusText}`
       );
     }
     return json as T;
@@ -269,43 +266,43 @@ export function makeSlackWebClient(token: string, logger: Logger): SlackClient {
   return {
     chat: {
       postMessage: (args) =>
-        call<ChatPostMessageResponse>("chat.postMessage", args),
+        call<ChatPostMessageResponse>('chat.postMessage', args),
     },
     views: {
-      publish: (args) => call<ViewsPublishResponse>("views.publish", args),
+      publish: (args) => call<ViewsPublishResponse>('views.publish', args),
     },
     users: {
-      info: (args) => call<UsersInfoResponse>("users.info", args),
+      info: (args) => call<UsersInfoResponse>('users.info', args),
       lookupByEmail: (args) =>
-        call<UsersLookupByEmailResponse>("users.lookupByEmail", args),
-      list: (args) => call<UsersListResponse>("users.list", args ?? {}),
+        call<UsersLookupByEmailResponse>('users.lookupByEmail', args),
+      list: (args) => call<UsersListResponse>('users.list', args ?? {}),
       conversations: (args) =>
-        call<UsersConversationsResponse>("users.conversations", args),
+        call<UsersConversationsResponse>('users.conversations', args),
       profile: {
-        get: (args) => call<UsersProfileGetResponse>("users.profile.get", args),
+        get: (args) => call<UsersProfileGetResponse>('users.profile.get', args),
       },
     },
     team: {
       profile: {
-        get: () => call<TeamProfileGetResponse>("team.profile.get"),
+        get: () => call<TeamProfileGetResponse>('team.profile.get'),
       },
     },
     conversations: {
       create: (args) =>
-        call<ConversationsCreateResponse>("conversations.create", args),
+        call<ConversationsCreateResponse>('conversations.create', args),
       invite: (args) =>
-        call<ConversationsInviteResponse>("conversations.invite", args),
+        call<ConversationsInviteResponse>('conversations.invite', args),
       info: (args) =>
-        call<ConversationsInfoResponse>("conversations.info", args),
+        call<ConversationsInfoResponse>('conversations.info', args),
       replies: (args) =>
-        call<ConversationsRepliesResponse>("conversations.replies", args),
+        call<ConversationsRepliesResponse>('conversations.replies', args),
     },
     assistant: {
       threads: {
-        setStatus: (args) => call("assistant.threads.setStatus", args),
-        setTitle: (args) => call("assistant.threads.setTitle", args),
+        setStatus: (args) => call('assistant.threads.setStatus', args),
+        setTitle: (args) => call('assistant.threads.setTitle', args),
         setSuggestedPrompts: (args) =>
-          call("assistant.threads.setSuggestedPrompts", args),
+          call('assistant.threads.setSuggestedPrompts', args),
       },
     },
     apiCall: <T>(method: string, args?: Record<string, unknown>) =>
@@ -328,12 +325,12 @@ export interface RecordingSlackOverrides {
   teamProfileFields?: SlackTeamProfileField[];
   conversationsReplies?: Record<
     string,
-    NonNullable<ConversationsRepliesResponse["messages"]>
+    NonNullable<ConversationsRepliesResponse['messages']>
   >;
 }
 
 export function makeRecordingSlackClient(
-  overrides: RecordingSlackOverrides = {},
+  overrides: RecordingSlackOverrides = {}
 ): SlackClient {
   const calls: SlackCall[] = [];
   const record = <T>(method: string, args: object, result: T): T => {
@@ -349,7 +346,7 @@ export function makeRecordingSlackClient(
     _calls: calls,
     chat: {
       postMessage: async (args) =>
-        record("chat.postMessage", args as unknown as Record<string, unknown>, {
+        record('chat.postMessage', args as unknown as Record<string, unknown>, {
           ok: true,
           channel: args.channel,
           ts: `${Date.now() / 1000}`,
@@ -357,39 +354,39 @@ export function makeRecordingSlackClient(
     },
     views: {
       publish: async (args) =>
-        record("views.publish", args as unknown as Record<string, unknown>, {
+        record('views.publish', args as unknown as Record<string, unknown>, {
           ok: true,
         }),
     },
     users: {
       info: async (args) => {
         const user = overrides.usersInfo?.[args.user];
-        return record("users.info", args, {
+        return record('users.info', args, {
           ok: Boolean(user),
           user,
         });
       },
       lookupByEmail: async (args) => {
         const user = overrides.usersLookupByEmail?.[args.email.toLowerCase()];
-        return record("users.lookupByEmail", args, {
+        return record('users.lookupByEmail', args, {
           ok: Boolean(user),
           user,
         });
       },
       list: async (args) =>
-        record("users.list", (args ?? {}) as Record<string, unknown>, {
+        record('users.list', (args ?? {}) as Record<string, unknown>, {
           ok: true,
           members: overrides.usersList ?? [],
         }),
       conversations: async (args) =>
-        record("users.conversations", args, {
+        record('users.conversations', args, {
           ok: true,
           channels: [],
         }),
       profile: {
         get: async (args) => {
           const profile = overrides.usersProfileGet?.[args.user];
-          return record("users.profile.get", args, {
+          return record('users.profile.get', args, {
             ok: true,
             profile: profile ?? {},
           });
@@ -400,18 +397,18 @@ export function makeRecordingSlackClient(
       profile: {
         get: async () =>
           record(
-            "team.profile.get",
+            'team.profile.get',
             {},
             {
               ok: true,
-              profile: { fields: overrides.teamProfileFields ?? [] },
-            },
+              profile: {fields: overrides.teamProfileFields ?? []},
+            }
           ),
       },
     },
     conversations: {
       create: async (args) =>
-        record("conversations.create", args, {
+        record('conversations.create', args, {
           ok: true,
           channel: {
             id: `C_TEST_${args.name}`,
@@ -420,18 +417,18 @@ export function makeRecordingSlackClient(
           },
         }),
       invite: async (args) =>
-        record("conversations.invite", args, {
+        record('conversations.invite', args, {
           ok: true,
-          channel: { id: args.channel },
+          channel: {id: args.channel},
         }),
       info: async (args) =>
-        record("conversations.info", args, {
+        record('conversations.info', args, {
           ok: true,
-          channel: { id: args.channel },
+          channel: {id: args.channel},
         }),
       replies: async (args) => {
         const messages = overrides.conversationsReplies?.[args.ts] ?? [];
-        return record("conversations.replies", args, {
+        return record('conversations.replies', args, {
           ok: true,
           messages,
         });
@@ -441,25 +438,25 @@ export function makeRecordingSlackClient(
       threads: {
         setStatus: async (args) =>
           record(
-            "assistant.threads.setStatus",
+            'assistant.threads.setStatus',
             args as unknown as Record<string, unknown>,
-            { ok: true },
+            {ok: true}
           ),
         setTitle: async (args) =>
           record(
-            "assistant.threads.setTitle",
+            'assistant.threads.setTitle',
             args as unknown as Record<string, unknown>,
-            { ok: true },
+            {ok: true}
           ),
         setSuggestedPrompts: async (args) =>
           record(
-            "assistant.threads.setSuggestedPrompts",
+            'assistant.threads.setSuggestedPrompts',
             args as unknown as Record<string, unknown>,
-            { ok: true },
+            {ok: true}
           ),
       },
     },
     apiCall: async <T>(method: string, args?: Record<string, unknown>) =>
-      record(method, args ?? {}, { ok: true } as unknown as T),
+      record(method, args ?? {}, {ok: true} as unknown as T),
   };
 }

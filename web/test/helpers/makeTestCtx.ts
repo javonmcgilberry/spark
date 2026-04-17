@@ -8,23 +8,23 @@ import {
   makeStubLlm,
   TEST_ENV,
   type HandlerCtx,
-} from "../../lib/ctx";
+} from '../../lib/ctx';
 import type {
   RecordingSlackOverrides,
   SlackClient,
-} from "../../lib/services/slack";
-import type { LlmClient, StubLlmOptions } from "../../lib/services/llm";
-import type { JiraClient, JiraStubOverrides } from "../../lib/services/jira";
+} from '../../lib/services/slack';
+import type {LlmClient, StubLlmOptions} from '../../lib/services/llm';
+import type {JiraClient, JiraStubOverrides} from '../../lib/services/jira';
 import type {
   GitHubClient,
   GitHubStubOverrides,
-} from "../../lib/services/github";
+} from '../../lib/services/github';
 import type {
   ConfluenceClient,
   ConfluenceStubOverrides,
-} from "../../lib/services/confluence";
-import type { DraftStore } from "../../lib/draftStore";
-import type { Logger } from "../../lib/logger";
+} from '../../lib/services/confluence';
+import type {DraftStore} from '../../lib/draftStore';
+import type {Logger} from '../../lib/logger';
 
 export interface MakeTestCtxOptions {
   slack?: SlackClient | RecordingSlackOverrides;
@@ -79,7 +79,7 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
     github,
     confluence,
     logger,
-    env: { ...TEST_ENV, ...(options.env ?? {}) } as CloudflareEnv,
+    env: {...TEST_ENV, ...(options.env ?? {})} as CloudflareEnv,
     scratch: options.scratch ?? {},
     waitUntil: (promise) => {
       waitUntilTasks.push(promise);
@@ -95,45 +95,45 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
  * to assert on the result.
  */
 export async function drainWaitUntil(
-  tasks: Array<Promise<unknown>>,
+  tasks: Array<Promise<unknown>>
 ): Promise<void> {
   await Promise.allSettled(tasks);
 }
 
 function isSlackClient(v: unknown): v is SlackClient {
   return (
-    typeof v === "object" &&
+    typeof v === 'object' &&
     v !== null &&
-    "chat" in (v as Record<string, unknown>)
+    'chat' in (v as Record<string, unknown>)
   );
 }
 function isLlmClient(v: unknown): v is LlmClient {
   return (
-    typeof v === "object" &&
+    typeof v === 'object' &&
     v !== null &&
-    typeof (v as { message?: unknown }).message === "function"
+    typeof (v as {message?: unknown}).message === 'function'
   );
 }
 function isJiraClient(v: unknown): v is JiraClient {
   return (
-    typeof v === "object" &&
+    typeof v === 'object' &&
     v !== null &&
-    typeof (v as { findAssignedToEmail?: unknown }).findAssignedToEmail ===
-      "function"
+    typeof (v as {findAssignedToEmail?: unknown}).findAssignedToEmail ===
+      'function'
   );
 }
 function isGitHubClient(v: unknown): v is GitHubClient {
   return (
-    typeof v === "object" &&
+    typeof v === 'object' &&
     v !== null &&
-    typeof (v as { findOpenPullRequestsForUser?: unknown })
-      .findOpenPullRequestsForUser === "function"
+    typeof (v as {findOpenPullRequestsForUser?: unknown})
+      .findOpenPullRequestsForUser === 'function'
   );
 }
 function isConfluenceClient(v: unknown): v is ConfluenceClient {
   return (
-    typeof v === "object" &&
+    typeof v === 'object' &&
     v !== null &&
-    typeof (v as { searchFirst?: unknown }).searchFirst === "function"
+    typeof (v as {searchFirst?: unknown}).searchFirst === 'function'
   );
 }

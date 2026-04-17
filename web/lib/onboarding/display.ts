@@ -9,28 +9,26 @@ import type {
   RitualGuide,
   SlackChannelGuide,
   ToolGuide,
-} from "../types";
+} from '../types';
 
 /**
- * Display helpers ported from spark/src/onboarding/display.ts.
+ * Display helpers that format onboarding package content for rendering.
  *
- * We intentionally drop the Block Kit builders (`buildPeopleSections`)
- * since the Webflow Cloud port doesn't publish interactive Slack blocks
- * to the hire's Home tab via the same flow — the Canvas + React
- * dashboard are the primary surfaces now. The canvas markdown helpers
- * stay because the canvas is still the hire's north-star document.
+ * The canvas markdown helpers produce the hire's long-form workspace
+ * canvas. The people grouping helpers back the UI's "People to meet"
+ * section and the canvas's teammates block.
  */
 
 export function groupPeopleByWeek(people: OnboardingPerson[]) {
   return [
-    { label: "Week 1-2", weekBucket: "week1-2" as const },
-    { label: "Week 2-3", weekBucket: "week2-3" as const },
-    { label: "Week 3+", weekBucket: "week3+" as const },
+    {label: 'Week 1-2', weekBucket: 'week1-2' as const},
+    {label: 'Week 2-3', weekBucket: 'week2-3' as const},
+    {label: 'Week 3+', weekBucket: 'week3+' as const},
   ]
     .map((bucket) => ({
       label: bucket.label,
       people: people.filter(
-        (person) => person.weekBucket === bucket.weekBucket,
+        (person) => person.weekBucket === bucket.weekBucket
       ),
     }))
     .filter((bucket) => bucket.people.length > 0);
@@ -38,53 +36,53 @@ export function groupPeopleByWeek(people: OnboardingPerson[]) {
 
 export function formatChannels(
   channels: SlackChannelGuide[],
-  heading = "Channels",
+  heading = 'Channels'
 ): string {
   return `*${heading}*\n${channels
     .map((channel) => `• *${channel.channel}* — ${channel.description}`)
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatTools(tools: ToolGuide[]): string {
   return `*Tools*\n${tools
     .map((tool) => `• *${tool.tool}* — ${tool.description}`)
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatRituals(rituals: RitualGuide[]): string {
   return `*Rituals*\n${rituals
     .map(
       (ritual) =>
-        `• *${ritual.meeting}* — ${ritual.cadence}, ${ritual.attendance.toLowerCase()}`,
+        `• *${ritual.meeting}* — ${ritual.cadence}, ${ritual.attendance.toLowerCase()}`
     )
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatDocs(
   docs: DocLink[],
-  heading = "Docs to start with",
+  heading = 'Docs to start with'
 ): string {
   return `*${heading}*\n${docs
     .map((doc) =>
       doc.url
         ? `• <${doc.url}|${doc.title}> — ${doc.description}`
-        : `• ${doc.title} — ${doc.description}`,
+        : `• ${doc.title} — ${doc.description}`
     )
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatConfluenceLinks(
   links: ConfluenceLink[],
-  heading = "Helpful Confluence pages",
+  heading = 'Helpful Confluence pages'
 ): string {
   return `*${heading}*\n${links
     .map((link) => `• <${link.url}|${link.title}> — ${link.summary}`)
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatReferences(
   references: OnboardingReferences,
-  heading = "Focused Confluence references",
+  heading = 'Focused Confluence references'
 ): string {
   const links = [
     references.teamPage,
@@ -100,9 +98,9 @@ export function formatReferences(
 }
 
 export function formatResourceLibrary(
-  resources: EngineeringResourceLibrarySection,
+  resources: EngineeringResourceLibrarySection
 ): string {
-  const parts = [formatDocs(resources.docs, "Core engineering docs")];
+  const parts = [formatDocs(resources.docs, 'Core engineering docs')];
   if (
     resources.references.teamPage ||
     resources.references.pillarPage ||
@@ -113,26 +111,26 @@ export function formatResourceLibrary(
   parts.push(
     formatKeyPaths(
       resources.keyPaths,
-      "Ask your buddy which CODEOWNERS paths matter most for your team.",
-    ),
+      'Ask your buddy which CODEOWNERS paths matter most for your team.'
+    )
   );
-  return parts.join("\n\n");
+  return parts.join('\n\n');
 }
 
 export function formatKeyPaths(
   keyPaths: string[],
-  emptyText = "Team-owned paths aren't listed yet — check with your buddy or look at CODEOWNERS.",
+  emptyText = "Team-owned paths aren't listed yet — check with your buddy or look at CODEOWNERS."
 ): string {
   if (keyPaths.length === 0) {
     return `*Key repo paths*\n${emptyText}`;
   }
   return `*Key repo paths*\n${keyPaths
     .map((keyPath) => `• \`${keyPath}\``)
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 export function formatChecklistItem(item: ChecklistItem): string {
-  const notesSuffix = item.notes ? ` — ${item.notes}` : "";
+  const notesSuffix = item.notes ? ` — ${item.notes}` : '';
   if (!hasChecklistResource(item)) {
     return `• *${item.label}*${notesSuffix}`;
   }
@@ -165,8 +163,8 @@ export function formatCanvasChecklistItem(item: ChecklistItem): string[] {
 
 export function linkedChecklistItemsForMilestone(
   checklistSections: ChecklistSection[],
-  milestoneLabel: string,
-): Array<ChecklistItem & { resourceUrl: string }> {
+  milestoneLabel: string
+): Array<ChecklistItem & {resourceUrl: string}> {
   const sectionId = checklistSectionIdForMilestone(milestoneLabel);
   if (!sectionId) return [];
   return (
@@ -178,13 +176,13 @@ export function linkedChecklistItemsForMilestone(
 }
 
 export function formatChecklistResourceLink(
-  item: ChecklistItem & { resourceUrl: string },
+  item: ChecklistItem & {resourceUrl: string}
 ): string {
   return `<${item.resourceUrl}|${item.resourceLabel ?? item.label}>`;
 }
 
 export function formatCanvasChecklistResourceLink(
-  item: ChecklistItem & { resourceUrl: string },
+  item: ChecklistItem & {resourceUrl: string}
 ): string {
   return `[${item.resourceLabel ?? item.label}](${item.resourceUrl})`;
 }
@@ -194,18 +192,18 @@ export function formatCanvasPerson(person: OnboardingPerson): string {
 }
 
 function hasChecklistResource(
-  item: ChecklistItem,
-): item is ChecklistItem & { resourceUrl: string } {
-  return typeof item.resourceUrl === "string" && item.resourceUrl.length > 0;
+  item: ChecklistItem
+): item is ChecklistItem & {resourceUrl: string} {
+  return typeof item.resourceUrl === 'string' && item.resourceUrl.length > 0;
 }
 
 function checklistSectionIdForMilestone(
-  milestoneLabel: string,
+  milestoneLabel: string
 ): string | undefined {
   const normalized = milestoneLabel.toLowerCase();
-  if (normalized.includes("week 1")) return "week1-setup";
-  if (normalized.includes("week 2")) return "week2-workflows";
-  if (normalized.includes("week 3")) return "week3-contribution";
-  if (normalized.includes("week 4")) return "week4-citizenship";
+  if (normalized.includes('week 1')) return 'week1-setup';
+  if (normalized.includes('week 2')) return 'week2-workflows';
+  if (normalized.includes('week 3')) return 'week3-contribution';
+  if (normalized.includes('week 4')) return 'week4-citizenship';
   return undefined;
 }

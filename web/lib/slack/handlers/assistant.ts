@@ -1,19 +1,14 @@
 /**
- * Assistant thread handler. Ports spark/src/slack/handlers/assistant.ts
- * to Events API shape — no more Bolt Assistant wrapper, the HTTP
- * webhook delivers event_type = `assistant_thread_started` directly.
- *
- * The Node bot's assistant used `sayStream` for incremental markdown
- * chunks. Events API doesn't have that affordance, so we post once
- * via chat.postMessage with the full answer. For the hackathon this
- * is acceptable — the agent response is already fast enough.
+ * Assistant thread handler — responds to `assistant_thread_started`
+ * and `assistant_thread_context_changed` events. Sets the thread
+ * title + suggested prompts and posts the opening greeting.
  */
 
-import type { HandlerCtx } from "../../ctx";
-import { resolveFromSlack } from "../../services/identityResolver";
+import type {HandlerCtx} from '../../ctx';
+import {resolveFromSlack} from '../../services/identityResolver';
 
 interface AssistantThreadStartedEvent {
-  type: "assistant_thread_started";
+  type: 'assistant_thread_started';
   assistant_thread: {
     user_id: string;
     channel_id: string;
@@ -28,14 +23,14 @@ interface AssistantThreadStartedEvent {
 }
 
 interface AssistantThreadContextChangedEvent {
-  type: "assistant_thread_context_changed";
-  assistant_thread: AssistantThreadStartedEvent["assistant_thread"];
+  type: 'assistant_thread_context_changed';
+  assistant_thread: AssistantThreadStartedEvent['assistant_thread'];
   event_ts: string;
 }
 
 export async function handleAssistantThreadStarted(
   event: AssistantThreadStartedEvent,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<void> {
   const userId = event.assistant_thread.user_id;
   const channel = event.assistant_thread.channel_id;
@@ -43,10 +38,10 @@ export async function handleAssistantThreadStarted(
   ctx.logger.info(`Assistant thread started for ${userId}`);
 
   const profile = await resolveFromSlack(ctx, userId).catch((error) => {
-    ctx.logger.warn("resolveFromSlack failed for assistant thread", error);
+    ctx.logger.warn('resolveFromSlack failed for assistant thread', error);
     return null;
   });
-  const firstName = profile?.firstName ?? "there";
+  const firstName = profile?.firstName ?? 'there';
 
   await ctx.slack.assistant.threads.setTitle({
     channel_id: channel,
@@ -59,20 +54,20 @@ export async function handleAssistantThreadStarted(
     thread_ts,
     prompts: [
       {
-        title: "Which Slack channels first?",
-        message: "Which Slack channels should I join first?",
+        title: 'Which Slack channels first?',
+        message: 'Which Slack channels should I join first?',
       },
       {
         title: "What's in week 1?",
-        message: "What does my week 1 checklist look like?",
+        message: 'What does my week 1 checklist look like?',
       },
       {
-        title: "Who should I meet?",
-        message: "Who should I meet this week?",
+        title: 'Who should I meet?',
+        message: 'Who should I meet this week?',
       },
       {
-        title: "Help me write my user guide",
-        message: "Can you help me draft my Webflow user guide?",
+        title: 'Help me write my user guide',
+        message: 'Can you help me draft my Webflow user guide?',
       },
     ],
   });
@@ -86,12 +81,10 @@ export async function handleAssistantThreadStarted(
 
 export async function handleAssistantThreadContextChanged(
   event: AssistantThreadContextChangedEvent,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<void> {
-  // Non-fatal — just log for observability. The Node bot used this
-  // to invalidate per-channel caches; we don't keep any per-channel
-  // state on Workers yet.
+  // Log-only — no per-channel state to invalidate on context change.
   ctx.logger.info(
-    `Assistant thread context changed for ${event.assistant_thread.user_id}`,
+    `Assistant thread context changed for ${event.assistant_thread.user_id}`
   );
 }

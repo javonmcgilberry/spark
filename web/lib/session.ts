@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import {cookies} from 'next/headers';
 
 /**
  * Demo session — cookie first, DEMO_MANAGER_SLACK_ID env fallback.
@@ -8,38 +8,38 @@ import { cookies } from "next/headers";
  * makeProdCtx(env) and read directly from CloudflareEnv.
  */
 
-export const SESSION_COOKIE_NAME = "spark_manager_slack_id";
+export const SESSION_COOKIE_NAME = 'spark_manager_slack_id';
 
 export interface ManagerSession {
   managerSlackId: string;
-  source: "cookie" | "env";
+  source: 'cookie' | 'env';
 }
 
 export async function getManagerSession(
-  env?: CloudflareEnv,
+  env?: CloudflareEnv
 ): Promise<ManagerSession | null> {
   const store = await cookies();
   const cookieValue = store.get(SESSION_COOKIE_NAME)?.value?.trim();
   if (cookieValue && /^[A-Z0-9]+$/.test(cookieValue)) {
-    return { managerSlackId: cookieValue, source: "cookie" };
+    return {managerSlackId: cookieValue, source: 'cookie'};
   }
   const envFallback = (
     env?.DEMO_MANAGER_SLACK_ID ?? process.env.DEMO_MANAGER_SLACK_ID
   )?.trim();
   if (envFallback && /^[A-Z0-9]+$/.test(envFallback)) {
-    return { managerSlackId: envFallback, source: "env" };
+    return {managerSlackId: envFallback, source: 'env'};
   }
   return null;
 }
 
 export async function requireManagerSession(
-  env?: CloudflareEnv,
+  env?: CloudflareEnv
 ): Promise<ManagerSession> {
   const session = await getManagerSession(env);
   if (!session) {
-    throw new Response(JSON.stringify({ error: "no session" }), {
+    throw new Response(JSON.stringify({error: 'no session'}), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: {'Content-Type': 'application/json'},
     });
   }
   return session;

@@ -2,9 +2,8 @@
 
 End-to-end: clone → local dev → Webflow Cloud deploy → 4-minute Loom.
 
-After the Webflow Cloud migration, Spark runs as a single Next.js app.
-No separate Node bot to keep alive. No Cloudflare Tunnel in production.
-One URL. One deploy.
+Spark runs as a single Next.js app on Webflow Cloud. One URL. One
+deploy. No sidecar process.
 
 ---
 
@@ -154,7 +153,7 @@ tune_checklist → finalize_draft`. The welcome text renders live
 
 ---
 
-## 7. Environment variable table (final state)
+## 7. Environment variable table
 
 Deployed on Webflow Cloud:
 
@@ -166,10 +165,6 @@ Deployed on Webflow Cloud:
 - `JIRA_BASE_URL`, `JIRA_API_EMAIL`, `JIRA_API_TOKEN` (optional)
 - `CONFLUENCE_BASE_URL`, `CONFLUENCE_API_TOKEN` (optional)
 - `DEMO_MANAGER_SLACK_ID`
-
-**Removed** after the migration: `SPARK_API_BASE_URL`,
-`SPARK_API_TOKEN`, `SLACK_APP_TOKEN`, `DX_WAREHOUSE_DSN`,
-`WEBFLOW_MONOREPO_PATH`.
 
 ---
 

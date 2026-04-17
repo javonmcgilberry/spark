@@ -7,7 +7,7 @@ minutes — then delivers a personalized plan to the hire via Slack.
 
 Spark runs **entirely on Webflow Cloud** following Cloudflare's "Build
 a Slack Agent" pattern. One Next.js app, one Worker, one deploy, one
-URL. No separate Node bot process. No Cloudflare Tunnel in production.
+URL.
 
 ## Quick Start
 

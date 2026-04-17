@@ -3,16 +3,12 @@
  * list with a prefix-ranked search over it. One pagination pass per
  * cache refresh; 10-minute TTL.
  *
- * Ported from spark/src/services/slackUserDirectoryService.ts. Uses
- * HandlerCtx instead of an external SlackClient arg so tests pass a
- * recording Slack client via the ctx.
- *
- * Cache lives on ctx.scratch so one Worker invocation shares the
- * cache across route handlers; cold starts re-pull. This is fine for
- * the hackathon volume. Moving to a KV-backed cache is a later phase.
+ * Cache lives on ctx.scratch so one Worker invocation shares the cache
+ * across route handlers; cold starts re-pull. Tests pass a recording
+ * Slack client via ctx.slack and prime the cache directly.
  */
 
-import type { HandlerCtx } from "../ctx";
+import type {HandlerCtx} from '../ctx';
 
 export interface SlackUserHit {
   slackUserId: string;
@@ -37,10 +33,10 @@ function getCache(ctx: HandlerCtx): {
   inFlight: Promise<SlackUserHit[]> | null;
 } {
   const existing = ctx.scratch.slackDirectory as
-    | { current: Cache | null; inFlight: Promise<SlackUserHit[]> | null }
+    | {current: Cache | null; inFlight: Promise<SlackUserHit[]> | null}
     | undefined;
   if (existing) return existing;
-  const created = { current: null as Cache | null, inFlight: null };
+  const created = {current: null as Cache | null, inFlight: null};
   ctx.scratch.slackDirectory = created;
   return created;
 }
@@ -49,13 +45,13 @@ export async function searchUsers(
   ctx: HandlerCtx,
   query: string,
   limit = 10,
-  options: { seedSlackUserIds?: string[] } = {},
+  options: {seedSlackUserIds?: string[]} = {}
 ): Promise<SlackUserHit[]> {
   const users = await getAll(ctx);
   const cache = getCache(ctx);
 
   const missing = (options.seedSlackUserIds ?? []).filter(
-    (id) => !users.some((u) => u.slackUserId === id),
+    (id) => !users.some((u) => u.slackUserId === id)
   );
   if (missing.length > 0) {
     await seedByIds(ctx, cache, missing);
@@ -65,10 +61,10 @@ export async function searchUsers(
   const needle = query.trim().toLowerCase();
   if (!needle) return pool.slice(0, limit);
 
-  const scored: Array<{ hit: SlackUserHit; score: number }> = [];
+  const scored: Array<{hit: SlackUserHit; score: number}> = [];
   for (const user of pool) {
     const score = rank(user, needle);
-    if (score > 0) scored.push({ hit: user, score });
+    if (score > 0) scored.push({hit: user, score});
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((s) => s.hit);
@@ -97,17 +93,17 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     pagesUsed = page + 1;
-    const res = await ctx.slack.users.list({ limit: PAGE_LIMIT, cursor });
+    const res = await ctx.slack.users.list({limit: PAGE_LIMIT, cursor});
     for (const member of res.members ?? []) {
       if (member.deleted || member.is_bot) continue;
-      if (member.id === "USLACKBOT" || !member.id) continue;
+      if (member.id === 'USLACKBOT' || !member.id) continue;
       const profile = member.profile ?? {};
       const realName =
         profile.real_name_normalized ??
         profile.real_name ??
         member.real_name ??
         member.name ??
-        "Unknown";
+        'Unknown';
       const displayName =
         profile.display_name_normalized ?? profile.display_name ?? realName;
       hits.push({
@@ -125,17 +121,17 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
 
   hits.sort((a, b) =>
     a.displayName.localeCompare(b.displayName, undefined, {
-      sensitivity: "base",
-    }),
+      sensitivity: 'base',
+    })
   );
 
-  cache.current = { users: hits, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache.current = {users: hits, expiresAt: Date.now() + CACHE_TTL_MS};
   ctx.logger.info(
-    `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)`,
+    `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)`
   );
   if (pagesUsed >= MAX_PAGES && cursor) {
     ctx.logger.warn(
-      `Slack user directory: pagination cap (${MAX_PAGES} pages) hit, some users may be missing.`,
+      `Slack user directory: pagination cap (${MAX_PAGES} pages) hit, some users may be missing.`
     );
   }
   return hits;
@@ -144,12 +140,12 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
 async function seedByIds(
   ctx: HandlerCtx,
   cache: ReturnType<typeof getCache>,
-  ids: string[],
+  ids: string[]
 ): Promise<void> {
   if (!cache.current) return;
   for (const id of ids) {
     try {
-      const res = await ctx.slack.users.info({ user: id });
+      const res = await ctx.slack.users.info({user: id});
       const member = res.user;
       if (!member?.id || member.deleted || member.is_bot) continue;
       const profile = member.profile ?? {};
@@ -158,7 +154,7 @@ async function seedByIds(
         profile.real_name ??
         member.real_name ??
         member.name ??
-        "Unknown";
+        'Unknown';
       const displayName =
         profile.display_name_normalized ?? profile.display_name ?? realName;
       cache.current.users.push({
@@ -172,21 +168,21 @@ async function seedByIds(
     } catch (error) {
       ctx.logger.warn(
         `Slack user directory: seed-by-id failed for ${id}`,
-        error,
+        error
       );
     }
   }
   cache.current.users.sort((a, b) =>
     a.displayName.localeCompare(b.displayName, undefined, {
-      sensitivity: "base",
-    }),
+      sensitivity: 'base',
+    })
   );
 }
 
 function rank(user: SlackUserHit, needle: string): number {
   const name = user.name.toLowerCase();
   const display = user.displayName.toLowerCase();
-  const email = user.email?.toLowerCase() ?? "";
+  const email = user.email?.toLowerCase() ?? '';
   if (name.startsWith(needle) || display.startsWith(needle)) return 100;
   if (email && email.startsWith(needle)) return 90;
   if (name.includes(needle) || display.includes(needle)) return 50;
@@ -197,8 +193,8 @@ function rank(user: SlackUserHit, needle: string): number {
 /** Test-only: prime the cache without making any Slack calls. */
 export function primeDirectoryForTests(
   ctx: HandlerCtx,
-  users: SlackUserHit[],
+  users: SlackUserHit[]
 ): void {
   const cache = getCache(ctx);
-  cache.current = { users, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache.current = {users, expiresAt: Date.now() + CACHE_TTL_MS};
 }

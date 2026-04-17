@@ -2,13 +2,8 @@
  * peopleInsights — "Ask me about …" blurbs for each person in a draft.
  *
  * Pulls recent Jira tickets + GitHub PRs and feeds both to the LLM to
- * produce a warm, specific one-liner. Ported from spark/src/services/
- * peopleInsightsService.ts — fn-module shape instead of class so the
- * DI ctx is explicit.
- *
- * Cache is held on ctx.scratch so multiple tools in one agent turn
- * share the insights. Each Worker invocation starts with a fresh
- * cache; cross-invocation caching via KV can come later if needed.
+ * produce a warm, specific one-liner. Cache is held on ctx.scratch so
+ * multiple tools in one agent turn share the insights.
  */
 
 import type {HandlerCtx} from '../ctx';

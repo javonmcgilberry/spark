@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { Logger } from "../logger";
+import Anthropic from '@anthropic-ai/sdk';
+import type {Logger} from '../logger';
 
 /**
  * Narrow LLM client interface. In production it wraps @anthropic-ai/sdk
@@ -30,33 +30,33 @@ export interface LlmClient {
   generate(
     system: string,
     user: string,
-    opts?: { maxTokens?: number; signal?: AbortSignal },
+    opts?: {maxTokens?: number; signal?: AbortSignal}
   ): Promise<string>;
   /** True in prod, false in tests/sandbox. */
   isConfigured(): boolean;
 }
 
-const DEFAULT_MODEL = "claude-3-5-haiku-latest";
+const DEFAULT_MODEL = 'claude-3-5-haiku-latest';
 const DEFAULT_MAX_TOKENS = 700;
 
 export function makeAnthropicClient(
   apiKey: string | undefined,
   logger: Logger,
-  defaultModel: string = DEFAULT_MODEL,
+  defaultModel: string = DEFAULT_MODEL
 ): LlmClient {
   if (!apiKey) {
     logger.warn(
-      "Anthropic API key missing; LLM calls will throw. Set ANTHROPIC_MOCK_MODE=1 for local dev.",
+      'Anthropic API key missing; LLM calls will throw. Set ANTHROPIC_MOCK_MODE=1 for local dev.'
     );
   }
-  const client = apiKey ? new Anthropic({ apiKey }) : null;
+  const client = apiKey ? new Anthropic({apiKey}) : null;
 
   return {
     isConfigured: () => client !== null,
     async message(input) {
       if (!client) {
         throw new Error(
-          "Anthropic client not configured. Set ANTHROPIC_API_KEY or ANTHROPIC_MOCK_MODE=1.",
+          'Anthropic client not configured. Set ANTHROPIC_API_KEY or ANTHROPIC_MOCK_MODE=1.'
         );
       }
       return client.messages.create(
@@ -67,21 +67,21 @@ export function makeAnthropicClient(
           messages: input.messages,
           tools: input.tools,
         },
-        { signal: input.signal },
+        {signal: input.signal}
       );
     },
     async generate(system, user, opts = {}) {
       if (!client) {
-        throw new Error("Anthropic client not configured");
+        throw new Error('Anthropic client not configured');
       }
       const response = await client.messages.create(
         {
           model: defaultModel,
           max_tokens: opts.maxTokens ?? 350,
           system,
-          messages: [{ role: "user", content: user }],
+          messages: [{role: 'user', content: user}],
         },
-        { signal: opts.signal },
+        {signal: opts.signal}
       );
       return extractText(response.content);
     },
@@ -98,7 +98,7 @@ export interface StubLlmOptions {
    * Canned text-only responses keyed by (system prompt fragment).
    * First substring match wins.
    */
-  textResponses?: Array<{ match: string | RegExp; text: string }>;
+  textResponses?: Array<{match: string | RegExp; text: string}>;
   /**
    * For agent-loop tests: a queue of Messages API responses that
    * `message` returns in order. Once exhausted, falls back to a
@@ -115,18 +115,18 @@ export function makeStubLlm(options: StubLlmOptions = {}): LlmClient {
     async message() {
       const next = queue.shift();
       if (next) return next;
-      return makeStubTextMessage(options.defaultText ?? "stubbed reply");
+      return makeStubTextMessage(options.defaultText ?? 'stubbed reply');
     },
     async generate(system, user) {
       const fingerprint = `${system}\n---\n${user}`;
       for (const candidate of options.textResponses ?? []) {
-        if (typeof candidate.match === "string") {
+        if (typeof candidate.match === 'string') {
           if (fingerprint.includes(candidate.match)) return candidate.text;
         } else if (candidate.match.test(fingerprint)) {
           return candidate.text;
         }
       }
-      return options.defaultText ?? "stubbed reply";
+      return options.defaultText ?? 'stubbed reply';
     },
   };
 }
@@ -134,11 +134,11 @@ export function makeStubLlm(options: StubLlmOptions = {}): LlmClient {
 export function makeStubTextMessage(text: string): Anthropic.Message {
   return {
     id: `msg_stub_${Math.random().toString(36).slice(2)}`,
-    type: "message",
-    role: "assistant",
-    model: "stub-model",
-    content: [{ type: "text", text, citations: null }],
-    stop_reason: "end_turn",
+    type: 'message',
+    role: 'assistant',
+    model: 'stub-model',
+    content: [{type: 'text', text, citations: null}],
+    stop_reason: 'end_turn',
     stop_sequence: null,
     usage: {
       input_tokens: 0,
@@ -154,8 +154,8 @@ export function makeStubTextMessage(text: string): Anthropic.Message {
 
 function extractText(content: Anthropic.ContentBlock[]): string {
   return content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
     .map((block) => block.text)
-    .join("\n")
+    .join('\n')
     .trim();
 }

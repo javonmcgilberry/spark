@@ -55,7 +55,7 @@ declare global {
   interface SparkD1PreparedStatement {
     bind(...values: unknown[]): SparkD1PreparedStatement;
     first<T = unknown>(): Promise<T | null>;
-    all<T = unknown>(): Promise<{ results: T[] }>;
+    all<T = unknown>(): Promise<{results: T[]}>;
     run(): Promise<unknown>;
   }
 

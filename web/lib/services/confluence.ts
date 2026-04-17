@@ -1,5 +1,5 @@
-import type { Logger } from "../logger";
-import type { ConfluenceLink } from "../types";
+import type {Logger} from '../logger';
+import type {ConfluenceLink} from '../types';
 
 /**
  * Confluence client. Combines search + doc-page-id lookup in a single
@@ -16,7 +16,7 @@ export interface ConfluenceClient {
     phrase: string,
     fallbackSummary: string,
     authEmail: string,
-    options?: { excludeTitlePrefixes?: string[] },
+    options?: {excludeTitlePrefixes?: string[]}
   ): Promise<ConfluenceLink | undefined>;
   /** Build a canonical URL for a known page id. */
   urlForPageId(spaceKey: string, pageId: string): string | null;
@@ -34,14 +34,14 @@ const REQUEST_TIMEOUT_MS = 8000;
 
 export function makeConfluenceClient(
   env: ConfluenceEnv,
-  logger: Logger,
+  logger: Logger
 ): ConfluenceClient {
   const configured = Boolean(
-    env.CONFLUENCE_API_TOKEN && env.CONFLUENCE_BASE_URL,
+    env.CONFLUENCE_API_TOKEN && env.CONFLUENCE_BASE_URL
   );
   const cache = new Map<
     string,
-    { value: ConfluenceLink | undefined; expiresAt: number }
+    {value: ConfluenceLink | undefined; expiresAt: number}
   >();
 
   const baseUrl = () =>
@@ -52,36 +52,36 @@ export function makeConfluenceClient(
   const searchPhrase = async (
     phrase: string,
     summary: string,
-    authEmail: string,
+    authEmail: string
   ): Promise<ConfluenceLink | undefined> => {
     if (!configured || !env.CONFLUENCE_BASE_URL || !env.CONFLUENCE_API_TOKEN) {
       return undefined;
     }
     const url = new URL(
-      "rest/api/content/search",
-      ensureTrailingSlash(env.CONFLUENCE_BASE_URL),
+      'rest/api/content/search',
+      ensureTrailingSlash(env.CONFLUENCE_BASE_URL)
     );
     url.searchParams.set(
-      "cql",
-      `type = page AND siteSearch ~ "\\\"${escapeCql(phrase)}\\\"" ORDER BY lastmodified DESC`,
+      'cql',
+      `type = page AND siteSearch ~ "\\\"${escapeCql(phrase)}\\\"" ORDER BY lastmodified DESC`
     );
-    url.searchParams.set("limit", "1");
+    url.searchParams.set('limit', '1');
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(url, {
         headers: {
-          Accept: "application/json",
+          Accept: 'application/json',
           Authorization: `Basic ${base64Encode(
-            `${authEmail}:${env.CONFLUENCE_API_TOKEN}`,
+            `${authEmail}:${env.CONFLUENCE_API_TOKEN}`
           )}`,
         },
         signal: controller.signal,
       });
       if (!res.ok) {
         logger.warn(
-          `Confluence search failed for "${phrase}" (${res.status}).`,
+          `Confluence search failed for "${phrase}" (${res.status}).`
         );
         return undefined;
       }
@@ -89,10 +89,10 @@ export function makeConfluenceClient(
         results?: Array<{
           title?: string;
           excerpt?: string;
-          _links?: { base?: string; webui?: string };
+          _links?: {base?: string; webui?: string};
           content?: {
             title?: string;
-            _links?: { base?: string; webui?: string };
+            _links?: {base?: string; webui?: string};
           };
         }>;
       };
@@ -113,7 +113,7 @@ export function makeConfluenceClient(
     } catch (error) {
       logger.warn(
         `Confluence lookup failed for "${phrase}", continuing without enrichment.`,
-        error,
+        error
       );
       return undefined;
     } finally {
@@ -157,7 +157,7 @@ export interface ConfluenceStubOverrides {
 }
 
 export function makeStubConfluence(
-  overrides: ConfluenceStubOverrides = {},
+  overrides: ConfluenceStubOverrides = {}
 ): ConfluenceClient {
   return {
     isConfigured: () => overrides.configured ?? false,
@@ -176,17 +176,17 @@ export function makeStubConfluence(
 }
 
 function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
+  return value.endsWith('/') ? value : `${value}/`;
 }
 
 function escapeCql(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }
 
 function stripHtml(value?: string): string {
-  return (value ?? "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+  return (value ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -197,10 +197,10 @@ function isExcluded(link: ConfluenceLink, excludes: string[]): boolean {
 }
 
 function base64Encode(value: string): string {
-  if (typeof btoa !== "undefined") return btoa(value);
+  if (typeof btoa !== 'undefined') return btoa(value);
   const g = globalThis as unknown as {
-    Buffer?: { from: (v: string) => { toString: (enc: string) => string } };
+    Buffer?: {from: (v: string) => {toString: (enc: string) => string}};
   };
-  if (g.Buffer) return g.Buffer.from(value).toString("base64");
-  throw new Error("No base64 encoder available");
+  if (g.Buffer) return g.Buffer.from(value).toString('base64');
+  throw new Error('No base64 encoder available');
 }

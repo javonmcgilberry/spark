@@ -1,9 +1,9 @@
 import {z} from 'zod';
 
 /**
- * Zod schemas mirroring spark/src/onboarding/types.ts. The Generator
- * agent's finalize_draft tool is validated against these before the
- * draft is persisted. If the bot's types drift, add the field here too.
+ * Zod schemas for validating the Generator agent's finalize_draft
+ * tool input before the draft is persisted. If a type in `lib/types.ts`
+ * changes, add the matching field here too.
  */
 
 export const checklistItemSchema = z.object({
@@ -53,9 +53,9 @@ export const buddyProposalSchema = z.object({
 
 /**
  * Minimum shape the Generator must produce for the finalize_draft tool
- * to succeed. We only validate the fields the agent is expected to
- * populate — the bot will merge these with the existing draft shell
- * through PATCH, so sections already built from the catalog stay intact.
+ * to succeed. Only fields the agent is expected to populate are
+ * validated here — the finalize route merges these into the existing
+ * draft shell via PATCH, so catalog-built sections stay intact.
  *
  * Two voices: `welcomeIntro` is short and Spark-branded (the fun
  * welcoming line); `welcomeNote` is the manager-voice paragraph that

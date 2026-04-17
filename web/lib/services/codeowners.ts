@@ -1,17 +1,12 @@
 /**
  * codeowners — heuristic team → github-slug + keyPaths lookup.
  *
- * This is the simplified port of the Node bot's CodeownersService.
- * On Workers we can't run `git ls-files` or shell out to the `co`
- * binary, so the team→paths helpers work on the raw CODEOWNERS text
- * fetched via ctx.github.fetchCodeowners(). The fetched text is
- * cached on ctx.scratch to avoid refetching across tool calls in one
- * agent turn.
+ * Works entirely on the raw CODEOWNERS text fetched via
+ * ctx.github.fetchCodeowners(). The fetched text is cached on
+ * ctx.scratch to avoid refetching across tool calls in one agent turn.
  *
- * If the CODEOWNERS text is unavailable (no GITHUB_TOKEN, 404, etc)
- * all helpers fall back to the static TEAM_PATH_HINTS heuristics —
- * same "dumb but useful" path suggestions the Node bot used as a
- * secondary input.
+ * If CODEOWNERS is unavailable (no GITHUB_TOKEN, 404, etc) all helpers
+ * fall back to the static TEAM_PATH_HINTS heuristics below.
  */
 
 interface CodeownerEntry {
@@ -19,31 +14,31 @@ interface CodeownerEntry {
   owners: string[];
 }
 
-const TEAM_PATH_HINTS: Array<{ keywords: string[]; paths: string[] }> = [
+const TEAM_PATH_HINTS: Array<{keywords: string[]; paths: string[]}> = [
   {
-    keywords: ["design", "designer", "frontend", "spring", "ux"],
+    keywords: ['design', 'designer', 'frontend', 'spring', 'ux'],
     paths: [
-      "public/js/designer-flux",
-      "packages/systems/spring",
-      "packages/systems/permissions",
+      'public/js/designer-flux',
+      'packages/systems/spring',
+      'packages/systems/permissions',
     ],
   },
   {
-    keywords: ["backend", "server", "api", "cms", "billing", "auth"],
+    keywords: ['backend', 'server', 'api', 'cms', 'billing', 'auth'],
     paths: [
-      "entrypoints/server",
-      "packages/domains/billing",
-      "packages/domains/collections",
-      "packages/systems/feature-config/server",
+      'entrypoints/server',
+      'packages/domains/billing',
+      'packages/domains/collections',
+      'packages/systems/feature-config/server',
     ],
   },
   {
-    keywords: ["infra", "platform", "build", "delivery", "cloud"],
+    keywords: ['infra', 'platform', 'build', 'delivery', 'cloud'],
     paths: [
-      "entrypoints/webflow-hud",
-      "packages/tooling",
-      "entrypoints/dashboard",
-      "packages/systems/feature-config",
+      'entrypoints/webflow-hud',
+      'packages/tooling',
+      'entrypoints/dashboard',
+      'packages/systems/feature-config',
     ],
   },
 ];
@@ -51,7 +46,7 @@ const TEAM_PATH_HINTS: Array<{ keywords: string[]; paths: string[] }> = [
 export async function suggestPathsForTeam(
   codeownersText: string,
   teamName: string | undefined,
-  githubTeamSlug?: string,
+  githubTeamSlug?: string
 ): Promise<string[]> {
   const entries = parseCodeowners(codeownersText);
   const candidates = new Set<string>();
@@ -68,7 +63,7 @@ export async function suggestPathsForTeam(
     const keywords = tokenize(teamName);
     for (const entry of entries) {
       const haystack =
-        `${entry.pattern} ${entry.owners.join(" ")}`.toLowerCase();
+        `${entry.pattern} ${entry.owners.join(' ')}`.toLowerCase();
       if (keywords.some((keyword) => haystack.includes(keyword))) {
         candidates.add(patternToDirectory(entry.pattern));
       }
@@ -85,7 +80,7 @@ export async function suggestPathsForTeam(
 
 export async function findGitHubTeamSlug(
   codeownersText: string,
-  teamName?: string,
+  teamName?: string
 ): Promise<string | undefined> {
   if (!teamName) return undefined;
   const entries = parseCodeowners(codeownersText);
@@ -94,11 +89,11 @@ export async function findGitHubTeamSlug(
 
   for (const entry of entries) {
     for (const owner of entry.owners) {
-      if (!owner.startsWith("@webflow/")) continue;
-      const slug = owner.replace("@webflow/", "");
+      if (!owner.startsWith('@webflow/')) continue;
+      const slug = owner.replace('@webflow/', '');
       const haystack = slug.toLowerCase();
       const score = keywords.filter((keyword) =>
-        haystack.includes(keyword),
+        haystack.includes(keyword)
       ).length;
       if (score > 0) {
         matches.set(slug, Math.max(matches.get(slug) ?? 0, score));
@@ -110,30 +105,30 @@ export async function findGitHubTeamSlug(
 
 function parseCodeowners(text: string): CodeownerEntry[] {
   return text
-    .split("\n")
+    .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
+    .filter((line) => line && !line.startsWith('#'))
     .map((line) => {
       const [pattern, ...owners] = line.split(/\s+/);
-      return { pattern, owners };
+      return {pattern, owners};
     });
 }
 
 function patternToDirectory(pattern: string): string {
   return pattern
-    .replace(/^\//, "")
-    .replace(/\/\*\*\/\*$/, "")
-    .replace(/\/\*\*$/, "")
-    .replace(/\/\*$/, "")
-    .replace(/\*.*$/, "")
-    .replace(/\/$/, "");
+    .replace(/^\//, '')
+    .replace(/\/\*\*\/\*$/, '')
+    .replace(/\/\*\*$/, '')
+    .replace(/\/\*$/, '')
+    .replace(/\*.*$/, '')
+    .replace(/\/$/, '');
 }
 
 function tokenize(value: string): string[] {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .split(" ")
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
     .map((token) => token.trim())
     .filter((token) => token.length >= 3);
 }

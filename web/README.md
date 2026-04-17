@@ -1,41 +1,29 @@
 # Spark Onboarding Assistant
 
-Next.js 15 dashboard that runs on Webflow Cloud (Cloudflare Workers). Spark
-generates onboarding drafts via the Generator agent, lets the manager edit
-them inline — welcome note, people to meet, weekly checklist — then hands
-off to the Slack bot for publish.
+Next.js 15 app that runs on Webflow Cloud (Cloudflare Workers). Spark
+generates onboarding drafts via the Generator agent, lets the manager
+edit them inline — welcome, people to meet, weekly checklist — then
+publishes to Slack. The Slack Events API webhook, the agent loop, and
+the draft store all live in this same app.
 
-The full getting-started runbook lives at
-[../docs/manager-dashboard-demo.md](../docs/manager-dashboard-demo.md) —
-start there if this is your first time.
+Full runbook:
+[../docs/manager-dashboard-demo.md](../docs/manager-dashboard-demo.md).
+Developer setup (named tunnel, dev Slack app, preview deploys):
+[../docs/dev-setup.md](../docs/dev-setup.md).
 
-## Local dev (short version)
-
-Environment lives in a single file: `spark/.env`. Two symlinks make it
-available to the Next dev server and to Wrangler for OpenNext preview.
+## Local dev
 
 ```bash
-# 1) Fill in the bot/web env once (in spark/)
-cd spark
-cp .env.example .env
-#   then edit .env — SLACK_*, ANTHROPIC_API_KEY, SPARK_API_TOKEN, SPARK_API_BASE_URL,
-#   DEMO_MANAGER_SLACK_ID. The bot and the web app both read this file.
+cd spark/web
 npm install
-
-# 2) Symlink from the web app (one-time)
-cd web
-ln -s ../.env .env.local     # Next reads .env.local
-ln -s ../.env .dev.vars      # Wrangler reads .dev.vars for OpenNext preview
-npm install
-
-# 3) Two terminals
-cd spark        && npm run dev      # bot on :8787
-cd spark/web    && npm run dev      # UI on http://localhost:3000
+SLACK_MOCK_MODE=1 ANTHROPIC_MOCK_MODE=1 npm run dev
+# http://localhost:3000
+# http://localhost:3000/dev/slack-sandbox   — Slack event replay sandbox
 ```
 
-Both symlinks are gitignored (`.env*.local`, `.dev.vars` in
-[.gitignore](.gitignore)), so the single `spark/.env` never leaves your
-machine.
+With the mock modes on, tests and manual flows never hit Slack or
+Anthropic. Flip them off (or omit them) when you need real traffic —
+see the dev-setup doc for the Cloudflare Tunnel + dev Slack app flow.
 
 ## Local OpenNext preview (validates the Workers bundle)
 
@@ -44,29 +32,12 @@ Webflow Cloud actually runs, use OpenNext preview — it compiles to
 `.open-next/worker.js` and serves via `wrangler dev`:
 
 ```bash
-npm run preview       # listens on :8788 (bot is on :8787)
+npm run preview
 curl http://localhost:8788/healthz
 ```
 
-The preview catches OpenNext/Workers-specific issues (edge-runtime-split
-errors, Node-only API leaks) that `next build` does not.
-
-## Webflow Cloud deploy
-
-See [../docs/manager-dashboard-demo.md](../docs/manager-dashboard-demo.md)
-for every prompt and dashboard click. Short version:
-
-```bash
-cd spark/web
-# Create the Webflow Cloud project via the dashboard (CLI OAuth doesn't
-# work from Webflow Inside — see the runbook). Deploy to a new domain.
-# Set env vars in the Webflow Cloud UI.
-# Start the tunnel so the edge bundle can reach the local bot:
-cd ../ && ./scripts/tunnel.sh
-# Push to the connected branch → auto-deploy
-```
-
-The app deploys at the Webflow Cloud new-domain URL root (no `basePath`).
+Catches OpenNext/Workers-specific issues (edge runtime splits, Node-only
+API leaks) that `next build` does not.
 
 ## Layout
 
@@ -75,38 +46,50 @@ app/
   layout.tsx              Dashboard chrome + global CSS reset (dark theme)
   page.tsx                Manager home — open drafts + published
   new/page.tsx            Intake form (feeds the Generator agent)
-  draft/[newHireId]/      Draft detail (Welcome + People + Checklist grid)
-  api/drafts/             Routes that proxy to the bot
-  healthz/                Health check for deploy verification
+  draft/[newHireId]/      Draft detail (Welcome + People + Checklist tabs)
+  dev/slack-sandbox/      Dev-only Slack event replay UI
+  api/drafts/             Draft CRUD + generate + critique + publish
+  api/slack/events/       Slack Events API webhook (HMAC verified)
+  api/slack/interactivity Block Kit actions
+  healthz/                Health check
 components/
   DraftContext.ts         React 19 context: {state, actions, meta}
   DraftProvider.tsx       Owns draft state, agent streaming, critique
   DraftWorkspace.tsx      Named subcomponents (Header/Body/Welcome/People/...)
   WelcomeNoteEditor.tsx   Two stacked voices: Spark intro + manager note
   PeopleEditor.tsx        Editable rows; avatars; add-teammate via Slack picker
-  ChecklistGrid.tsx       Week 1 | Week 2 | Week 3 | Week 4 columns
+  ChecklistTabs.tsx       Week 1 / Week 2 / Week 3 / Week 4 tabs
   AgentTimeline.tsx       Per-tool collapsible step cards + progress pill
   Avatar.tsx              Image or initials fallback
 lib/
-  types.ts                Shared shape with the bot's OnboardingPackage
-  sparkApi.ts             Typed fetch wrapper (bearer + manager header)
-  session.ts              Demo session cookie + env fallback
-  useDraft.ts             Debounced-PATCH + optimistic update hook
-  agents/                 Generator (9-tool loop) + Critique (structural rules)
+  ctx.ts                  HandlerCtx + makeProdCtx + mock-mode factories
+  draftStore.ts           D1 + in-memory implementations of DraftStore
+  types.ts                Onboarding domain types
+  agents/                 Generator tool-use loop + Critique rules
+  services/               slack, llm, jira, github, confluence, canvas, etc.
+  slack/                  Events dispatcher + handlers (app_mention, assistant, home)
+  handlers/               Route handler implementations (testable without Next)
+test/
+  fixtures/               Real-shape Slack event payloads for fixture-driven tests
+  helpers/                postSignedEvent, makeTestCtx — the two-helper pair
+  slack/                  Events route + dispatcher + HMAC tests
+  services/               Per-service behavior tests (pure vitest, no Miniflare)
+  handlers/               Route handler tests via makeTestCtx
+  agents/                 Generator + Critique tests
 ```
 
-## What the bot expects
+## How it fits together
 
-Each request carries `Authorization: Bearer <SPARK_API_TOKEN>` and
-`X-Spark-Manager-Slack-Id: U...`. The UI calls the bot server-to-server
-from the Cloudflare Workers runtime, so there are no browser CORS
-concerns on that hop. See
-[../docs/manager-dashboard-demo.md](../docs/manager-dashboard-demo.md#why-the-spark_api_token-exists)
-for why the bearer token is still required even with Webflow workspace
-SSO on the UI.
+Every service + handler in `lib/` takes `HandlerCtx` as its first
+argument. `makeProdCtx(env)` is the only place real Slack / Anthropic /
+D1 clients are constructed; `makeTestCtx({overrides})` returns
+recording/stub versions for vitest. That means every test is pure
+vitest, sub-second, no external traffic.
 
 ## Tests
 
 ```bash
 npm test
 ```
+
+68+ tests, 12 files, ~1s.

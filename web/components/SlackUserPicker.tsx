@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useCallback,
@@ -8,15 +8,15 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
-} from "react";
-import type { SlackUserHit } from "../lib/services/slackUserDirectory";
+} from 'react';
+import type {SlackUserHit} from '../lib/services/slackUserDirectory';
 
 const DEBOUNCE_MS = 250;
 
 export function SlackUserPicker({
   value,
   onChange,
-  placeholder = "Search the Slack workspace…",
+  placeholder = 'Search the Slack workspace…',
   autoFocus,
 }: {
   value: SlackUserHit | null;
@@ -24,7 +24,7 @@ export function SlackUserPicker({
   placeholder?: string;
   autoFocus?: boolean;
 }) {
-  const [query, setQuery] = useState(value?.displayName ?? "");
+  const [query, setQuery] = useState(value?.displayName ?? '');
   const [hits, setHits] = useState<SlackUserHit[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,7 +37,7 @@ export function SlackUserPicker({
 
   useEffect(() => {
     if (!value) {
-      setQuery("");
+      setQuery('');
       setHits([]);
       setError(null);
     }
@@ -54,15 +54,15 @@ export function SlackUserPicker({
     try {
       const res = await fetch(
         `/api/lookup/slack-users?q=${encodeURIComponent(q)}&limit=10`,
-        { signal: controller.signal },
+        {signal: controller.signal}
       );
       if (!res.ok) throw new Error(`lookup failed (${res.status})`);
-      const body = (await res.json()) as { users: SlackUserHit[] };
+      const body = (await res.json()) as {users: SlackUserHit[]};
       setHits(body.users);
       setHighlight(0);
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "lookup failed");
+      if ((err as Error).name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'lookup failed');
       setHits([]);
     } finally {
       setLoading(false);
@@ -87,19 +87,19 @@ export function SlackUserPicker({
   }
 
   function onKey(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       setOpen(true);
       setHighlight((h) => Math.min(h + 1, hits.length - 1));
-    } else if (event.key === "ArrowUp") {
+    } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       setHighlight((h) => Math.max(h - 1, 0));
-    } else if (event.key === "Enter") {
+    } else if (event.key === 'Enter') {
       if (open && hits[highlight]) {
         event.preventDefault();
         pick(hits[highlight]);
       }
-    } else if (event.key === "Escape") {
+    } else if (event.key === 'Escape') {
       setOpen(false);
     }
   }
@@ -107,21 +107,21 @@ export function SlackUserPicker({
   if (value) {
     return (
       <div style={selectedCardStyle} aria-label="Selected new hire">
-        <div style={{ display: "grid", gap: 2, minWidth: 0, flex: 1 }}>
+        <div style={{display: 'grid', gap: 2, minWidth: 0, flex: 1}}>
           <strong style={selectedNameStyle}>
             {value.name || value.displayName}
           </strong>
           <span style={selectedMetaStyle}>
             {[value.title, value.email]
               .filter((part): part is string => Boolean(part))
-              .join(" · ") || value.slackUserId}
+              .join(' · ') || value.slackUserId}
           </span>
         </div>
         <button
           type="button"
           onClick={() => {
             onChange(null);
-            setQuery("");
+            setQuery('');
             setHits([]);
             setOpen(false);
             setError(null);
@@ -137,7 +137,7 @@ export function SlackUserPicker({
   }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{position: 'relative'}}>
       <input
         id={inputId}
         type="text"
@@ -170,10 +170,10 @@ export function SlackUserPicker({
       {open && (hits.length > 0 || loading || error) ? (
         <ul id={listboxId} role="listbox" style={listboxStyle}>
           {loading && hits.length === 0 ? (
-            <li style={{ ...rowStyle, color: "#94a3b8" }}>Searching…</li>
+            <li style={{...rowStyle, color: '#94a3b8'}}>Searching…</li>
           ) : null}
           {error ? (
-            <li style={{ ...rowStyle, color: "#fca5a5" }}>Error: {error}</li>
+            <li style={{...rowStyle, color: '#fca5a5'}}>Error: {error}</li>
           ) : null}
           {hits.map((hit, index) => (
             <li
@@ -191,23 +191,23 @@ export function SlackUserPicker({
                 ...rowStyle,
                 background:
                   index === highlight
-                    ? "rgba(56, 189, 248, 0.14)"
-                    : "transparent",
+                    ? 'rgba(56, 189, 248, 0.14)'
+                    : 'transparent',
               }}
             >
-              <div style={{ display: "grid", gap: 2 }}>
-                <strong style={{ fontSize: 14 }}>{hit.displayName}</strong>
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>
+              <div style={{display: 'grid', gap: 2}}>
+                <strong style={{fontSize: 14}}>{hit.displayName}</strong>
+                <span style={{fontSize: 12, color: '#94a3b8'}}>
                   {[hit.title, hit.email, hit.slackUserId]
                     .filter((part): part is string => Boolean(part))
                     .slice(0, 2)
-                    .join(" · ")}
+                    .join(' · ')}
                 </span>
               </div>
             </li>
           ))}
           {!loading && hits.length === 0 && !error ? (
-            <li style={{ ...rowStyle, color: "#94a3b8" }}>No matches</li>
+            <li style={{...rowStyle, color: '#94a3b8'}}>No matches</li>
           ) : null}
         </ul>
       ) : null}
@@ -216,78 +216,78 @@ export function SlackUserPicker({
 }
 
 const inputStyle: CSSProperties = {
-  padding: "10px 12px",
+  padding: '10px 12px',
   borderRadius: 8,
-  border: "1px solid rgba(148, 163, 184, 0.3)",
-  background: "rgba(30, 41, 59, 0.7)",
-  color: "#e2e8f0",
-  fontFamily: "inherit",
+  border: '1px solid rgba(148, 163, 184, 0.3)',
+  background: 'rgba(30, 41, 59, 0.7)',
+  color: '#e2e8f0',
+  fontFamily: 'inherit',
   fontSize: 14,
-  width: "100%",
+  width: '100%',
 };
 
 const selectedCardStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
+  display: 'flex',
+  alignItems: 'center',
   gap: 12,
-  padding: "10px 12px",
+  padding: '10px 12px',
   borderRadius: 8,
-  border: "1px solid rgba(56, 189, 248, 0.35)",
-  background: "rgba(56, 189, 248, 0.08)",
+  border: '1px solid rgba(56, 189, 248, 0.35)',
+  background: 'rgba(56, 189, 248, 0.08)',
 };
 
 const selectedNameStyle: CSSProperties = {
   fontSize: 14,
-  color: "#e2e8f0",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
+  color: '#e2e8f0',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const selectedMetaStyle: CSSProperties = {
   fontSize: 12,
-  color: "#94a3b8",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
+  color: '#94a3b8',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const clearBtnStyle: CSSProperties = {
-  background: "transparent",
-  color: "#94a3b8",
-  border: "1px solid rgba(148, 163, 184, 0.25)",
+  background: 'transparent',
+  color: '#94a3b8',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
   borderRadius: 6,
   width: 26,
   height: 26,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   fontSize: 16,
   lineHeight: 1,
-  cursor: "pointer",
+  cursor: 'pointer',
   flexShrink: 0,
 };
 
 const listboxStyle: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 4px)",
+  position: 'absolute',
+  top: 'calc(100% + 4px)',
   left: 0,
   right: 0,
   margin: 0,
   padding: 4,
-  listStyle: "none",
-  background: "rgba(15, 23, 42, 0.98)",
-  border: "1px solid rgba(148, 163, 184, 0.25)",
+  listStyle: 'none',
+  background: 'rgba(15, 23, 42, 0.98)',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
   borderRadius: 8,
   maxHeight: 280,
-  overflowY: "auto",
+  overflowY: 'auto',
   zIndex: 50,
-  boxShadow: "0 12px 32px rgba(15, 23, 42, 0.45)",
+  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.45)',
 };
 
 const rowStyle: CSSProperties = {
-  padding: "8px 10px",
+  padding: '8px 10px',
   borderRadius: 6,
-  cursor: "pointer",
-  color: "#e2e8f0",
+  cursor: 'pointer',
+  color: '#e2e8f0',
 };

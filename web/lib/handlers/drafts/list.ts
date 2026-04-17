@@ -1,26 +1,26 @@
-import { z } from "zod";
-import type { HandlerCtx } from "../../ctx";
-import type { ManagerSession } from "../../session";
-import { createDraftPackage } from "../../services/onboardingPackages";
+import {z} from 'zod';
+import type {HandlerCtx} from '../../ctx';
+import type {ManagerSession} from '../../session';
+import {createDraftPackage} from '../../services/onboardingPackages';
 import {
   resolveFromEmail,
   resolveFromSlack,
-} from "../../services/identityResolver";
-import { enrichPackageInsights } from "./enrich";
+} from '../../services/identityResolver';
+import {enrichPackageInsights} from './enrich';
 
 export async function handleListDrafts(
   ctx: HandlerCtx,
-  session: ManagerSession,
+  session: ManagerSession
 ): Promise<Response> {
   const drafts = await ctx.db.listDraftsForManager(session.managerSlackId);
   const allManaged = await ctx.db.listPackagesManagedBy(session.managerSlackId);
   const publishedPackages = allManaged.filter(
-    (pkg) => pkg.status === "published",
+    (pkg) => pkg.status === 'published'
   );
   return Response.json({
     drafts: drafts.map((pkg) => enrichPackageInsights(ctx, pkg)),
     publishedPackages: publishedPackages.map((pkg) =>
-      enrichPackageInsights(ctx, pkg),
+      enrichPackageInsights(ctx, pkg)
     ),
   });
 }
@@ -36,14 +36,14 @@ const createBodySchema = z.object({
 export async function handleCreateDraft(
   request: Request,
   ctx: HandlerCtx,
-  session: ManagerSession,
+  session: ManagerSession
 ): Promise<Response> {
   const raw = await request.json().catch(() => null);
   const parsed = createBodySchema.safeParse(raw ?? {});
   if (!parsed.success) {
     return Response.json(
-      { error: "invalid body", issues: parsed.error.issues },
-      { status: 400 },
+      {error: 'invalid body', issues: parsed.error.issues},
+      {status: 400}
     );
   }
   const {
@@ -55,8 +55,8 @@ export async function handleCreateDraft(
   } = parsed.data;
   if (!newHireSlackId && !newHireEmail) {
     return Response.json(
-      { error: "newHireSlackId or newHireEmail required" },
-      { status: 400 },
+      {error: 'newHireSlackId or newHireEmail required'},
+      {status: 400}
     );
   }
 
@@ -72,8 +72,5 @@ export async function handleCreateDraft(
     stakeholderUserIds,
   });
 
-  return Response.json(
-    { pkg: enrichPackageInsights(ctx, pkg) },
-    { status: 201 },
-  );
+  return Response.json({pkg: enrichPackageInsights(ctx, pkg)}, {status: 201});
 }

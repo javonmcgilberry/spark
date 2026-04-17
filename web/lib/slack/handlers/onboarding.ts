@@ -4,20 +4,16 @@
  *   - message (im): hire DMs Spark.
  *   - member_joined_channel: hire joins a watched channel.
  *
- * Each handler does a minimal-useful acknowledgement in the Webflow
- * Cloud port: short LLM reply via ctx.llm, no streaming. The Node
- * bot's rich journey/state logic isn't ported in this phase — that
- * was tightly coupled to the JourneyService which lived in
- * spark/src and used in-memory state. A later pass can bring the
- * journey back if we need it; for now the published OnboardingPackage
- * and the hire's Home tab carry the structure.
+ * Each handler produces a short LLM reply via ctx.llm. The published
+ * OnboardingPackage + hire Home tab carry the structural state; these
+ * handlers are conversational acknowledgements on top.
  */
 
-import type { HandlerCtx } from "../../ctx";
-import { resolveFromSlack } from "../../services/identityResolver";
+import type {HandlerCtx} from '../../ctx';
+import {resolveFromSlack} from '../../services/identityResolver';
 
 interface AppMentionEvent {
-  type: "app_mention";
+  type: 'app_mention';
   user: string;
   text: string;
   ts: string;
@@ -26,8 +22,8 @@ interface AppMentionEvent {
 }
 
 interface MessageImEvent {
-  type: "message";
-  channel_type: "im";
+  type: 'message';
+  channel_type: 'im';
   user?: string;
   text?: string;
   ts: string;
@@ -38,7 +34,7 @@ interface MessageImEvent {
 }
 
 interface MemberJoinedChannelEvent {
-  type: "member_joined_channel";
+  type: 'member_joined_channel';
   user: string;
   channel: string;
   channel_type?: string;
@@ -47,14 +43,14 @@ interface MemberJoinedChannelEvent {
 
 export async function handleAppMention(
   event: AppMentionEvent,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<void> {
   const profile = await resolveFromSlack(ctx, event.user).catch(() => null);
-  const firstName = profile?.firstName ?? "there";
+  const firstName = profile?.firstName ?? 'there';
   const response = await generateConversationalReply(
     ctx,
     firstName,
-    stripBotMention(event.text),
+    stripBotMention(event.text)
   );
   await ctx.slack.chat.postMessage({
     channel: event.channel,
@@ -65,15 +61,15 @@ export async function handleAppMention(
 
 export async function handleMessageIm(
   event: MessageImEvent,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<void> {
   if (event.subtype || event.bot_id || !event.user || !event.text) return;
   const profile = await resolveFromSlack(ctx, event.user).catch(() => null);
-  const firstName = profile?.firstName ?? "there";
+  const firstName = profile?.firstName ?? 'there';
   const response = await generateConversationalReply(
     ctx,
     firstName,
-    event.text,
+    event.text
   );
   await ctx.slack.chat.postMessage({
     channel: event.channel,
@@ -84,23 +80,22 @@ export async function handleMessageIm(
 
 export async function handleMemberJoinedChannel(
   event: MemberJoinedChannelEvent,
-  ctx: HandlerCtx,
+  ctx: HandlerCtx
 ): Promise<void> {
-  // Hackathon scope: log only. The Node bot greeted new joiners in
-  // specific channels; that state (which channels to watch) lived
-  // in env config. Reintroducing that requires a channel allowlist
-  // that's outside the minimum-viable migration.
+  // Log-only today. A per-channel greet flow needs a channel allowlist
+  // (which channels warrant an auto-greet) — add that here when we
+  // decide to ship it.
   ctx.logger.info(
-    `member_joined_channel: user=${event.user} channel=${event.channel}`,
+    `member_joined_channel: user=${event.user} channel=${event.channel}`
   );
 }
 
 async function generateConversationalReply(
   ctx: HandlerCtx,
   firstName: string,
-  text: string,
+  text: string
 ): Promise<string> {
-  const sanitized = text.trim() || "Say hello";
+  const sanitized = text.trim() || 'Say hello';
   if (!ctx.llm.isConfigured()) {
     return `Hey ${firstName} 👋 I'm Spark. My AI is offline right now — your Home tab has your onboarding plan while I catch up.`;
   }
@@ -110,16 +105,16 @@ async function generateConversationalReply(
         `You are Spark, a friendly onboarding companion for Webflow engineers.`,
         `Keep replies short (2-4 sentences) and concrete.`,
         `If the user needs something you cannot do, point them to the "Request Help" workflow in #triage-build-loop.`,
-      ].join("\n"),
-      `${firstName} said: ${sanitized}`,
+      ].join('\n'),
+      `${firstName} said: ${sanitized}`
     );
     return reply || `Thanks ${firstName} — I'll follow up shortly.`;
   } catch (error) {
-    ctx.logger.warn("LLM conversational reply failed", error);
+    ctx.logger.warn('LLM conversational reply failed', error);
     return `Thanks ${firstName} — I'm having trouble reaching my assistant right now. Try again in a moment, or check your Home tab for the onboarding plan.`;
   }
 }
 
 function stripBotMention(text: string): string {
-  return text.replace(/<@[A-Z0-9]+>/g, "").trim();
+  return text.replace(/<@[A-Z0-9]+>/g, '').trim();
 }
