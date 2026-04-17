@@ -10,8 +10,8 @@
  *      prevent cookie-theft flow-completion attacks).
  *   2. Exchange the code for access + refresh tokens.
  *   3. Hit accessible-resources to learn which Atlassian site (cloudId)
- *      the token is scoped to. Pick the first one — multi-site-per-user
- *      is out of scope for the hackathon.
+ *      the token is scoped to. The first accessible site wins; managers
+ *      with multiple sites can rewire via a disconnect + reconnect.
  *   4. Persist the full record in the atlassian_tokens D1 table keyed
  *      on the viewer's email.
  *   5. 302 back to the home page.

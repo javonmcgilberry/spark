@@ -94,14 +94,11 @@ describe('Slack event dispatcher', () => {
     const ctx = makeTestCtx({
       db,
       slack: {
-        usersInfo: {
+        usersProfileGet: {
           UHIRE0001: {
-            id: 'UHIRE0001',
-            profile: {
-              first_name: 'New',
-              display_name: 'newhire',
-              email: 'newhire@webflow.com',
-            },
+            first_name: 'New',
+            display_name: 'newhire',
+            email: 'newhire@webflow.com',
           },
         },
       },

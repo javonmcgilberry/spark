@@ -36,15 +36,19 @@ lives in from day one.
 Spark is a multi-agent system that turns onboarding into a reviewable
 draft in minutes:
 
-1. **Generator agent** — Anthropic tool-use loop with six real tools.
-   It calls `resolve_new_hire` against Slack, `fetch_team_roster` to
-   pull actual engineer peers / PM / designer / director / people
-   partner via custom Slack profile fields and manager-chain
-   traversal, `find_stakeholders` to look up Confluence user guides,
-   `draft_welcome_note` to stream two welcome voices (manager + Spark)
-   the instant they're written, `tune_checklist` to add team-specific
-   items, and `finalize_draft` to commit the full plan. Up to 20
-   iterations with per-tool timeouts and schema validation.
+1. **Generator agent** — Anthropic tool-use loop. Before the loop runs,
+   Spark resolves the real roster deterministically from the DX
+   warehouse (Postgres over Cloudflare Workers TCP sockets) — teammates,
+   manager chain, PM, designer, director, and people partner — and
+   hydrates avatars + Slack ids from the workspace directory. The LLM
+   then calls `resolve_new_hire` for hire metadata, `draft_welcome_note`
+   to stream two welcome voices (manager + Spark) the instant they're
+   written, `find_team_references` for Confluence team context,
+   `tune_checklist` to add team-specific items, and `finalize_draft` to
+   commit the welcome copy + checklist. People selection, buddy
+   assignment, and reviewer identity are server-owned; the LLM never
+   names a teammate or fabricates a Slack id. Up to 20 iterations with
+   per-tool timeouts and schema validation.
 2. **Critique agent** — reads the finalized draft and returns
    structured findings (missing buddy, thin welcome note, roster
    mismatches). Each finding ships with a one-click patch.
@@ -164,10 +168,11 @@ for the full runbook. The ~4-minute happy path:
 2. Click **Create onboarding plan** → pick a new hire from the Slack
    picker.
 3. Click **Create draft & run agent** → watch the generator timeline
-   stream live (`resolve_new_hire → fetch_team_roster →
-draft_welcome_note → find_stakeholders → tune_checklist →
-finalize_draft`). The welcome note persists the instant
-   `draft_welcome_note` fires.
+   stream live (`resolve_new_hire → draft_welcome_note →
+find_team_references → tune_checklist → finalize_draft`). The
+   welcome note persists the instant `draft_welcome_note` fires, and
+   the roster is already populated with real teammates from the DX
+   warehouse before the loop even starts.
 4. In the draft workspace: assign the buddy (manager's call — Spark
    never auto-selects), edit anything, click **Ask agent to review**
    to run the Critique agent.

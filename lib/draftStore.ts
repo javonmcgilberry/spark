@@ -254,25 +254,15 @@ export function applyPatchInPlace(
     existing.welcomeIntro = next;
     existing.sections.welcome.intro = next ?? existing.sections.welcome.intro;
   }
-  if (patch.buddyUserId !== undefined) {
-    existing.buddyUserId = patch.buddyUserId ?? undefined;
-  }
-  if (patch.stakeholderUserIds) {
-    const baseIds = [
-      existing.createdByUserId,
-      existing.managerUserId,
-      existing.buddyUserId,
-      ...patch.stakeholderUserIds,
-    ].filter((value): value is string => Boolean(value));
-    existing.reviewerUserIds = Array.from(new Set(baseIds));
-  }
   if (patch.customChecklistItems) {
     existing.customChecklistItems = patch.customChecklistItems.map(cloneItem);
   }
   if (patch.peopleToMeet) {
-    const people = patch.peopleToMeet.map(clonePerson);
-    existing.sections.peopleToMeet.people = people;
-    const assignedBuddy = people.find(
+    existing.sections.peopleToMeet.people = mergePeopleRows(
+      existing.sections.peopleToMeet.people,
+      patch.peopleToMeet
+    );
+    const assignedBuddy = existing.sections.peopleToMeet.people.find(
       (person) => person.kind === 'buddy' && person.slackUserId
     )?.slackUserId;
     existing.buddyUserId = assignedBuddy ?? undefined;
@@ -323,4 +313,79 @@ function cloneItem(item: ChecklistItem): ChecklistItem {
 
 function clonePerson(person: OnboardingPerson): OnboardingPerson {
   return {...person};
+}
+
+/**
+ * Merge patched people into the existing roster, keyed by canonical
+ * identity (slackUserId → email → name, lowercased). Preserves
+ * server-owned fields on each existing row (`userGuide`, `avatarUrl`,
+ * `insightsAttempts`, etc.) while letting the patch supply editable
+ * fields. New rows from the patch are appended. Removed rows (in
+ * existing but absent from the patch) are dropped — this matches the
+ * editor's "send the whole list" shape while still preserving metadata
+ * on rows that survive.
+ *
+ * De-dupes on insert: if two patch rows collide on canonical identity
+ * (e.g. the manager promoted an existing teammate into the buddy slot)
+ * the last one wins and the earlier entry is dropped.
+ */
+function mergePeopleRows(
+  existing: OnboardingPerson[],
+  patchRows: OnboardingPerson[]
+): OnboardingPerson[] {
+  const existingByKey = new Map<string, OnboardingPerson>();
+  for (const row of existing) {
+    existingByKey.set(canonicalKey(row), row);
+  }
+  const merged: OnboardingPerson[] = [];
+  const seen = new Set<string>();
+  for (const row of patchRows) {
+    const key = canonicalKey(row);
+    if (seen.has(key)) {
+      // Later patch entry takes precedence over earlier ones.
+      const index = merged.findIndex(
+        (candidate) => canonicalKey(candidate) === key
+      );
+      if (index >= 0) {
+        const prior = existingByKey.get(key);
+        merged[index] = mergePerson(prior, row);
+      }
+      continue;
+    }
+    seen.add(key);
+    const prior = existingByKey.get(key);
+    merged.push(mergePerson(prior, row));
+  }
+  return merged;
+}
+
+function canonicalKey(person: OnboardingPerson): string {
+  return (person.slackUserId || person.email || person.name)
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Merge rule: patch fields win over existing fields for anything the
+ * manager can edit in the UI (name, role, discussionPoints, weekBucket,
+ * kind, title, notes, askMeAbout, insightsStatus). Server-owned fields
+ * (userGuide, insightsAttempts) are preserved when the patch omits
+ * them. Identity fields (slackUserId, email, avatarUrl) are preserved
+ * from the existing row when the patch omits them so a "text-only edit"
+ * never clears avatar/email.
+ */
+function mergePerson(
+  prior: OnboardingPerson | undefined,
+  patch: OnboardingPerson
+): OnboardingPerson {
+  if (!prior) return {...patch};
+  return {
+    ...prior,
+    ...patch,
+    slackUserId: patch.slackUserId ?? prior.slackUserId,
+    email: patch.email ?? prior.email,
+    avatarUrl: patch.avatarUrl ?? prior.avatarUrl,
+    userGuide: patch.userGuide ?? prior.userGuide,
+    insightsAttempts: patch.insightsAttempts ?? prior.insightsAttempts,
+  };
 }

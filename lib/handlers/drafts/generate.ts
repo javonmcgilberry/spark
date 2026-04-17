@@ -1,7 +1,7 @@
 import type {HandlerCtx} from '../../ctx';
 import type {ManagerSession} from '../../session';
 import {runGenerator, type GeneratorInput} from '../../agents/generator';
-import type {OnboardingPerson} from '../../types';
+import type {OnboardingPackage, OnboardingPerson} from '../../types';
 
 export async function handleGenerateDraft(
   request: Request,
@@ -22,6 +22,15 @@ export async function handleGenerateDraft(
   }
 
   const encoder = new TextEncoder();
+  // Preflight snapshot: the deterministic roster + insight work that
+  // already ran during handleCreateDraft. Fetched before the LLM loop
+  // kicks off so we can surface it as the first step in the agent
+  // timeline — otherwise managers see "Resolving new hire" as the
+  // first step and have no visibility into whether teammates actually
+  // resolved.
+  const existing = await ctx.db.get(userId).catch(() => undefined);
+  const preflight = buildRosterPreflight(existing);
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: unknown) => {
@@ -29,6 +38,27 @@ export async function handleGenerateDraft(
           encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
         );
       };
+
+      // Emit the preflight as a tool_call + tool_result pair so the
+      // AgentTimeline renders it as "step 1" without any new event
+      // type. iteration: -1 marks it as pre-LLM work.
+      if (preflight) {
+        send({
+          type: 'tool_call',
+          iteration: -1,
+          tool: 'resolve_team_roster',
+          input: preflight.input,
+        });
+        send({
+          type: 'tool_result',
+          iteration: -1,
+          tool: 'resolve_team_roster',
+          durationMs: 0,
+          ok: true,
+          preview: preflight.preview,
+        });
+      }
+
       try {
         for await (const event of runGenerator(body, {
           ctx,
@@ -64,17 +94,14 @@ export async function handleGenerateDraft(
             }
           }
           if (event.type === 'draft_ready') {
+            // The generator's finalize_draft schema carries welcome copy
+            // + checklist additions. The roster (peopleToMeet) is
+            // resolved deterministically server-side and never flows
+            // from the LLM.
             try {
-              const existing = await ctx.db.get(userId);
               const pkg = await ctx.db.applyFieldPatch(userId, {
                 welcomeIntro: event.draft.welcomeIntro,
                 welcomeNote: event.draft.welcomeNote,
-                buddyUserId: existing?.buddyUserId ?? null,
-                stakeholderUserIds: event.draft.stakeholderUserIds,
-                peopleToMeet: mergePeopleToMeet(
-                  existing?.sections.peopleToMeet.people ?? [],
-                  event.draft.peopleToMeet
-                ),
                 customChecklistItems: event.draft.customChecklistItems,
               });
               if (pkg) {
@@ -111,62 +138,72 @@ export async function handleGenerateDraft(
   });
 }
 
-function mergePeopleToMeet(
-  existing: OnboardingPerson[],
-  generated: OnboardingPerson[]
-): OnboardingPerson[] {
-  const merged = generated.map((person) =>
-    hydrateGeneratedPerson(person, existing)
-  );
-  const seen = new Set(merged.map(personKey));
-  for (const person of existing) {
-    const key = personKey(person);
-    if (seen.has(key)) continue;
-    merged.push(person);
-    seen.add(key);
-  }
-  return merged.slice(0, 12);
-}
-
-function hydrateGeneratedPerson(
-  person: OnboardingPerson,
-  existing: OnboardingPerson[]
-): OnboardingPerson {
-  const match = person.slackUserId
-    ? existing.find((candidate) => candidate.slackUserId === person.slackUserId)
-    : existing.find((candidate) => sameRole(candidate, person));
-  if (!match) return person;
-  if (!person.slackUserId) {
-    return {
-      ...match,
-      ...person,
-      name: match.name,
-      role: match.role,
-      title: match.title,
-      slackUserId: match.slackUserId,
-      email: match.email,
-      avatarUrl: match.avatarUrl,
-      kind: person.kind ?? match.kind,
-    };
-  }
-  return {
-    ...match,
-    ...person,
-    title: person.title ?? match.title,
-    email: match.email,
-    avatarUrl: match.avatarUrl,
-    kind: person.kind ?? match.kind,
+interface RosterPreflight {
+  input: {
+    teamName: string;
+    pillarName?: string;
+  };
+  preview: {
+    resolved: number;
+    placeholders: number;
+    teammates: number;
+    crossFunctional: number;
+    manager: string | null;
+    source: 'warehouse' | 'slack-fallback' | 'unknown';
+    roster: Array<{
+      name: string;
+      kind: string;
+      resolved: boolean;
+    }>;
   };
 }
 
-function sameRole(left: OnboardingPerson, right: OnboardingPerson): boolean {
-  return roleKey(left) === roleKey(right);
+function buildRosterPreflight(
+  pkg: OnboardingPackage | undefined
+): RosterPreflight | null {
+  if (!pkg) return null;
+  const people = pkg.sections.peopleToMeet.people;
+  const resolved = people.filter((p) => Boolean(p.slackUserId));
+  const placeholders = people.filter((p) => !p.slackUserId);
+  const teammates = resolved.filter((p) => p.kind === 'teammate').length;
+  const crossFunctional = resolved.filter((p) =>
+    ['pm', 'designer', 'director', 'people-partner'].includes(p.kind ?? '')
+  ).length;
+  const manager = people.find((p) => p.kind === 'manager');
+  // Infer the source from what's filled in. A populated teammate or
+  // cross-functional row means the warehouse answered; otherwise, if
+  // the manager is the only resolved slot, the fallback resolver did.
+  const source: RosterPreflight['preview']['source'] =
+    teammates > 0 || crossFunctional > 0
+      ? 'warehouse'
+      : resolved.some((p) => p.kind === 'manager')
+        ? 'slack-fallback'
+        : 'unknown';
+  return {
+    input: {
+      teamName: pkg.teamName ?? 'Engineering',
+      pillarName: pkg.pillarName,
+    },
+    preview: {
+      resolved: resolved.length,
+      placeholders: placeholders.length,
+      teammates,
+      crossFunctional,
+      manager: manager?.slackUserId ? (manager.name ?? null) : null,
+      source,
+      roster: people.map(personSummary),
+    },
+  };
 }
 
-function personKey(person: OnboardingPerson): string {
-  return person.slackUserId?.toLowerCase() ?? roleKey(person);
-}
-
-function roleKey(person: OnboardingPerson): string {
-  return (person.kind ?? person.role).trim().toLowerCase();
+function personSummary(person: OnboardingPerson): {
+  name: string;
+  kind: string;
+  resolved: boolean;
+} {
+  return {
+    name: person.name,
+    kind: person.kind ?? 'custom',
+    resolved: Boolean(person.slackUserId),
+  };
 }

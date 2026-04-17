@@ -27,8 +27,12 @@ export default function RootLayout({children}: {children: ReactNode}) {
       <body
         style={{
           margin: 0,
+          // Pure system stack. We never ship a custom web font, so listing
+          // one here just caused every page to do a useless font-family
+          // lookup before falling through to system-ui. Keeping the stack
+          // OS-native also avoids FOUT/FOIT entirely.
           fontFamily:
-            'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+            'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
           background: '#0f172a',
           color: '#e2e8f0',
           minHeight: '100vh',

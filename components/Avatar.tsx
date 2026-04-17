@@ -4,10 +4,18 @@ export function Avatar({
   name,
   src,
   size = 40,
+  priority = false,
 }: {
   name: string | undefined;
   src?: string;
   size?: number;
+  /**
+   * `priority` marks an above-the-fold avatar that should load eagerly
+   * (e.g. the manager card at the top of the draft workspace). Defaults
+   * false so the default behavior for list items is lazy-loading — most
+   * avatars live in rosters / search results that scroll into view.
+   */
+  priority?: boolean;
 }) {
   const safeName = name?.trim() || '?';
   if (src) {
@@ -17,6 +25,9 @@ export function Avatar({
         alt=""
         width={size}
         height={size}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        {...(priority ? {fetchPriority: 'high' as const} : {})}
         style={imageStyle(size)}
       />
     );

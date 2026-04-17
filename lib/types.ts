@@ -89,7 +89,21 @@ export interface OnboardingPerson {
   slackUserId?: string;
   avatarUrl?: string;
   askMeAbout?: string;
-  insightsStatus?: 'pending' | 'ready' | 'error' | 'data-starved';
+  /**
+   * Insight lifecycle state. `pending` — awaiting prewarm/refresh;
+   * `ready` — blurb + data arrived; `data-starved` — no Jira/GitHub
+   * signal so the row falls back to the catalog discussion points;
+   * `error` / `retryable-error` — refresh failed, caller should retry;
+   * `user-overridden` — the manager edited discussionPoints, so
+   * server-side refreshes must not overwrite this row's text.
+   */
+  insightsStatus?:
+    | 'pending'
+    | 'ready'
+    | 'error'
+    | 'retryable-error'
+    | 'data-starved'
+    | 'user-overridden';
   insightsAttempts?: InsightAttempt[];
 }
 
@@ -245,9 +259,13 @@ export interface OnboardingPackage {
 export interface DraftFieldPatch {
   welcomeNote?: string | null;
   welcomeIntro?: string | null;
-  buddyUserId?: string | null;
-  stakeholderUserIds?: string[];
   customChecklistItems?: ChecklistItem[];
+  /**
+   * Manager's edits to the roster. Setting a buddy row's slackUserId
+   * here is what promotes someone to the onboarding buddy — the server
+   * derives pkg.buddyUserId from this list, so there's no separate
+   * buddy-assignment affordance on the patch surface.
+   */
   peopleToMeet?: OnboardingPerson[];
   checklistRows?: Record<string, ChecklistItem[]>;
 }
@@ -256,7 +274,4 @@ export interface CreateDraftBody {
   newHireSlackId?: string;
   newHireEmail?: string;
   teamHint?: string;
-  welcomeNote?: string;
-  buddyUserId?: string;
-  stakeholderUserIds?: string[];
 }

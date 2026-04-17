@@ -46,6 +46,7 @@ export function useDraft(
       return;
     }
     setStatus('saving');
+    const expectedUpdatedAt = pkg.updatedAt;
     const run = (async () => {
       try {
         const res = await fetch(
@@ -53,9 +54,19 @@ export function useDraft(
           {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(batch),
+            body: JSON.stringify({...batch, expectedUpdatedAt}),
           }
         );
+        if (res.status === 409) {
+          // Another tab or server-initiated write won. Re-fetch and let
+          // the user retry. We don't silently replay: the patch may no
+          // longer make sense against the new server state.
+          setStatus('error');
+          setLastError(
+            'This draft changed in another tab. Refresh to load the latest.'
+          );
+          return;
+        }
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as {
             error?: string;
@@ -75,7 +86,7 @@ export function useDraft(
     })();
     inFlight.current = run;
     await run;
-  }, [pkg.userId]);
+  }, [pkg.userId, pkg.updatedAt]);
 
   const patch = useCallback(
     (next: DraftFieldPatch, opts?: {flush?: boolean}) => {
@@ -98,6 +109,9 @@ export function useDraft(
   );
 
   const reload = useCallback(async () => {
+    // Flush any pending edits before we pull the latest server state so
+    // typing-in-flight doesn't lose out to a refresh-insights response.
+    await flush().catch(() => {});
     try {
       const res = await fetch(`/api/drafts/${encodeURIComponent(pkg.userId)}`);
       if (!res.ok) throw new Error(`reload failed (${res.status})`);
@@ -109,13 +123,21 @@ export function useDraft(
       setStatus('error');
       setLastError(error instanceof Error ? error.message : 'unknown error');
     }
-  }, [pkg.userId]);
+  }, [pkg.userId, flush]);
 
-  const replace = useCallback((next: OnboardingPackage) => {
-    setPkg(next);
-    setStatus('idle');
-    setLastError(null);
-  }, []);
+  const replace = useCallback(
+    (next: OnboardingPackage) => {
+      // Same precaution as reload: if the user is typing while a
+      // server-initiated update lands, flush first. Callers that know
+      // there's no client-side write in flight (e.g. initial load) are
+      // unaffected — flush is a no-op with an empty pending batch.
+      void flush().catch(() => {});
+      setPkg(next);
+      setStatus('idle');
+      setLastError(null);
+    },
+    [flush]
+  );
 
   useEffect(() => {
     return () => {
@@ -151,9 +173,6 @@ function applyLocal(
     if (patch.welcomeIntro) {
       next.sections.welcome.intro = patch.welcomeIntro;
     }
-  }
-  if (patch.buddyUserId !== undefined) {
-    next.buddyUserId = patch.buddyUserId ?? undefined;
   }
   if (patch.customChecklistItems !== undefined) {
     next.customChecklistItems = [...patch.customChecklistItems];

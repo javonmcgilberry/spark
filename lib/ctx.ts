@@ -24,6 +24,8 @@ import type {JiraClient} from './services/jira';
 import {makeJiraClient, makeStubJira} from './services/jira';
 import type {LlmClient} from './services/llm';
 import {makeAnthropicClient, makeStubLlm} from './services/llm';
+import type {OrgGraphClient} from './services/orgGraph';
+import {makeOrgGraphClient, makeStubOrgGraph} from './services/orgGraph';
 import type {SlackClient} from './services/slack';
 import {makeRecordingSlackClient, makeSlackWebClient} from './services/slack';
 import type {DraftStore} from './draftStore';
@@ -38,6 +40,13 @@ export interface HandlerCtx {
   jira: JiraClient;
   github: GitHubClient;
   confluence: ConfluenceClient;
+  /**
+   * DX warehouse org-graph. Primary source of truth for teammates,
+   * cross-functional partners, and the manager chain. Degrades to a
+   * no-op client when DX_WAREHOUSE_DSN is missing so the Slack
+   * fallback path in identityResolver can take over cleanly.
+   */
+  org: OrgGraphClient;
   logger: Logger;
   env: CloudflareEnv;
   /**
@@ -106,6 +115,7 @@ export function makeProdCtx(
       );
 
   const github = makeGitHubClient(env as Record<string, string>, logger);
+  const org = makeOrgGraphClient(env as Record<string, string>, logger);
   const db = resolveDraftStore(env, logger);
 
   const waitUntil =
@@ -128,6 +138,7 @@ export function makeProdCtx(
     jira: undefined as unknown as JiraClient,
     confluence: undefined as unknown as ConfluenceClient,
     github,
+    org,
     logger,
     env,
     scratch: {},
@@ -206,6 +217,7 @@ export {
   makeStubGitHub,
   makeStubJira,
   makeStubLlm,
+  makeStubOrgGraph,
   makeRecordingSlackClient,
   makeMemoryDraftStore,
 };

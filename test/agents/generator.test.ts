@@ -87,24 +87,6 @@ const VALID_DRAFT = {
     "Welcome aboard! I've mapped out your first few weeks — people, a PR, and the rooms that matter.",
   welcomeNote:
     'Welcome to Webflow and to the Commerce Sprint team. Your first few weeks will focus on learning our checkout flow and pairing on a small feature. Glad to have you.',
-  buddyUserId: 'UTM1',
-  stakeholderUserIds: ['UPM1'],
-  peopleToMeet: [
-    {
-      name: 'Grace Hopper',
-      role: 'Manager',
-      discussionPoints: 'Priorities',
-      weekBucket: 'week1-2',
-      slackUserId: 'UMGR',
-    },
-    {
-      name: 'Maria Vega',
-      role: 'Senior Engineer',
-      discussionPoints: 'Codebase tour',
-      weekBucket: 'week1-2',
-      slackUserId: 'UTM1',
-    },
-  ],
   customChecklistItems: [
     {
       label: 'Shadow the on-call rotation in week 2',
@@ -155,8 +137,10 @@ describe('runGenerator — happy path', () => {
       (e): e is Extract<GeneratorEvent, {type: 'draft_ready'}> =>
         e.type === 'draft_ready'
     );
-    expect(draftReady?.draft.buddyUserId).toBe('UTM1');
-    expect(draftReady?.draft.peopleToMeet).toHaveLength(2);
+    expect(draftReady?.draft.customChecklistItems).toHaveLength(1);
+    // Generator output carries ONLY welcome + checklist fields now.
+    expect('peopleToMeet' in (draftReady?.draft ?? {})).toBe(false);
+    expect('buddyUserId' in (draftReady?.draft ?? {})).toBe(false);
   });
 });
 
@@ -199,8 +183,6 @@ describe('runGenerator — Zod validation', () => {
         content: [
           toolUse('finalize_draft', {
             welcomeNote: 'short',
-            stakeholderUserIds: [],
-            peopleToMeet: [],
             customChecklistItems: [],
             summary: '',
           }),

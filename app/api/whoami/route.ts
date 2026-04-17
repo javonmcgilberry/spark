@@ -39,6 +39,7 @@ const SECRET_ENV_KEYS = [
   'CONFLUENCE_API_TOKEN',
   'ATLASSIAN_OAUTH_CLIENT_ID',
   'ATLASSIAN_OAUTH_CLIENT_SECRET',
+  'DX_WAREHOUSE_DSN',
 ] as const;
 
 // Vars whose values are non-sensitive config — the probe shows them

@@ -19,6 +19,17 @@ export interface SlackUserHit {
   avatarUrl?: string;
 }
 
+export interface SearchUsersResult {
+  users: SlackUserHit[];
+  /**
+   * `partial` signals that the current directory snapshot is
+   * incomplete (rate-limit, pagination cap, or transient error).
+   * Pickers can surface a "still loading" hint so an empty result
+   * doesn't read as "no matches."
+   */
+  partial: boolean;
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const PAGE_LIMIT = 200;
 const MAX_PAGES = 100;
@@ -26,40 +37,66 @@ const MAX_PAGES = 100;
 interface Cache {
   users: SlackUserHit[];
   expiresAt: number;
+  partial: boolean;
 }
 
-function getCache(ctx: HandlerCtx): {
+interface CacheContainer {
   current: Cache | null;
   inFlight: Promise<SlackUserHit[]> | null;
-} {
-  const existing = ctx.scratch.slackDirectory as
-    | {current: Cache | null; inFlight: Promise<SlackUserHit[]> | null}
-    | undefined;
+}
+
+/**
+ * Directory cache lives on `globalThis` so it survives across
+ * HandlerCtx instances within the same Worker isolate. Cold starts
+ * repopulate; warm starts read from memory instantly. Without this,
+ * every picker keystroke re-paginated `users.list` (Tier 2,
+ * 20 req/min) and got rate-limited on any workspace bigger than a few
+ * hundred people.
+ *
+ * The cache is still request-scoped via ctx.scratch as a fallback in
+ * test environments where globalThis is fine to mutate but each test
+ * wants an isolated cache. `primeDirectoryForTests` writes to both.
+ */
+const DIRECTORY_SYMBOL = Symbol.for('spark.slackDirectory');
+function getIsolateCache(): CacheContainer {
+  const host = globalThis as unknown as Record<symbol, CacheContainer>;
+  if (!host[DIRECTORY_SYMBOL]) {
+    host[DIRECTORY_SYMBOL] = {current: null, inFlight: null};
+  }
+  return host[DIRECTORY_SYMBOL];
+}
+
+function getCache(ctx: HandlerCtx): CacheContainer {
+  const existing = ctx.scratch.slackDirectory as CacheContainer | undefined;
   if (existing) return existing;
-  const created = {current: null as Cache | null, inFlight: null};
-  ctx.scratch.slackDirectory = created;
-  return created;
+  // Share the isolate-scoped cache so repeat requests within the same
+  // Worker instance reuse the populated directory instead of
+  // re-paginating on every keystroke.
+  const shared = getIsolateCache();
+  ctx.scratch.slackDirectory = shared;
+  return shared;
 }
 
 export async function searchUsers(
   ctx: HandlerCtx,
   query: string,
-  limit = 10,
-  options: {seedSlackUserIds?: string[]} = {}
+  limit = 10
 ): Promise<SlackUserHit[]> {
+  const result = await searchUsersWithState(ctx, query, limit);
+  return result.users;
+}
+
+export async function searchUsersWithState(
+  ctx: HandlerCtx,
+  query: string,
+  limit = 10
+): Promise<SearchUsersResult> {
   const users = await getAll(ctx);
   const cache = getCache(ctx);
-
-  const missing = (options.seedSlackUserIds ?? []).filter(
-    (id) => !users.some((u) => u.slackUserId === id)
-  );
-  if (missing.length > 0) {
-    await seedByIds(ctx, cache, missing);
-  }
-
   const pool = cache.current?.users ?? users;
+  const partial = cache.current?.partial ?? false;
   const needle = query.trim().toLowerCase();
-  if (!needle) return pool.slice(0, limit);
+  if (!needle) return {users: pool.slice(0, limit), partial};
 
   const scored: Array<{hit: SlackUserHit; score: number}> = [];
   for (const user of pool) {
@@ -67,7 +104,7 @@ export async function searchUsers(
     if (score > 0) scored.push({hit: user, score});
   }
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.hit);
+  return {users: scored.slice(0, limit).map((s) => s.hit), partial};
 }
 
 export async function listAllUsers(ctx: HandlerCtx): Promise<SlackUserHit[]> {
@@ -145,7 +182,7 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
   // whatever we got so the picker stays usable, but cut the TTL so we
   // retry sooner instead of serving a half-empty directory for 10 min.
   const ttl = partial ? 60_000 : CACHE_TTL_MS;
-  cache.current = {users: hits, expiresAt: Date.now() + ttl};
+  cache.current = {users: hits, expiresAt: Date.now() + ttl, partial};
   ctx.logger.info(
     `Slack user directory refreshed: ${hits.length} users across ${pagesUsed} page(s)${partial ? ' (partial — pagination cut short)' : ''}`
   );
@@ -155,48 +192,6 @@ async function refresh(ctx: HandlerCtx): Promise<SlackUserHit[]> {
     );
   }
   return hits;
-}
-
-async function seedByIds(
-  ctx: HandlerCtx,
-  cache: ReturnType<typeof getCache>,
-  ids: string[]
-): Promise<void> {
-  if (!cache.current) return;
-  for (const id of ids) {
-    try {
-      const res = await ctx.slack.users.info({user: id});
-      const member = res.user;
-      if (!member?.id || member.deleted || member.is_bot) continue;
-      const profile = member.profile ?? {};
-      const realName =
-        profile.real_name_normalized ??
-        profile.real_name ??
-        member.real_name ??
-        member.name ??
-        'Unknown';
-      const displayName =
-        profile.display_name_normalized ?? profile.display_name ?? realName;
-      cache.current.users.push({
-        slackUserId: member.id,
-        name: realName,
-        displayName: displayName || realName,
-        email: profile.email?.trim() || undefined,
-        title: profile.title?.trim() || undefined,
-        avatarUrl: profile.image_192 ?? profile.image_72 ?? undefined,
-      });
-    } catch (error) {
-      ctx.logger.warn(
-        `Slack user directory: seed-by-id failed for ${id}`,
-        error
-      );
-    }
-  }
-  cache.current.users.sort((a, b) =>
-    a.displayName.localeCompare(b.displayName, undefined, {
-      sensitivity: 'base',
-    })
-  );
 }
 
 function rank(user: SlackUserHit, needle: string): number {
@@ -215,6 +210,23 @@ export function primeDirectoryForTests(
   ctx: HandlerCtx,
   users: SlackUserHit[]
 ): void {
-  const cache = getCache(ctx);
-  cache.current = {users, expiresAt: Date.now() + CACHE_TTL_MS};
+  // Tests get their own isolated cache on ctx.scratch so the
+  // globalThis singleton doesn't leak across cases. The real picker
+  // path reads whichever cache ctx.scratch.slackDirectory points at,
+  // so either way works.
+  const fresh: CacheContainer = {
+    current: {
+      users,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      partial: false,
+    },
+    inFlight: null,
+  };
+  ctx.scratch.slackDirectory = fresh;
+}
+
+/** Test-only: wipe the globalThis-scoped directory so cases start clean. */
+export function resetIsolateDirectoryCacheForTests(): void {
+  const host = globalThis as unknown as Record<symbol, CacheContainer>;
+  delete host[DIRECTORY_SYMBOL];
 }

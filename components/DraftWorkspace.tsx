@@ -18,7 +18,12 @@ export function DraftWorkspaceHeader() {
   return (
     <header style={headerStyle}>
       <div style={{display: 'flex', gap: 16, alignItems: 'center'}}>
-        <Avatar name={displayName} src={state.pkg.newHireAvatarUrl} size={48} />
+        <Avatar
+          name={displayName}
+          src={state.pkg.newHireAvatarUrl}
+          size={48}
+          priority
+        />
         <div style={{display: 'grid', gap: 4}}>
           <p style={eyebrowStyle}>Onboarding plan for</p>
           <h1 style={{margin: 0, fontSize: 28, lineHeight: 1.15}}>

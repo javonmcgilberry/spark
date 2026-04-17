@@ -194,10 +194,11 @@ Before first deploy:
 1. Open the same app URL you configured in Slack. Show the draft inbox.
 2. Click **Create onboarding plan**. Pick a new hire.
 3. Click **Ask Spark to draft**. Watch the agent timeline in the
-   sidebar tick through `resolve_new_hire → fetch_team_roster →
-propose_buddy → draft_welcome_note → find_stakeholders →
-tune_checklist → finalize_draft`. The welcome text renders live
-   as soon as `draft_welcome_note` fires.
+   sidebar tick through `resolve_new_hire → draft_welcome_note →
+find_team_references → tune_checklist → finalize_draft`. The
+   welcome text renders live as soon as `draft_welcome_note` fires.
+   (People-to-meet is already populated from the DX warehouse by the
+   time the agent starts — the LLM never touches it.)
 4. Edit the welcome note, swap a person, check the Critique
    findings in the sidebar.
 5. Click **Publish**. Show the new hire receiving the Slack canvas

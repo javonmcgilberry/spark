@@ -16,6 +16,16 @@ import {writePersonBlurb} from './llmBlurbs';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_TICKETS_PER_PERSON = 3;
 const MAX_PRS_PER_PERSON = 3;
+/**
+ * Concurrency cap for bulk prewarm. Each "insight" does a Jira search, a
+ * GitHub search, and an LLM blurb call — three external round-trips.
+ * With Anthropic rate limits and Workers' 6-simultaneous-subrequest
+ * default, a hard cap keeps the fan-out predictable and leaves headroom
+ * for the rest of the handler. 4 is empirically the sweet spot: it
+ * saturates Anthropic without starving Slack/Jira/GitHub calls that run
+ * concurrently from other code paths.
+ */
+const INSIGHT_BULK_CONCURRENCY = 4;
 
 export interface PersonInsight {
   askMeAbout: string | null;
@@ -120,12 +130,18 @@ export async function getInsightsForPeople(
   people: OnboardingPerson[],
   teamName: string
 ): Promise<Record<string, PersonInsight>> {
-  const entries = await Promise.all(
-    people.map(async (person) => {
+  const entries: Array<readonly [string, PersonInsight]> = [];
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < people.length) {
+      const index = cursor++;
+      const person = people[index];
       const insight = await getInsight(ctx, person, teamName);
-      return [personCacheKey(person), insight] as const;
-    })
-  );
+      entries.push([personCacheKey(person), insight] as const);
+    }
+  };
+  const workerCount = Math.min(INSIGHT_BULK_CONCURRENCY, people.length);
+  await Promise.all(Array.from({length: workerCount}, worker));
   return Object.fromEntries(entries);
 }
 

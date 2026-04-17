@@ -34,6 +34,15 @@ declare global {
     /** Repo that hosts CODEOWNERS. Defaults to "webflow/webflow". */
     GITHUB_CODEOWNERS_REPO?: string;
 
+    // ---- DX warehouse ---------------------------------------------------
+    /**
+     * Postgres DSN for the DX warehouse. Primary source of truth for
+     * teammates, cross-functional partners, and the manager chain.
+     * Unset = automatic Slack fallback in identityResolver. Store as an
+     * env secret in the Webflow Cloud dashboard, never committed.
+     */
+    DX_WAREHOUSE_DSN?: string;
+
     // ---- Atlassian ------------------------------------------------------
     /** Jira Cloud base URL (e.g. https://webflow.atlassian.net). */
     JIRA_BASE_URL?: string;

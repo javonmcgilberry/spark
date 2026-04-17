@@ -6,6 +6,7 @@ import {
   makeStubGitHub,
   makeStubJira,
   makeStubLlm,
+  makeStubOrgGraph,
   TEST_ENV,
   type HandlerCtx,
 } from '../../lib/ctx';
@@ -23,6 +24,13 @@ import type {
   ConfluenceClient,
   ConfluenceStubOverrides,
 } from '../../lib/services/confluence';
+import type {
+  OrgGraphClient,
+  OrgGraphStubOverrides,
+} from '../../lib/services/orgGraph';
+import {resetBreakerForTests} from '../../lib/services/orgGraph';
+import {resetIsolateFieldIdsForTests} from '../../lib/services/identityResolver';
+import {resetIsolateDirectoryCacheForTests} from '../../lib/services/slackUserDirectory';
 import type {DraftStore} from '../../lib/draftStore';
 import type {Logger} from '../../lib/logger';
 
@@ -32,6 +40,7 @@ export interface MakeTestCtxOptions {
   jira?: JiraClient | JiraStubOverrides;
   github?: GitHubClient | GitHubStubOverrides;
   confluence?: ConfluenceClient | ConfluenceStubOverrides;
+  org?: OrgGraphClient | OrgGraphStubOverrides;
   db?: DraftStore;
   logger?: Logger;
   env?: Partial<CloudflareEnv>;
@@ -49,6 +58,14 @@ export interface MakeTestCtxOptions {
  * service.
  */
 export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
+  // Isolate-scoped caches (directory, field-ids, orgGraph breaker) live
+  // on globalThis so they survive across HandlerCtx instances in prod.
+  // Tests expect each case to start clean, so wipe the singletons
+  // whenever a fresh ctx is built.
+  resetIsolateDirectoryCacheForTests();
+  resetIsolateFieldIdsForTests();
+  resetBreakerForTests();
+
   const slack = isSlackClient(options.slack)
     ? options.slack
     : makeRecordingSlackClient(options.slack);
@@ -67,6 +84,10 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
     ? options.confluence
     : makeStubConfluence(options.confluence);
 
+  const org = isOrgGraphClient(options.org)
+    ? options.org
+    : makeStubOrgGraph(options.org);
+
   const db = options.db ?? makeMemoryDraftStore();
   const logger = options.logger ?? createSilentLogger();
   const waitUntilTasks = options.waitUntilTasks ?? [];
@@ -78,6 +99,7 @@ export function makeTestCtx(options: MakeTestCtxOptions = {}): HandlerCtx {
     jira,
     github,
     confluence,
+    org,
     logger,
     env: {...TEST_ENV, ...(options.env ?? {})} as CloudflareEnv,
     scratch: options.scratch ?? {},
@@ -135,5 +157,12 @@ function isConfluenceClient(v: unknown): v is ConfluenceClient {
     typeof v === 'object' &&
     v !== null &&
     typeof (v as {searchFirst?: unknown}).searchFirst === 'function'
+  );
+}
+function isOrgGraphClient(v: unknown): v is OrgGraphClient {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as {lookupTeammates?: unknown}).lookupTeammates === 'function'
   );
 }

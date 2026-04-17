@@ -30,9 +30,12 @@ A Next.js 15 onboarding app on Webflow Cloud with two AI teammates:
 1. **Generator agent** — takes the new hire's Slack profile + a
    sentence of context ("Maria, backend, joining Commerce on May 1,
    cares about reliability") and autonomously runs a tool loop
-   (resolve_new_hire → fetch_team_roster → propose_buddy →
-   draft_welcome_note → find_stakeholders → tune_checklist →
-   finalize_draft). Produces a Zod-validated draft in ~20 seconds.
+   (resolve_new_hire → draft_welcome_note → find_team_references →
+   tune_checklist → finalize_draft). The roster (teammates, manager
+   chain, cross-functional partners) is resolved deterministically
+   from the DX warehouse before the loop starts, so the LLM never
+   names people or fabricates Slack ids. Produces a Zod-validated
+   welcome + checklist draft in ~10–20 seconds.
 2. **Critique agent** — runs on every save. Deterministic structural
    rules flag missing welcome notes, missing buddies, thin
    people-to-meet lists, uniform task difficulty, dead resource

@@ -5,12 +5,13 @@ import type {CSSProperties} from 'react';
 import type {GeneratorEvent} from '../lib/agents/generator';
 
 const TOOL_LABELS: Record<string, string> = {
+  // Preflight: deterministic roster work that happened at draft-create
+  // time. Emitted as a pseudo-tool_result at iteration -1 so the
+  // manager sees up front that teammates got resolved, with counts.
+  resolve_team_roster: 'Resolving team roster',
   resolve_new_hire: 'Resolving new hire',
   resolve_team: 'Looking up team',
-  fetch_team_roster: 'Fetching team roster',
-  propose_buddy: 'Proposing buddy',
-  find_stakeholders: 'Finding stakeholders',
-  find_contribution_tasks: 'Scanning for contribution tasks',
+  find_team_references: 'Finding team references',
   draft_welcome_note: 'Drafting welcome note',
   tune_checklist: 'Tuning checklist',
   finalize_draft: 'Finalizing draft',
@@ -180,9 +181,41 @@ function ProgressPill({
   );
 }
 
+interface RosterPreview {
+  resolved?: number;
+  placeholders?: number;
+  teammates?: number;
+  crossFunctional?: number;
+  manager?: string | null;
+  source?: 'warehouse' | 'slack-fallback' | 'unknown';
+  roster?: Array<{name: string; kind: string; resolved: boolean}>;
+}
+
+function rosterSummary(preview: unknown): string | null {
+  if (typeof preview !== 'object' || preview === null) return null;
+  const p = preview as RosterPreview;
+  if (typeof p.resolved !== 'number') return null;
+  const source =
+    p.source === 'warehouse'
+      ? 'DX warehouse'
+      : p.source === 'slack-fallback'
+        ? 'Slack fallback'
+        : null;
+  const pieces = [
+    `${p.resolved ?? 0} resolved`,
+    p.placeholders
+      ? `${p.placeholders} placeholder${p.placeholders === 1 ? '' : 's'}`
+      : null,
+    source,
+  ].filter((piece): piece is string => Boolean(piece));
+  return pieces.join(' · ');
+}
+
 function StepCard({step}: {step: Step}) {
   const [open, setOpen] = useState(false);
   const label = TOOL_LABELS[step.tool] ?? step.tool;
+  const summary =
+    step.tool === 'resolve_team_roster' ? rosterSummary(step.preview) : null;
   const hasDetail =
     step.input !== undefined ||
     step.preview !== undefined ||
@@ -200,9 +233,37 @@ function StepCard({step}: {step: Step}) {
           cursor: hasDetail ? 'pointer' : 'default',
         }}
       >
-        <span style={{display: 'flex', alignItems: 'center', gap: 10}}>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
           <StatusDot status={step.status} />
-          <span style={{fontSize: 13, color: '#e2e8f0'}}>{label}</span>
+          <span
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              minWidth: 0,
+            }}
+          >
+            <span style={{fontSize: 13, color: '#e2e8f0'}}>{label}</span>
+            {summary ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: '#94a3b8',
+                  marginTop: 2,
+                }}
+              >
+                {summary}
+              </span>
+            ) : null}
+          </span>
         </span>
         <span
           style={{
@@ -227,12 +288,18 @@ function StepCard({step}: {step: Step}) {
       {open && hasDetail ? (
         <div style={detailStyle}>
           {step.error ? <pre style={errorPreStyle}>{step.error}</pre> : null}
-          {step.input !== undefined ? (
-            <DetailBlock label="Input" value={step.input} />
-          ) : null}
-          {step.preview !== undefined ? (
-            <DetailBlock label="Result" value={step.preview} />
-          ) : null}
+          {step.tool === 'resolve_team_roster' && step.preview ? (
+            <RosterDetail preview={step.preview as RosterPreview} />
+          ) : (
+            <>
+              {step.input !== undefined ? (
+                <DetailBlock label="Input" value={step.input} />
+              ) : null}
+              {step.preview !== undefined ? (
+                <DetailBlock label="Result" value={step.preview} />
+              ) : null}
+            </>
+          )}
           {step.thinking.length > 0 ? (
             <div style={{display: 'grid', gap: 4}}>
               <span style={detailLabelStyle}>Thinking</span>
@@ -246,6 +313,63 @@ function StepCard({step}: {step: Step}) {
         </div>
       ) : null}
     </li>
+  );
+}
+
+function RosterDetail({preview}: {preview: RosterPreview}) {
+  const roster = preview.roster ?? [];
+  return (
+    <div style={{display: 'grid', gap: 6}}>
+      <span style={detailLabelStyle}>Roster</span>
+      {roster.length === 0 ? (
+        <span style={{fontSize: 12, color: '#94a3b8'}}>
+          No people resolved yet.
+        </span>
+      ) : (
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'grid',
+            gap: 2,
+          }}
+        >
+          {roster.map((person, i) => (
+            <li
+              key={i}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12,
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: person.resolved ? '#86efac' : '#fde68a',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  color: person.resolved ? '#e2e8f0' : '#94a3b8',
+                }}
+              >
+                {person.name}
+              </span>
+              <span style={{fontSize: 10, color: '#64748b'}}>
+                {person.kind}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

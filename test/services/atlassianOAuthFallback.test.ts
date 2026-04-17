@@ -48,7 +48,7 @@ describe('Jira + Confluence: OAuth preferred, Basic fallback', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [calledUrl, init] = fetchMock.mock.calls[0];
     expect(String(calledUrl)).toMatch(
-      /^https:\/\/api\.atlassian\.com\/ex\/jira\/cloud-42\/rest\/api\/3\/search\?/
+      /^https:\/\/api\.atlassian\.com\/ex\/jira\/cloud-42\/rest\/api\/3\/search\/jql\?/
     );
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       'Bearer bearer-token'
@@ -74,7 +74,7 @@ describe('Jira + Confluence: OAuth preferred, Basic fallback', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [calledUrl, init] = fetchMock.mock.calls[0];
     expect(String(calledUrl)).toMatch(
-      /^https:\/\/webflow\.atlassian\.net\/rest\/api\/3\/search\?/
+      /^https:\/\/webflow\.atlassian\.net\/rest\/api\/3\/search\/jql\?/
     );
     const auth = (init?.headers as Record<string, string>).Authorization;
     expect(auth).toMatch(/^Basic /);
