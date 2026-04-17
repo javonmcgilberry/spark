@@ -16,6 +16,7 @@ import {
   linkedChecklistItemsForMilestone,
 } from '../onboarding/display';
 import type {OnboardingPackage, OnboardingPerson, TeamProfile} from '../types';
+import {APP_NAME} from '../branding';
 
 export interface DraftWorkspace {
   channelId: string;
@@ -34,7 +35,7 @@ export async function createDraftWorkspace(
   try {
     const channelName = buildDraftChannelName(profile);
     ctx.logger.info(
-      `Creating Spark draft channel for ${profile.userId} (${channelName})`
+      `Creating ${APP_NAME} draft channel for ${profile.userId} (${channelName})`
     );
     const channel = await ctx.slack.conversations.create({
       name: channelName,

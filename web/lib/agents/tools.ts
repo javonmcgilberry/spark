@@ -10,6 +10,7 @@ import {
 } from '../services/confluenceSearch';
 import {resolveFromEmail, resolveFromSlack} from '../services/identityResolver';
 import type {OnboardingPerson} from '../types';
+import {APP_NAME} from '../branding';
 
 export interface AgentToolContext {
   ctx: HandlerCtx;
@@ -202,8 +203,7 @@ export const findStakeholdersTool: ToolDescriptor = {
 
 export const draftWelcomeNoteTool: ToolDescriptor = {
   name: 'draft_welcome_note',
-  description:
-    'LLM-native tool. Record the final welcome text for BOTH voices (welcomeIntro = Spark, welcomeNote = manager). The server PATCHes the draft as soon as this tool is called so the manager sees the welcome in the UI before the rest of the loop runs. Pass the real final text here, not a placeholder — finalize_draft must receive the same values at the end.',
+  description: `LLM-native tool. Record the final welcome text for BOTH voices (welcomeIntro = ${APP_NAME}, welcomeNote = manager). The server PATCHes the draft as soon as this tool is called so the manager sees the welcome in the UI before the rest of the loop runs. Pass the real final text here, not a placeholder — finalize_draft must receive the same values at the end.`,
   input_schema: {
     type: 'object',
     required: ['welcomeIntro', 'welcomeNote'],

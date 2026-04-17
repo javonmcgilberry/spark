@@ -8,8 +8,7 @@ import type {HandlerCtx} from '../ctx';
 import type {OnboardingPerson, ContributionTask} from '../types';
 import type {GitHubPullRequest} from './github';
 import type {JiraIssue} from './jira';
-
-const APP_NAME = 'Spark';
+import {APP_NAME} from '../branding';
 
 export async function writePersonBlurb(
   ctx: HandlerCtx,

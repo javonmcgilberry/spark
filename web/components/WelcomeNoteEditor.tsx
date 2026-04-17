@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect, useState} from 'react';
+import {APP_NAME} from '../lib/branding';
 
 export function WelcomeNoteEditor({
   intro,
@@ -47,7 +48,7 @@ export function WelcomeNoteEditor({
 
       <div style={{display: 'grid', gap: 6}}>
         <div style={labelRow}>
-          <span style={labelStyle}>From Spark</span>
+          <span style={labelStyle}>From {APP_NAME}</span>
           <span style={hintStyle}>Short, friendly opener — 1–2 sentences</span>
         </div>
         <textarea
@@ -63,7 +64,7 @@ export function WelcomeNoteEditor({
             fontStyle: 'italic',
             color: '#cbd5e1',
           }}
-          aria-label="Welcome note from Spark"
+          aria-label={`Welcome note from ${APP_NAME}`}
         />
       </div>
     </div>

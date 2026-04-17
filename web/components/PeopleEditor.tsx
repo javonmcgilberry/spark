@@ -5,6 +5,7 @@ import type {CSSProperties} from 'react';
 import type {InsightAttempt, OnboardingPerson} from '../lib/types';
 import type {SlackUserHit} from '../lib/services/slackUserDirectory';
 import type {InsightHints} from '../lib/services/peopleInsights';
+import {APP_NAME} from '../lib/branding';
 import {Avatar} from './Avatar';
 import {SlackUserPicker} from './SlackUserPicker';
 
@@ -275,7 +276,7 @@ function TroubleshootPanel({
     <div style={troubleshootStyle}>
       <div style={{display: 'grid', gap: 4}}>
         <strong style={diagnosisHeadingStyle}>
-          Why Spark couldn&apos;t help
+          Why {APP_NAME} couldn&apos;t help
         </strong>
         <p style={diagnosisBodyStyle}>
           {diagnosisFor(person.insightsAttempts ?? [])}
@@ -358,12 +359,12 @@ function diagnosisFor(attempts: InsightAttempt[]): string {
   for (const attempt of attempts) {
     const source = attempt.kind === 'jira' ? 'Jira' : 'GitHub';
     if (attempt.reason === 'not_configured') {
-      lines.push(`${source} isn’t configured on Spark.`);
+      lines.push(`${source} isn’t configured on ${APP_NAME}.`);
       continue;
     }
     if (attempt.reason === 'no_email') {
       lines.push(
-        `${source} needs ${attempt.kind === 'jira' ? 'an email' : 'a GitHub handle'} — Spark didn’t have one to try.`
+        `${source} needs ${attempt.kind === 'jira' ? 'an email' : 'a GitHub handle'} — ${APP_NAME} didn’t have one to try.`
       );
       continue;
     }
@@ -376,7 +377,7 @@ function diagnosisFor(attempts: InsightAttempt[]): string {
     );
   }
   if (lines.length === 0) {
-    return 'No record of what Spark tried. Provide hints below to retry.';
+    return `No record of what ${APP_NAME} tried. Provide hints below to retry.`;
   }
   return lines.join(' ');
 }

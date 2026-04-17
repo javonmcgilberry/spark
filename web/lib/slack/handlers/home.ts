@@ -8,6 +8,7 @@
 
 import type {HandlerCtx} from '../../ctx';
 import {resolveFromSlack} from '../../services/identityResolver';
+import {APP_NAME} from '../../branding';
 
 interface AppHomeOpenedEvent {
   type: 'app_home_opened';
@@ -74,7 +75,7 @@ export async function handleAppHomeOpened(
     elements: [
       {
         type: 'mrkdwn',
-        text: 'Ping @Spark in any channel or DM to ask about your checklist, people to meet, or Slack channels.',
+        text: `Ping @${APP_NAME} in any channel or DM to ask about your checklist, people to meet, or Slack channels.`,
       },
     ],
   });

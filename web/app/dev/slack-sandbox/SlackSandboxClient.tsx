@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import {APP_NAME} from '../../../lib/branding';
 
 interface FixtureEntry {
   id: string;
@@ -118,7 +119,7 @@ export default function SlackSandboxClient({
         <div>
           <h1 style={{margin: 0, fontSize: 20}}>Slack Sandbox</h1>
           <p style={{margin: '4px 0 0 0', color: '#64748b', fontSize: 13}}>
-            Dev-only. Signed-request replay for every Slack event Spark
+            Dev-only. Signed-request replay for every Slack event {APP_NAME}{' '}
             understands. Flip <code>ANTHROPIC_MOCK_MODE=1</code> and{' '}
             <code>SLACK_MOCK_MODE=1</code> in <code>.env</code> for free
             iteration.

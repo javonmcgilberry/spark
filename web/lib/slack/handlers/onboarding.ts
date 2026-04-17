@@ -11,6 +11,7 @@
 
 import type {HandlerCtx} from '../../ctx';
 import {resolveFromSlack} from '../../services/identityResolver';
+import {APP_NAME} from '../../branding';
 
 interface AppMentionEvent {
   type: 'app_mention';
@@ -97,12 +98,12 @@ async function generateConversationalReply(
 ): Promise<string> {
   const sanitized = text.trim() || 'Say hello';
   if (!ctx.llm.isConfigured()) {
-    return `Hey ${firstName} 👋 I'm Spark. My AI is offline right now — your Home tab has your onboarding plan while I catch up.`;
+    return `Hey ${firstName} 👋 I'm ${APP_NAME}. My AI is offline right now — your Home tab has your onboarding plan while I catch up.`;
   }
   try {
     const reply = await ctx.llm.generate(
       [
-        `You are Spark, a friendly onboarding companion for Webflow engineers.`,
+        `You are ${APP_NAME}, a friendly onboarding companion for Webflow engineers.`,
         `Keep replies short (2-4 sentences) and concrete.`,
         `If the user needs something you cannot do, point them to the "Request Help" workflow in #triage-build-loop.`,
       ].join('\n'),

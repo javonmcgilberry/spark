@@ -6,6 +6,7 @@
 
 import type {HandlerCtx} from '../../ctx';
 import {resolveFromSlack} from '../../services/identityResolver';
+import {APP_NAME} from '../../branding';
 
 interface AssistantThreadStartedEvent {
   type: 'assistant_thread_started';
@@ -46,7 +47,7 @@ export async function handleAssistantThreadStarted(
   await ctx.slack.assistant.threads.setTitle({
     channel_id: channel,
     thread_ts,
-    title: `Spark for ${firstName}`,
+    title: `${APP_NAME} for ${firstName}`,
   });
 
   await ctx.slack.assistant.threads.setSuggestedPrompts({
@@ -75,7 +76,7 @@ export async function handleAssistantThreadStarted(
   await ctx.slack.chat.postMessage({
     channel,
     thread_ts,
-    text: `Hey ${firstName} 👋 I'm Spark. Ask me about your onboarding checklist, people to meet, Slack channels, or anything else on your ramp. I can also help you draft your Webflow user guide.`,
+    text: `Hey ${firstName} 👋 I'm ${APP_NAME}. Ask me about your onboarding checklist, people to meet, Slack channels, or anything else on your ramp. I can also help you draft your Webflow user guide.`,
   });
 }
 

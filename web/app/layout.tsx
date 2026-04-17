@@ -1,10 +1,10 @@
 import type {Metadata} from 'next';
 import type {ReactNode} from 'react';
+import {APP_NAME} from '../lib/branding';
 
 export const metadata: Metadata = {
-  title: 'Spark — Onboarding assistant',
-  description:
-    'Plan onboarding drafts with Spark, your AI co-pilot. Generate, review, and send to Slack.',
+  title: `${APP_NAME} — Onboarding assistant`,
+  description: `Plan onboarding drafts with ${APP_NAME}, your AI co-pilot. Generate, review, and send to Slack.`,
 };
 
 const GLOBAL_STYLE = `
@@ -54,7 +54,9 @@ export default function RootLayout({children}: {children: ReactNode}) {
                 boxShadow: '0 0 12px rgba(56, 189, 248, 0.7)',
               }}
             />
-            <strong style={{fontSize: 16, letterSpacing: 0.3}}>Spark</strong>
+            <strong style={{fontSize: 16, letterSpacing: 0.3}}>
+              {APP_NAME}
+            </strong>
             <span style={{color: '#94a3b8', fontSize: 13}}>
               Onboarding assistant
             </span>

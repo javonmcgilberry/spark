@@ -4,6 +4,7 @@ import {useState, type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {SlackUserPicker} from '../../components/SlackUserPicker';
 import type {SlackUserHit} from '../../lib/services/slackUserDirectory';
+import {APP_NAME} from '../../lib/branding';
 
 export default function NewDraftPage() {
   const router = useRouter();
@@ -64,9 +65,9 @@ export default function NewDraftPage() {
     <div style={{maxWidth: 640, margin: '0 auto'}}>
       <section style={panelStyle}>
         <p style={eyebrowStyle}>New onboarding plan</p>
-        <h1 style={headingStyle}>Tell Spark about the new hire</h1>
+        <h1 style={headingStyle}>Tell {APP_NAME} about the new hire</h1>
         <p style={bodyStyle}>
-          Search the Slack workspace to pick the new hire. Spark uses their
+          Search the Slack workspace to pick the new hire. {APP_NAME} uses their
           profile to look up the team, pick candidates for buddy, draft the
           welcome, and tune the checklist. You&apos;ll review before anything
           reaches Slack.
@@ -105,8 +106,8 @@ export default function NewDraftPage() {
             />
           </Field>
           <Field
-            label="Context for Spark"
-            hint="Anything Spark should know that isn't in Slack or the org chart — what they care about, recent life context, specific worries. Optional."
+            label={`Context for ${APP_NAME}`}
+            hint={`Anything ${APP_NAME} should know that isn't in Slack or the org chart — what they care about, recent life context, specific worries. Optional.`}
           >
             <textarea
               value={intent}
