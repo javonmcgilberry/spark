@@ -22,18 +22,25 @@ That's it for the everyday dev loop. `.env` is read automatically; if
 it's empty, Slack and Anthropic fall back to their mock clients so you
 can iterate with zero token burn.
 
-When you want to exercise the real Worker + D1 runtime locally (what
-Webflow Cloud actually runs), do this once:
+To exercise the real Worker + D1 runtime locally (what Webflow Cloud
+actually runs in prod):
 
 ```bash
-npm run setup                        # one-time: auth, create D1, migrate
-npm run preview                      # Worker on :8788, real D1
+npm run preview                      # Worker on :8788, local SQLite D1
 ```
 
-`npm run setup` is idempotent and handles the full Cloudflare D1 dance:
-`wrangler login` if needed → creates `spark-drafts` if it doesn't exist
-→ patches `wrangler.jsonc` with the UUID → applies migrations locally
-→ offers to apply them remotely. Safe to re-run anytime.
+That'll run `npm run setup` for you — a thin wrapper around
+`wrangler d1 migrations apply spark-drafts --local` that creates the
+local SQLite file at `.wrangler/state/v3/d1/`. Idempotent.
+
+### Deploying to Webflow Cloud
+
+Just push. Webflow Cloud provisions the D1 database, fills in the
+real `database_id` in `wrangler.jsonc` at deploy time, and applies
+everything in `migrations/` automatically. The
+`REPLACE_WITH_D1_DATABASE_ID` placeholder is intentional — see the
+comment in `wrangler.jsonc` or [Webflow Cloud's storage
+docs](https://developers.webflow.com/webflow-cloud/storing-data/overview).
 
 For the full Slack round-trip setup (real tokens, named Cloudflare
 Tunnel, dev Slack app), see `docs/dev-setup.md`.
@@ -109,8 +116,9 @@ CONFLUENCE_BASE_URL=https://webflow.atlassian.net/wiki
 # Demo session (replace with Slack OAuth post-hackathon)
 DEMO_MANAGER_SLACK_ID=U...
 
-# D1 binding — configure in wrangler.jsonc, set database_id from
-# `wrangler d1 create spark-drafts`.
+# D1 binding is declared in wrangler.jsonc (not here). Webflow Cloud
+# auto-provisions the database on deploy and runs migrations — no env
+# vars needed.
 ```
 
 ## Slack app configuration
