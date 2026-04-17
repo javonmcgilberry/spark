@@ -1,7 +1,7 @@
 /**
  * identityResolver — builds a TeamProfile from a Slack user id or
  * email. Sources of truth:
- *   1. Slack user profile + custom fields (team, pillar, manager)
+ *   1. Slack user profile + custom fields (team/department, division, manager)
  *   2. CODEOWNERS heuristics for team → GitHub slug + keyPaths
  *
  * Every call takes HandlerCtx so nothing here imports a client
@@ -38,6 +38,7 @@ interface ProfileSeed {
 interface SlackCustomFields {
   division?: SlackProfileFieldValue;
   team?: SlackProfileFieldValue;
+  department?: SlackProfileFieldValue;
   manager?: SlackProfileFieldValue;
 }
 
@@ -100,6 +101,28 @@ export async function resolveFromEmail(
     caches.profile.set(canonicalUserId, cacheEntry);
   }
   return profile;
+}
+
+export async function applyTeamHint(
+  ctx: HandlerCtx,
+  profile: TeamProfile,
+  teamHint: string | undefined
+): Promise<TeamProfile> {
+  const trimmedHint = teamHint?.trim();
+  if (!trimmedHint) return profile;
+  if (trimmedHint.toLowerCase() === profile.teamName.trim().toLowerCase()) {
+    return profile;
+  }
+  return buildProfile(ctx, {
+    userId: profile.userId,
+    firstName: profile.firstName,
+    displayName: profile.displayName,
+    avatarUrl: profile.avatarUrl,
+    email: profile.email,
+    teamName: trimmedHint,
+    pillarName: profile.pillarName,
+    manager: profile.manager,
+  });
 }
 
 async function buildProfile(
@@ -233,6 +256,7 @@ async function lookupSlackCustomFields(
     return {
       division: readSlackField(fields, fieldIds, 'division'),
       team: readSlackField(fields, fieldIds, 'team'),
+      department: readSlackField(fields, fieldIds, 'department'),
       manager: readSlackField(fields, fieldIds, 'manager'),
     };
   } catch {
@@ -369,7 +393,10 @@ function buildSlackSeed(
     displayName: slackDisplayName(user) ?? 'New hire',
     avatarUrl: profile?.image_192 ?? profile?.image_72,
     email: profile?.email,
-    teamName: slackFieldText(customFields.team),
+    teamName: firstNonEmpty(
+      slackFieldText(customFields.team),
+      normalizeDepartmentTeamName(slackFieldText(customFields.department))
+    ),
     pillarName: slackFieldText(customFields.division),
     manager: buildManagerPerson(customFields.manager),
   };
@@ -442,6 +469,14 @@ function slackFieldText(
 ): string | undefined {
   const value = field?.alt?.trim() || field?.value?.trim();
   return value || undefined;
+}
+
+function normalizeDepartmentTeamName(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const withoutPrefix = trimmed.replace(/^\d+\s+/, '');
+  const withoutSuffix = withoutPrefix.replace(/\s+team$/i, '');
+  return withoutSuffix.trim() || undefined;
 }
 
 function parseSlackUserId(value?: string): string | undefined {

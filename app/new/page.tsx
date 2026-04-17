@@ -32,6 +32,7 @@ export default function NewDraftPage() {
           newHireSlackId: hire.slackUserId,
           // Slack may redact email for some users — slackUserId alone is fine.
           newHireEmail: hire.email,
+          teamHint: teamHint || undefined,
         }),
       });
       if (!res.ok) {

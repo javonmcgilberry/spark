@@ -253,6 +253,7 @@ export interface DraftFieldPatch {
 export interface CreateDraftBody {
   newHireSlackId?: string;
   newHireEmail?: string;
+  teamHint?: string;
   welcomeNote?: string;
   buddyUserId?: string;
   stakeholderUserIds?: string[];

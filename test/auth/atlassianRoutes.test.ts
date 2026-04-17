@@ -81,9 +81,14 @@ describe('/api/auth/atlassian/status', () => {
     seed({oauthConfigured: false});
     const {GET} = await import('../../app/api/auth/atlassian/status/route');
     const res = await GET();
-    const body = (await res.json()) as {connected: boolean; reason?: string};
+    const body = (await res.json()) as {
+      connected: boolean;
+      reason?: string;
+      demoMode?: boolean;
+    };
     expect(body.connected).toBe(false);
     expect(body.reason).toBe('oauth-not-configured');
+    expect(body.demoMode).toBe(false);
   });
 
   it('reports connected:false + not-connected when no row exists in the token store', async () => {
@@ -93,6 +98,25 @@ describe('/api/auth/atlassian/status', () => {
     const body = (await res.json()) as {connected: boolean; reason?: string};
     expect(body.connected).toBe(false);
     expect(body.reason).toBe('not-connected');
+  });
+
+  it('flags demoMode when Atlassian overrides are configured', async () => {
+    const ctx = seed({oauthConfigured: false});
+    ctx.env = {
+      ...ctx.env,
+      JIRA_API_EMAIL: 'demo-overrides@webflow.com',
+    } as CloudflareEnv;
+    sessionRef.env = ctx.env;
+    const {GET} = await import('../../app/api/auth/atlassian/status/route');
+    const res = await GET();
+    const body = (await res.json()) as {
+      connected: boolean;
+      reason?: string;
+      demoMode?: boolean;
+    };
+    expect(body.connected).toBe(false);
+    expect(body.reason).toBe('oauth-not-configured');
+    expect(body.demoMode).toBe(true);
   });
 
   it('reports connected:true with the stored site metadata', async () => {

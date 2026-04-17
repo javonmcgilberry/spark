@@ -74,6 +74,58 @@ describe('identityResolver', () => {
     expect(profile.docs.length).toBeGreaterThan(0);
   });
 
+  it('falls back to Department when the Slack workspace has no Team field', async () => {
+    const ctx = makeTestCtx({
+      slack: {
+        usersInfo: {
+          UHIRE001: {
+            id: 'UHIRE001',
+            real_name: 'Hira Test',
+            profile: {
+              first_name: 'Hira',
+              real_name: 'Hira Test',
+              display_name: 'hira',
+              email: 'hira@webflow.com',
+              title: 'Software Engineer',
+            },
+          },
+          UMANAGER1: {
+            id: 'UMANAGER1',
+            real_name: 'Mia Manager',
+            profile: {
+              first_name: 'Mia',
+              real_name: 'Mia Manager',
+              display_name: 'mia',
+              email: 'mia@webflow.com',
+              title: 'Engineering Manager',
+            },
+          },
+        },
+        usersProfileGet: {
+          UHIRE001: {
+            fields: {
+              F_DEPARTMENT: {value: '1500 Engineering Team'},
+              F_DIVISION: {value: 'Collaboration'},
+              F_MANAGER: {value: '<@UMANAGER1>', alt: 'Mia Manager'},
+            },
+          },
+        },
+        teamProfileFields: [
+          {id: 'F_DEPARTMENT', label: 'Department'},
+          {id: 'F_DIVISION', label: 'Division'},
+          {id: 'F_MANAGER', label: 'Manager'},
+        ],
+      },
+      github: {configured: false, codeowners: null},
+    });
+
+    const profile = await resolveFromSlack(ctx, 'UHIRE001');
+
+    expect(profile.teamName).toBe('Engineering');
+    expect(profile.pillarName).toBe('Collaboration');
+    expect(profile.manager.slackUserId).toBe('UMANAGER1');
+  });
+
   it('falls back to email-derived display name when Slack lookup misses', async () => {
     const ctx = makeTestCtx({
       slack: {}, // no usersLookupByEmail → returns ok:false

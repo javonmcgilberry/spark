@@ -22,9 +22,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const {ctx, env} = await buildRouteCtx();
   const {session} = await getSessionDetails(ctx);
+  const demoMode = hasDemoOverrides(env);
   if (!session?.email) {
     return NextResponse.json(
-      {connected: false, reason: 'no-session'},
+      {connected: false, reason: 'no-session', demoMode},
       {
         status: 200,
         headers: {'Cache-Control': 'no-store'},
@@ -34,13 +35,13 @@ export async function GET() {
   const store = resolveStore(ctx);
   if (!store) {
     return NextResponse.json(
-      {connected: false, reason: 'storage-unavailable'},
+      {connected: false, reason: 'storage-unavailable', demoMode},
       {status: 200, headers: {'Cache-Control': 'no-store'}}
     );
   }
   if (!env.ATLASSIAN_OAUTH_CLIENT_ID) {
     return NextResponse.json(
-      {connected: false, reason: 'oauth-not-configured'},
+      {connected: false, reason: 'oauth-not-configured', demoMode},
       {status: 200, headers: {'Cache-Control': 'no-store'}}
     );
   }
@@ -48,7 +49,7 @@ export async function GET() {
   const record = await store.get(session.email);
   if (!record) {
     return NextResponse.json(
-      {connected: false, reason: 'not-connected'},
+      {connected: false, reason: 'not-connected', demoMode},
       {status: 200, headers: {'Cache-Control': 'no-store'}}
     );
   }
@@ -67,4 +68,8 @@ export async function GET() {
     },
     {status: 200, headers: {'Cache-Control': 'no-store'}}
   );
+}
+
+function hasDemoOverrides(env: CloudflareEnv): boolean {
+  return Boolean(env.DEMO_MANAGER_EMAIL?.trim() || env.JIRA_API_EMAIL?.trim());
 }

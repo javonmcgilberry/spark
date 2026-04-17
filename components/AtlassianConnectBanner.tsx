@@ -11,9 +11,10 @@ import {useCallback, useEffect, useState} from 'react';
  * Three states, same data source (/api/auth/atlassian/status):
  *
  *   loading           — neutral skeleton pill, avoids layout thrash
- *   not-configured    — tiny note that the env isn't wired (no CTA)
  *   not-connected     — full value-prop banner with the connect CTA
  *   connected         — compact green confirmation + disconnect link
+ *   unavailable       — quiet by default; when demo overrides are set,
+ *                       render a muted banner that calls that out
  *
  * Does NOT block form submission — OAuth is strictly additive. A user
  * can skip the banner and still create a plan; the fallback Basic auth
@@ -31,6 +32,7 @@ interface StatusOk {
 interface StatusNotConnected {
   connected: false;
   reason: string;
+  demoMode?: boolean;
 }
 
 type Status = StatusOk | StatusNotConnected | null;
@@ -85,6 +87,9 @@ export function AtlassianConnectBanner() {
 
   const reason = status && !status.connected ? status.reason : null;
   if (reason === 'oauth-not-configured' || reason === 'storage-unavailable') {
+    if (status?.demoMode) {
+      return <DemoModeBanner />;
+    }
     // When OAuth can't run (missing ATLASSIAN_OAUTH_CLIENT_ID or no D1
     // token store), the Basic-auth fallback via JIRA_API_TOKEN /
     // CONFLUENCE_API_TOKEN still produces the plan. Render nothing
@@ -92,10 +97,16 @@ export function AtlassianConnectBanner() {
     return null;
   }
 
-  return <ConnectCta loading={loading} />;
+  return <ConnectCta loading={loading} demoMode={Boolean(status?.demoMode)} />;
 }
 
-function ConnectCta({loading}: {loading: boolean}) {
+function ConnectCta({
+  loading,
+  demoMode,
+}: {
+  loading: boolean;
+  demoMode?: boolean;
+}) {
   return (
     <aside style={ctaBannerStyle} role="region" aria-label="Atlassian connect">
       <div style={ctaIconWrap}>
@@ -110,6 +121,9 @@ function ConnectCta({loading}: {loading: boolean}) {
           Jira + Confluence authorize as <em>you</em>, respecting your
           permissions.
         </p>
+        {demoMode ? (
+          <p style={finePrintStyle}>Overrides detected. Demo mode.</p>
+        ) : null}
       </div>
       <a
         href="/api/auth/atlassian/start"
@@ -122,6 +136,25 @@ function ConnectCta({loading}: {loading: boolean}) {
       >
         Connect Jira &amp; Confluence
       </a>
+    </aside>
+  );
+}
+
+function DemoModeBanner() {
+  return (
+    <aside style={demoBannerStyle} role="note" aria-label="Atlassian demo mode">
+      <div style={ctaIconWrap}>
+        <AtlassianGlyph />
+      </div>
+      <div style={{flex: 1, minWidth: 0}}>
+        <p style={ctaTitleStyle}>Atlassian demo mode</p>
+        <p style={ctaBodyStyle}>
+          This environment is using configured Jira or viewer-email overrides
+          instead of the Atlassian connect flow. Plans still include the
+          available Jira and Confluence signal.
+        </p>
+        <p style={finePrintStyle}>Overrides detected. Demo mode.</p>
+      </div>
     </aside>
   );
 }
@@ -240,6 +273,13 @@ const ctaBodyStyle: React.CSSProperties = {
   color: 'rgba(226, 232, 240, 0.78)',
 };
 
+const finePrintStyle: React.CSSProperties = {
+  margin: '8px 0 0',
+  fontSize: 11.5,
+  lineHeight: 1.45,
+  color: 'rgba(226, 232, 240, 0.56)',
+};
+
 const ctaButtonStyle: React.CSSProperties = {
   textDecoration: 'none',
   padding: '9px 16px',
@@ -266,6 +306,13 @@ const connectedBannerStyle: React.CSSProperties = {
   color: '#bbf7d0',
   fontSize: 13,
   flexWrap: 'wrap',
+};
+
+const demoBannerStyle: React.CSSProperties = {
+  ...ctaBannerStyle,
+  border: '1px solid rgba(148, 163, 184, 0.24)',
+  background:
+    'linear-gradient(135deg, rgba(148, 163, 184, 0.1), rgba(30, 41, 59, 0.14))',
 };
 
 const checkIconStyle: React.CSSProperties = {

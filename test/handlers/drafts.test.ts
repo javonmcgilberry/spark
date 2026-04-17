@@ -73,6 +73,41 @@ describe('drafts handlers', () => {
     expect(getBody.pkg.userId).toBe('UHIRE001');
   });
 
+  it('createDraft applies teamHint to the initial draft profile', async () => {
+    const ctx = makeTestCtx({
+      slack: {
+        usersInfo: {
+          UHIRE001: {
+            id: 'UHIRE001',
+            real_name: 'Alice Adams',
+            profile: {
+              first_name: 'Alice',
+              display_name: 'alice',
+              email: 'alice@webflow.com',
+            },
+          },
+        },
+      },
+    });
+
+    const res = await handleCreateDraft(
+      jsonRequest({
+        newHireSlackId: 'UHIRE001',
+        teamHint: 'Frontend Platform',
+      }),
+      ctx,
+      session
+    );
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      pkg: {sections: {welcome: {intro: string}}};
+    };
+    expect(body.pkg.sections.welcome.intro).toContain(
+      'the Frontend Platform team'
+    );
+  });
+
   it('patchDraft updates welcomeNote', async () => {
     const ctx = await setupWithDraft();
     const res = await handlePatchDraft(

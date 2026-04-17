@@ -3,6 +3,7 @@ import type {HandlerCtx} from '../../ctx';
 import type {ManagerSession} from '../../session';
 import {createDraftPackage} from '../../services/onboardingPackages';
 import {
+  applyTeamHint,
   resolveFromEmail,
   resolveFromSlack,
 } from '../../services/identityResolver';
@@ -28,6 +29,7 @@ export async function handleListDrafts(
 const createBodySchema = z.object({
   newHireSlackId: z.string().optional(),
   newHireEmail: z.string().email().optional(),
+  teamHint: z.string().optional(),
   welcomeNote: z.string().optional(),
   buddyUserId: z.string().optional(),
   stakeholderUserIds: z.array(z.string()).optional(),
@@ -49,6 +51,7 @@ export async function handleCreateDraft(
   const {
     newHireSlackId,
     newHireEmail,
+    teamHint,
     welcomeNote,
     buddyUserId,
     stakeholderUserIds,
@@ -63,9 +66,10 @@ export async function handleCreateDraft(
   const hire = newHireSlackId
     ? await resolveFromSlack(ctx, newHireSlackId)
     : await resolveFromEmail(ctx, newHireEmail!);
+  const profile = await applyTeamHint(ctx, hire, teamHint);
 
   const pkg = await createDraftPackage(ctx, {
-    profile: hire,
+    profile,
     createdByUserId: session.managerSlackId,
     welcomeNote,
     buddyUserId,

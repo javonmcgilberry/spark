@@ -106,6 +106,35 @@ Name it "Spark". Install into `webflow-inside` (prod) or
 
 ---
 
+## 4.1 Emergency fallback — public tunnel
+
+If `spark.wf.app` is behind Okta / Cloudflare Access and Slack cannot
+reach the webhook URLs, use a local Worker preview plus a public tunnel
+for the demo:
+
+```bash
+# terminal 1
+cd ~/webflow/spark
+set -a && source ".env.dev" && set +a
+npm run setup && npx opennextjs-cloudflare build && npx opennextjs-cloudflare preview --port 8791
+
+# terminal 2
+cd ~/webflow/spark
+cloudflared tunnel --url http://localhost:8791 --no-autoupdate
+```
+
+Then:
+
+1. Copy the `https://<random>.trycloudflare.com` URL from `cloudflared`.
+2. Point Slack at:
+   - `https://<random>.trycloudflare.com/api/slack/events`
+   - `https://<random>.trycloudflare.com/api/slack/interactivity`
+3. Demo the UI from the same tunnel URL, not `spark.wf.app`, because
+   the local preview is using local D1 state.
+4. Keep the laptop awake and both processes running for the entire demo.
+
+---
+
 ## 5. Webflow Cloud deploy
 
 Branch pushes auto-deploy to a preview URL; `main` deploys to
