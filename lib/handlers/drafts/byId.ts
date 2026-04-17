@@ -59,8 +59,6 @@ const personPatchSchema = z.object({
 const patchBodySchema = z.object({
   welcomeNote: z.string().nullable().optional(),
   welcomeIntro: z.string().nullable().optional(),
-  buddyUserId: z.string().nullable().optional(),
-  stakeholderUserIds: z.array(z.string()).optional(),
   customChecklistItems: z.array(checklistItemSchema).optional(),
   peopleToMeet: z.array(personPatchSchema).optional(),
   checklistRows: z.record(z.string(), z.array(checklistItemSchema)).optional(),
@@ -145,24 +143,20 @@ async function hydratePeoplePatch(
   rows: OnboardingPerson[]
 ): Promise<OnboardingPerson[]> {
   const existing = await ctx.db.get(userId).catch(() => undefined);
-  const existingById = new Map<string, OnboardingPerson>();
+  const knownSlackIds = new Set<string>();
   for (const row of existing?.sections.peopleToMeet.people ?? []) {
-    if (row.slackUserId) existingById.set(row.slackUserId, row);
+    if (row.slackUserId) knownSlackIds.add(row.slackUserId);
   }
-  const rowsNeedingHydration = rows.filter(
-    (row) =>
-      row.slackUserId &&
-      existingById.get(row.slackUserId)?.slackUserId !== row.slackUserId
+  const hasNewAssignment = rows.some(
+    (row) => row.slackUserId && !knownSlackIds.has(row.slackUserId)
   );
-  if (rowsNeedingHydration.length === 0) return rows;
+  if (!hasNewAssignment) return rows;
   const directory = await listAllUsers(ctx).catch(() => []);
   const directoryById = new Map(
     directory.map((user) => [user.slackUserId, user])
   );
   return rows.map((row) => {
-    if (!row.slackUserId) return row;
-    const prior = existingById.get(row.slackUserId);
-    if (prior && prior.slackUserId === row.slackUserId) return row;
+    if (!row.slackUserId || knownSlackIds.has(row.slackUserId)) return row;
     const hit = directoryById.get(row.slackUserId);
     if (!hit) return row;
     return {

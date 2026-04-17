@@ -174,9 +174,6 @@ function applyLocal(
       next.sections.welcome.intro = patch.welcomeIntro;
     }
   }
-  if (patch.buddyUserId !== undefined) {
-    next.buddyUserId = patch.buddyUserId ?? undefined;
-  }
   if (patch.customChecklistItems !== undefined) {
     next.customChecklistItems = [...patch.customChecklistItems];
   }

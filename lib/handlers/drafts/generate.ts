@@ -94,10 +94,10 @@ export async function handleGenerateDraft(
             }
           }
           if (event.type === 'draft_ready') {
-            // The generator's finalize_draft schema carries ONLY welcome
-            // copy + checklist additions. Identity fields (peopleToMeet,
-            // buddyUserId, stakeholderUserIds) are resolved
-            // deterministically server-side and never flow from the LLM.
+            // The generator's finalize_draft schema carries welcome copy
+            // + checklist additions. The roster (peopleToMeet) is
+            // resolved deterministically server-side and never flows
+            // from the LLM.
             try {
               const pkg = await ctx.db.applyFieldPatch(userId, {
                 welcomeIntro: event.draft.welcomeIntro,

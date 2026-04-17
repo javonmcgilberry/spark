@@ -254,18 +254,6 @@ export function applyPatchInPlace(
     existing.welcomeIntro = next;
     existing.sections.welcome.intro = next ?? existing.sections.welcome.intro;
   }
-  if (patch.buddyUserId !== undefined) {
-    existing.buddyUserId = patch.buddyUserId ?? undefined;
-  }
-  if (patch.stakeholderUserIds) {
-    const baseIds = [
-      existing.createdByUserId,
-      existing.managerUserId,
-      existing.buddyUserId,
-      ...patch.stakeholderUserIds,
-    ].filter((value): value is string => Boolean(value));
-    existing.reviewerUserIds = Array.from(new Set(baseIds));
-  }
   if (patch.customChecklistItems) {
     existing.customChecklistItems = patch.customChecklistItems.map(cloneItem);
   }

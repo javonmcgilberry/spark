@@ -259,9 +259,13 @@ export interface OnboardingPackage {
 export interface DraftFieldPatch {
   welcomeNote?: string | null;
   welcomeIntro?: string | null;
-  buddyUserId?: string | null;
-  stakeholderUserIds?: string[];
   customChecklistItems?: ChecklistItem[];
+  /**
+   * Manager's edits to the roster. Setting a buddy row's slackUserId
+   * here is what promotes someone to the onboarding buddy — the server
+   * derives pkg.buddyUserId from this list, so there's no separate
+   * buddy-assignment affordance on the patch surface.
+   */
   peopleToMeet?: OnboardingPerson[];
   checklistRows?: Record<string, ChecklistItem[]>;
 }
@@ -270,7 +274,4 @@ export interface CreateDraftBody {
   newHireSlackId?: string;
   newHireEmail?: string;
   teamHint?: string;
-  welcomeNote?: string;
-  buddyUserId?: string;
-  stakeholderUserIds?: string[];
 }

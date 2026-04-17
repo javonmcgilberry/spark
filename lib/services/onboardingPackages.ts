@@ -14,7 +14,6 @@ import type {
   ConfluenceLink,
   OnboardingPackage,
   OnboardingPerson,
-  OnboardingPersonKind,
   OnboardingReferences,
   TeamProfile,
 } from '../types';
@@ -30,8 +29,6 @@ export interface DraftPackageOptions {
   createdByUserId: string;
   welcomeNote?: string | null;
   welcomeIntro?: string | null;
-  buddyUserId?: string | null;
-  stakeholderUserIds?: string[];
   /** If false, skip the Slack draft-channel hydration step. */
   hydrateSlack?: boolean;
 }
@@ -47,8 +44,6 @@ export async function createDraftPackage(
     status: 'draft',
     welcomeNote: options.welcomeNote,
     welcomeIntro: options.welcomeIntro,
-    buddyUserId: options.buddyUserId,
-    stakeholderUserIds: options.stakeholderUserIds,
     existing,
   });
 
@@ -90,8 +85,6 @@ export async function updateDraftPackage(
     status: existing.status,
     welcomeNote: options.welcomeNote,
     welcomeIntro: options.welcomeIntro,
-    buddyUserId: options.buddyUserId,
-    stakeholderUserIds: options.stakeholderUserIds,
     existing,
     preserveExistingReviewers: false,
   });
@@ -139,8 +132,6 @@ async function buildPackage(
     status: OnboardingPackage['status'];
     welcomeNote?: string | null;
     welcomeIntro?: string | null;
-    buddyUserId?: string | null;
-    stakeholderUserIds?: string[];
     existing?: OnboardingPackage;
     preserveExistingReviewers?: boolean;
   }
@@ -151,8 +142,6 @@ async function buildPackage(
     status,
     welcomeNote,
     welcomeIntro,
-    buddyUserId,
-    stakeholderUserIds = [],
     existing,
     preserveExistingReviewers = true,
   } = params;
@@ -166,23 +155,8 @@ async function buildPackage(
       ? existing?.welcomeIntro
       : welcomeIntro || undefined;
 
-  const buddy = buddyUserId
-    ? await lookupSlackPerson(ctx, buddyUserId, 'buddy', 'week1-2', 'manager')
-    : profile.buddy;
-  const stakeholderPeople =
-    stakeholderUserIds.length > 0
-      ? await Promise.all(
-          stakeholderUserIds.map((userId) =>
-            lookupSlackPerson(ctx, userId, undefined, 'week2-3', 'manager')
-          )
-        )
-      : [];
-  const people = dedupePeople([
-    profile.manager,
-    buddy,
-    ...profile.teammates,
-    ...stakeholderPeople,
-  ]);
+  const buddy = profile.buddy;
+  const people = dedupePeople([profile.manager, buddy, ...profile.teammates]);
 
   // Confluence references and per-person user guides are independent
   // searches against the same Confluence client. Run them in parallel so
@@ -208,7 +182,6 @@ async function buildPackage(
     createdByUserId,
     profile.manager.slackUserId,
     buddy.slackUserId,
-    ...stakeholderUserIds,
     ...(preserveExistingReviewers ? (existing?.reviewerUserIds ?? []) : []),
   ]);
   const customChecklistItems = (existing?.customChecklistItems ?? []).map(
@@ -253,53 +226,6 @@ async function buildPackage(
   };
 }
 
-async function lookupSlackPerson(
-  ctx: HandlerCtx,
-  userId: string,
-  fallbackKind: OnboardingPersonKind | undefined,
-  weekBucket: OnboardingPerson['weekBucket'],
-  editableBy: OnboardingPerson['editableBy']
-): Promise<OnboardingPerson> {
-  try {
-    const response = await ctx.slack.users.info({user: userId});
-    const user = response.user;
-    const profile = user?.profile;
-    const name =
-      user?.real_name ??
-      profile?.real_name ??
-      profile?.display_name ??
-      'Slack user';
-    const title = profile?.title?.trim();
-    const kind = inferPersonKind(title, fallbackKind);
-    return {
-      name,
-      role: title || roleForKind(kind),
-      kind,
-      title,
-      discussionPoints: discussionPointsForKind(name, kind),
-      weekBucket,
-      editableBy,
-      email: profile?.email,
-      slackUserId: user?.id,
-      avatarUrl: profile?.image_192 ?? profile?.image_72,
-    };
-  } catch (error) {
-    ctx.logger.warn(`lookupSlackPerson failed for ${userId}`, error);
-    return {
-      name: 'Slack user',
-      role: roleForKind(fallbackKind ?? 'teammate'),
-      kind: fallbackKind ?? 'teammate',
-      discussionPoints: discussionPointsForKind(
-        'Slack user',
-        fallbackKind ?? 'teammate'
-      ),
-      weekBucket,
-      editableBy,
-      slackUserId: userId,
-    };
-  }
-}
-
 function dedupePeople(people: OnboardingPerson[]): OnboardingPerson[] {
   const seen = new Set<string>();
   const result: OnboardingPerson[] = [];
@@ -324,63 +250,4 @@ function dedupeUserIds(values: Array<string | undefined>): string[] {
 
 function personIdentifier(person: OnboardingPerson): string {
   return (person.slackUserId || person.email || person.name).toLowerCase();
-}
-
-function inferPersonKind(
-  title: string | undefined,
-  fallbackKind: OnboardingPersonKind | undefined
-): OnboardingPersonKind {
-  const normalized = title?.toLowerCase() ?? '';
-  if (normalized.includes('product manager')) return 'pm';
-  if (normalized.includes('designer')) return 'designer';
-  if (
-    normalized.includes('people partner') ||
-    normalized.includes('business partner')
-  ) {
-    return 'people-partner';
-  }
-  if (normalized.includes('director')) return 'director';
-  return fallbackKind ?? 'teammate';
-}
-
-function roleForKind(kind: OnboardingPersonKind): string {
-  switch (kind) {
-    case 'manager':
-      return 'Engineering Manager';
-    case 'buddy':
-      return 'Onboarding Buddy';
-    case 'pm':
-      return 'Product Manager';
-    case 'designer':
-      return 'Product Designer';
-    case 'director':
-      return 'Director';
-    case 'people-partner':
-      return 'People Partner';
-    default:
-      return 'Teammate';
-  }
-}
-
-function discussionPointsForKind(
-  name: string,
-  kind: OnboardingPersonKind
-): string {
-  const firstName = name.split(/\s+/)[0] || name;
-  switch (kind) {
-    case 'manager':
-      return 'Role expectations, day-to-day support, performance goals, and how the team roadmap connects to the first few weeks.';
-    case 'buddy':
-      return 'Day-to-day help, codebase guidance, debugging habits, and the team norms that rarely make it into docs.';
-    case 'pm':
-      return `Ask ${firstName} about roadmap context, priority tradeoffs, and how engineering work connects to customer value.`;
-    case 'designer':
-      return `Ask ${firstName} how design intent is shared, reviewed, and handed off in your area.`;
-    case 'director':
-      return `Ask ${firstName} how your team fits into the broader pillar strategy and where the group is headed next.`;
-    case 'people-partner':
-      return `Ask ${firstName} about growth support, milestone conversations, and people programs that become more relevant after the first month.`;
-    default:
-      return `Ask ${firstName} what they own, which systems they touch most often, and what they wish they had known in their first month at Webflow.`;
-  }
 }

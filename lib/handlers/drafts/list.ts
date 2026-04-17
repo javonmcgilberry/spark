@@ -48,9 +48,6 @@ const createBodySchema = z.object({
   newHireSlackId: z.string().optional(),
   newHireEmail: z.string().email().optional(),
   teamHint: z.string().optional(),
-  welcomeNote: z.string().optional(),
-  buddyUserId: z.string().optional(),
-  stakeholderUserIds: z.array(z.string()).optional(),
 });
 
 export async function handleCreateDraft(
@@ -66,14 +63,7 @@ export async function handleCreateDraft(
       {status: 400}
     );
   }
-  const {
-    newHireSlackId,
-    newHireEmail,
-    teamHint,
-    welcomeNote,
-    buddyUserId,
-    stakeholderUserIds,
-  } = parsed.data;
+  const {newHireSlackId, newHireEmail, teamHint} = parsed.data;
   if (!newHireSlackId && !newHireEmail) {
     return Response.json(
       {error: 'newHireSlackId or newHireEmail required'},
@@ -93,9 +83,6 @@ export async function handleCreateDraft(
   const pkg = await createDraftPackage(ctx, {
     profile,
     createdByUserId: session.managerSlackId,
-    welcomeNote,
-    buddyUserId,
-    stakeholderUserIds,
     hydrateSlack: false,
   });
 

@@ -135,14 +135,6 @@ describe('memory draft store', () => {
 });
 
 describe('applyPatchInPlace', () => {
-  it('patches stakeholderUserIds deduped with creator+manager+buddy', () => {
-    const pkg = samplePackage({buddyUserId: 'UBUD001'});
-    applyPatchInPlace(pkg, {stakeholderUserIds: ['UNEW', 'UMANAGER1']});
-    expect(new Set(pkg.reviewerUserIds)).toEqual(
-      new Set(['UMANAGER1', 'UBUD001', 'UNEW'])
-    );
-  });
-
   it('syncs buddyUserId from the assigned buddy slot in peopleToMeet', () => {
     const pkg = samplePackage({
       sections: {

@@ -819,8 +819,3 @@ function firstNameFromValue(value?: string | null): string | undefined {
   if (!trimmed) return undefined;
   return trimmed.split(/\s+/)[0] || undefined;
 }
-
-export {
-  inferRoleTrack as _inferRoleTrackForTest,
-  buildFallbackTeammate as _buildFallbackTeammateForTest,
-};
