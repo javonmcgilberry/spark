@@ -144,10 +144,21 @@ function ChecklistItemRow({
           Remove
         </button>
       </div>
+      <input
+        type="url"
+        value={item.resourceUrl ?? ''}
+        onChange={(event) => {
+          const next = event.target.value.trim();
+          onChange({resourceUrl: next || undefined});
+        }}
+        placeholder="Link (https://…) — optional"
+        aria-label="Item link"
+        style={linkInputStyle}
+      />
       <textarea
         value={item.notes}
         onChange={(event) => onChange({notes: event.target.value})}
-        placeholder="Notes, links, or context a manager would want the new hire to know."
+        placeholder="Notes or context a manager would want the new hire to know."
         rows={2}
         aria-label="Item notes"
         style={notesStyle}
@@ -239,6 +250,17 @@ const notesStyle: CSSProperties = {
   fontSize: 12,
   lineHeight: 1.5,
   resize: 'vertical',
+};
+
+const linkInputStyle: CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  borderRadius: 8,
+  border: '1px solid rgba(148, 163, 184, 0.3)',
+  background: 'rgba(15, 23, 42, 0.6)',
+  color: '#7dd3fc',
+  fontFamily: 'inherit',
+  fontSize: 12,
 };
 
 const removeBtnStyle: CSSProperties = {
