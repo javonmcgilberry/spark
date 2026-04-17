@@ -186,6 +186,43 @@ describe('OnboardingPackageService.applyFieldPatch', () => {
     expect(result).toBeUndefined();
   });
 
+  it('mirrors checklistRows into sections.onboardingChecklist so Slack publish sees manager edits', async () => {
+    const {profile, services} = createTestServices();
+    const managerUserId = profile.manager.slackUserId!;
+    const hire = cloneProfileWithUserId(profile, 'U_HIRE_CHECKLIST', 'U_BUDDY');
+
+    await services.onboardingPackages.createDraftPackage({
+      profile: hire,
+      createdByUserId: managerUserId,
+    });
+
+    const created = services.onboardingPackages.getPackageForUser(hire.userId);
+    const firstSection = created?.sections.onboardingChecklist.sections[0];
+    expect(firstSection).toBeDefined();
+    const sectionId = firstSection!.id;
+
+    const patched = services.onboardingPackages.applyFieldPatch(hire.userId, {
+      checklistRows: {
+        [sectionId]: [
+          {
+            label: 'Shadow the Friday incident review',
+            kind: 'task',
+            notes: 'Helps pattern-match on on-call issues.',
+            sectionId,
+          },
+        ],
+      },
+    });
+
+    const patchedSection = patched?.sections.onboardingChecklist.sections.find(
+      (s) => s.id === sectionId
+    );
+    expect(patchedSection?.items).toHaveLength(1);
+    expect(patchedSection?.items[0].label).toBe(
+      'Shadow the Friday incident review'
+    );
+  });
+
   it('refuses to patch already-published packages', async () => {
     const {profile, services} = createTestServices();
     const managerUserId = profile.manager.slackUserId!;

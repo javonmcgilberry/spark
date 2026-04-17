@@ -129,6 +129,16 @@ export class OnboardingPackageService {
           ])
         ),
       };
+      // Mirror the overrides into the rendered section items so
+      // downstream consumers (Slack canvas publish, Block Kit render,
+      // manager summary) see the manager's edits instead of the catalog
+      // defaults. checklistRows is the source of truth once touched.
+      for (const section of existing.sections.onboardingChecklist.sections) {
+        const override = existing.checklistRows[section.id];
+        if (override) {
+          section.items = override.map((item) => ({...item}));
+        }
+      }
     }
     existing.updatedAt = new Date().toISOString();
     this.logger.info(

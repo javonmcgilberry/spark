@@ -63,7 +63,7 @@ export function PeopleEditor({
       name: hit.displayName || hit.name,
       role: hit.title || 'Teammate',
       discussionPoints: '',
-      weekBucket: 'week1-2',
+      weekBucket: 'week3+',
       kind: 'teammate',
       slackUserId: hit.slackUserId,
       email: hit.email,
@@ -105,12 +105,53 @@ function PersonRow({
   onRemove: () => void;
   onRetryPerson?: RetryPersonInsights;
 }) {
+  const [assigning, setAssigning] = useState(false);
+  const isPlaceholder = !person.slackUserId;
   const isPending =
     person.insightsStatus === 'pending' &&
     !person.askMeAbout &&
     !person.discussionPoints;
   const canRetry = Boolean(onRetryPerson && person.slackUserId);
   const blurb = person.askMeAbout ?? person.discussionPoints ?? '';
+
+  if (assigning) {
+    return (
+      <div style={rowStyle}>
+        <div style={{display: 'grid', gap: 8}}>
+          <span style={{fontSize: 11, color: '#94a3b8'}}>
+            Pick a Slack teammate for the {person.role} slot
+          </span>
+          <SlackUserPicker
+            value={null}
+            placeholder="Search for a teammate…"
+            autoFocus
+            onChange={(hit) => {
+              if (!hit) return;
+              onChange({
+                name: hit.displayName || hit.name,
+                role: hit.title || person.role,
+                title: hit.title,
+                slackUserId: hit.slackUserId,
+                email: hit.email,
+                avatarUrl: hit.avatarUrl,
+                insightsStatus: 'pending',
+              });
+              setAssigning(false);
+            }}
+          />
+          <div style={{display: 'flex', justifyContent: 'flex-end'}}>
+            <button
+              type="button"
+              onClick={() => setAssigning(false)}
+              style={cancelButtonStyle}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={rowStyle}>
@@ -122,6 +163,15 @@ function PersonRow({
           </strong>
           <span style={{fontSize: 12, color: '#94a3b8'}}>{person.role}</span>
         </div>
+        {isPlaceholder ? (
+          <button
+            type="button"
+            onClick={() => setAssigning(true)}
+            style={assignBtnStyle}
+          >
+            Assign teammate
+          </button>
+        ) : null}
         <select
           value={person.weekBucket}
           onChange={(event) =>
@@ -418,6 +468,16 @@ const removeBtnStyle: CSSProperties = {
   background: 'transparent',
   color: '#fca5a5',
   border: '1px solid rgba(248, 113, 113, 0.35)',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const assignBtnStyle: CSSProperties = {
+  padding: '6px 10px',
+  background: 'transparent',
+  color: '#7dd3fc',
+  border: '1px solid rgba(56, 189, 248, 0.35)',
   borderRadius: 6,
   cursor: 'pointer',
   fontSize: 12,
