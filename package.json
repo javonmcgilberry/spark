@@ -8,10 +8,13 @@
     "node": ">=20.19.0"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview --port 8788",
+    "preview": "npm run db:migrate:local && opennextjs-cloudflare build && opennextjs-cloudflare preview --port 8788",
+    "db:migrate:local": "wrangler d1 migrations apply spark-drafts --local",
+    "db:migrate:remote": "wrangler d1 migrations apply spark-drafts --remote",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

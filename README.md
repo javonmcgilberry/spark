@@ -14,13 +14,29 @@ URL.
 
 ```bash
 npm install
-SLACK_MOCK_MODE=1 ANTHROPIC_MOCK_MODE=1 npm run dev
+npm run dev                          # in-memory draft store, zero setup
 open http://localhost:3000
 ```
 
-Mock modes mean you can iterate with zero token burn and zero Slack
-traffic. Flip them off when you're ready to exercise the real APIs
-(see `docs/dev-setup.md` for the named tunnel + dev Slack app setup).
+That's it for the everyday dev loop. `.env` is read automatically; if
+it's empty, Slack and Anthropic fall back to their mock clients so you
+can iterate with zero token burn.
+
+When you want to exercise the real Worker + D1 runtime locally (what
+Webflow Cloud actually runs), do this once:
+
+```bash
+npm run setup                        # one-time: auth, create D1, migrate
+npm run preview                      # Worker on :8788, real D1
+```
+
+`npm run setup` is idempotent and handles the full Cloudflare D1 dance:
+`wrangler login` if needed → creates `spark-drafts` if it doesn't exist
+→ patches `wrangler.jsonc` with the UUID → applies migrations locally
+→ offers to apply them remotely. Safe to re-run anytime.
+
+For the full Slack round-trip setup (real tokens, named Cloudflare
+Tunnel, dev Slack app), see `docs/dev-setup.md`.
 
 ## The three-tier dev loop
 

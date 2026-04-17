@@ -107,23 +107,26 @@ production.
 
 Before first deploy:
 
-1. **Provision a D1 database**:
-   ```sh
-   wrangler d1 create spark-drafts
-   ```
-   Copy the `database_id` into `spark/wrangler.jsonc` under the
-   `d1_databases` entry.
-2. **Apply the migration**:
+1. **Provision and migrate D1** — one command:
+
    ```sh
    cd spark
-   wrangler d1 migrations apply spark-drafts
+   npm run setup
    ```
-3. **Set env vars in Webflow Cloud**: everything from `spark/.env`
+
+   Handles `wrangler login`, creates `spark-drafts` if missing, patches
+   `wrangler.jsonc` with the UUID, and applies migrations to both local
+   and (when you say yes at the prompt) remote. Idempotent.
+
+   If you skipped the remote prompt the first time, run
+   `npm run db:migrate:remote` before pushing.
+
+2. **Set env vars in Webflow Cloud**: everything from `spark/.env`
    above (minus the `MOCK_MODE` flags).
-4. Push to your branch and watch the preview deploy.
-5. Point the dev Slack app's Events URL at the preview URL to smoke
+3. Push to your branch and watch the preview deploy.
+4. Point the dev Slack app's Events URL at the preview URL to smoke
    test.
-6. Merge to main → prod deploys → repoint production Slack app.
+5. Merge to main → prod deploys → repoint production Slack app.
 
 ---
 

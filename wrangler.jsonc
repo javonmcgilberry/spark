@@ -13,8 +13,8 @@
   },
 
   // D1 binding for draft persistence.
-  // Provision via Cloudflare dashboard or `wrangler d1 create spark-drafts`
-  // and paste the resulting database_id here. The binding name DRAFTS_DB
+  // Run `npm run setup` to provision the database, patch the
+  // database_id below, and apply migrations. The binding name DRAFTS_DB
   // is what `makeProdCtx` looks up on CloudflareEnv.
   "d1_databases": [
     {
