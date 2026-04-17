@@ -49,6 +49,16 @@ build/
 .cache/
 *.tgz
 
+# Next.js / OpenNext / Wrangler
+/out/
+/.open-next/
+.wrangler/
+*.tsbuildinfo
+next-env.d.ts
+
+# Wrangler local secrets (mirrors .env)
+.dev.vars
+
 # Python
 __pycache__/
 *.py[cod]
@@ -132,5 +142,3 @@ tmp/
 temp/
 *.tmp
 
-# Webflow CLI global telemetry file (landed here when CLI was run from spark/ instead of spark/web/)
-/webflow.json

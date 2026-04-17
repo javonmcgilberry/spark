@@ -24,15 +24,11 @@ deploy. No sidecar process.
 ## 2. One-time setup
 
 ```bash
-# Clone (spark is a submodule inside the webflow monorepo)
 cd ~/webflow/spark
-
-# Install deps (web is the whole app)
-cd web
 npm install
 ```
 
-Create `spark/web/.env.local`:
+Create `spark/.env`:
 
 ```env
 # Mock modes — flip off as you need real traffic
@@ -64,14 +60,14 @@ DEMO_MANAGER_SLACK_ID=U01...
 The default loop — zero external traffic, sub-second tests:
 
 ```bash
-cd spark/web
+cd spark
 npm run test:watch   # 68+ vitest cases against makeTestCtx
 ```
 
 For the full UI:
 
 ```bash
-cd spark/web
+cd spark
 npm run dev
 # visit http://localhost:3000
 # visit http://localhost:3000/dev/slack-sandbox for Slack event replay
@@ -115,15 +111,15 @@ Before first deploy:
    ```sh
    wrangler d1 create spark-drafts
    ```
-   Copy the `database_id` into `spark/web/wrangler.jsonc` under the
+   Copy the `database_id` into `spark/wrangler.jsonc` under the
    `d1_databases` entry.
 2. **Apply the migration**:
    ```sh
-   cd spark/web
+   cd spark
    wrangler d1 migrations apply spark-drafts
    ```
-3. **Set env vars in Webflow Cloud**: everything from
-   `spark/web/.env.local` above (minus the `MOCK_MODE` flags).
+3. **Set env vars in Webflow Cloud**: everything from `spark/.env`
+   above (minus the `MOCK_MODE` flags).
 4. Push to your branch and watch the preview deploy.
 5. Point the dev Slack app's Events URL at the preview URL to smoke
    test.

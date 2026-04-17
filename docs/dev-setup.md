@@ -13,7 +13,7 @@ walks you through the three-tier dev loop:
 ## Tier 1: vitest (default, zero setup)
 
 ```sh
-cd spark/web
+cd spark
 npm run test          # one-shot
 npm run test:watch    # watch mode
 ```
@@ -26,7 +26,7 @@ calls with `ctx.slack._calls`.
 ## Tier 2: dev sandbox (local `next dev`)
 
 ```sh
-cd spark/web
+cd spark
 SLACK_MOCK_MODE=1 ANTHROPIC_MOCK_MODE=1 npm run dev
 open http://localhost:3000/dev/slack-sandbox
 ```
@@ -95,7 +95,7 @@ Required when testing real Slack → Spark roundtrips (e.g., verifying
    `im:history`, `im:write`, `app_mentions:read`, `canvases:write`,
    `users:read`, `users:read.email`.
 7. Install to workspace. Copy bot token + signing secret into
-   `spark/web/.env.local`:
+   `spark/.env`:
    ```env
    SLACK_BOT_TOKEN=xoxb-...
    SLACK_SIGNING_SECRET=...
@@ -108,7 +108,7 @@ Required when testing real Slack → Spark roundtrips (e.g., verifying
 cloudflared tunnel run spark-dev
 
 # terminal 2
-cd spark/web
+cd spark
 SLACK_MOCK_MODE=0 ANTHROPIC_MOCK_MODE=0 npm run dev
 ```
 

@@ -13,7 +13,6 @@ URL.
 ## Quick Start
 
 ```bash
-cd web
 npm install
 SLACK_MOCK_MODE=1 ANTHROPIC_MOCK_MODE=1 npm run dev
 open http://localhost:3000
@@ -25,10 +24,10 @@ traffic. Flip them off when you're ready to exercise the real APIs
 
 ## The three-tier dev loop
 
-1. **vitest (default)** — `cd web && npm run test:watch`. Every
-   handler, service, and tool is tested against `makeTestCtx()` which
-   builds an in-memory `HandlerCtx` with recording Slack mock, stub
-   LLM, and stub Jira/GitHub/Confluence. Sub-second feedback.
+1. **vitest (default)** — `npm run test:watch`. Every handler, service,
+   and tool is tested against `makeTestCtx()` which builds an in-memory
+   `HandlerCtx` with recording Slack mock, stub LLM, and stub
+   Jira/GitHub/Confluence. Sub-second feedback.
 2. **Dev sandbox** — `/dev/slack-sandbox` in `next dev`. Every Slack
    event fixture Spark understands is reachable from a dropdown. Tweak
    the JSON, click Send, see response + outbound Slack calls inline.
@@ -125,7 +124,6 @@ implemented as a native reference on Webflow Cloud.
 ## Testing
 
 ```bash
-cd web
 npm run test           # 68+ tests, sub-second
 npm run test:watch     # watch mode
 npm run typecheck      # tsc --noEmit

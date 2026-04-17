@@ -1,12 +1,10 @@
 node_modules/
-web/node_modules/
-web/.next/
-web/.open-next/
-web/.wrangler/
+.next/
+.open-next/
+.wrangler/
 dist/
 build/
 package-lock.json
-web/package-lock.json
 
 # Generated fixture JSON
-web/public/dev-fixtures/
+public/dev-fixtures/
