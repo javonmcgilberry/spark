@@ -48,7 +48,7 @@ export function useDraft(
     const run = (async () => {
       try {
         const res = await fetch(
-          `/spark-manager/api/drafts/${encodeURIComponent(pkg.userId)}`,
+          `/api/drafts/${encodeURIComponent(pkg.userId)}`,
           {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
@@ -99,7 +99,7 @@ export function useDraft(
   const reload = useCallback(async () => {
     try {
       const res = await fetch(
-        `/spark-manager/api/drafts/${encodeURIComponent(pkg.userId)}`
+        `/api/drafts/${encodeURIComponent(pkg.userId)}`
       );
       if (!res.ok) throw new Error(`reload failed (${res.status})`);
       const body = (await res.json()) as {pkg: OnboardingPackage};

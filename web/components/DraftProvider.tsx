@@ -70,7 +70,7 @@ export function DraftProvider({
     setAgentEvents([]);
     try {
       const res = await fetch(
-        `/spark-manager/api/drafts/${encodeURIComponent(newHireId)}/generate`,
+        `/api/drafts/${encodeURIComponent(newHireId)}/generate`,
         {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -138,7 +138,7 @@ export function DraftProvider({
     setCritiqueError(null);
     try {
       const res = await fetch(
-        `/spark-manager/api/drafts/${encodeURIComponent(newHireId)}/critique`,
+        `/api/drafts/${encodeURIComponent(newHireId)}/critique`,
         {method: 'POST'}
       );
       if (!res.ok) throw new Error(`critique failed (${res.status})`);

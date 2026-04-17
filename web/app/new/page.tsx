@@ -23,7 +23,7 @@ export default function NewDraftPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/spark-manager/api/drafts', {
+      const res = await fetch('/api/drafts', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({

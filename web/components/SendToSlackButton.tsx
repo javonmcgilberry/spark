@@ -27,7 +27,7 @@ export function SendToSlackButton({
     setError(null);
     try {
       const res = await fetch(
-        `/spark-manager/api/drafts/${encodeURIComponent(pkg.userId)}/publish`,
+        `/api/drafts/${encodeURIComponent(pkg.userId)}/publish`,
         {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
