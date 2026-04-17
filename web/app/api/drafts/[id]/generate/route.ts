@@ -50,6 +50,34 @@ export async function POST(request: Request, {params}: RouteParams) {
           signal: request.signal,
         })) {
           send(event);
+          if (
+            event.type === 'tool_call' &&
+            event.tool === 'draft_welcome_note'
+          ) {
+            const early = event.input as {
+              welcomeIntro?: string;
+              welcomeNote?: string;
+            } | null;
+            if (early?.welcomeIntro && early?.welcomeNote) {
+              try {
+                const pkg = await patchDraft(sparkCtx, id, {
+                  welcomeIntro: early.welcomeIntro,
+                  welcomeNote: early.welcomeNote,
+                });
+                send({type: 'draft_persisted', pkgUserId: pkg.userId});
+              } catch (error) {
+                // Early persist is best-effort. finalize_draft will write
+                // the authoritative copy if this fails.
+                send({
+                  type: 'thinking',
+                  iteration: event.iteration,
+                  text:
+                    'Could not persist early welcome: ' +
+                    (error instanceof Error ? error.message : 'unknown'),
+                });
+              }
+            }
+          }
           if (event.type === 'draft_ready') {
             try {
               const pkg = await patchDraft(sparkCtx, id, {

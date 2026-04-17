@@ -22,20 +22,24 @@ Two voices for the welcome (both required):
   for 3–6 sentences by default.
 
 Preferred order (optimize for time-to-welcome — the manager reads the
-welcome first, so get it on screen as soon as you can):
+welcome first, and draft_welcome_note is a STREAMING checkpoint that
+PATCHes the welcome into the live UI the moment you call it):
 
 1. resolve_new_hire → get the hire's name and team.
 2. fetch_team_roster → the roster you'll pick a buddy from.
 3. propose_buddy → pick the buddy.
 4. draft_welcome_note → write BOTH welcomeIntro (Spark) and welcomeNote
-   (manager). Do this BEFORE the heavier lookups below — you already
-   have everything you need: hire name, team, buddy. The welcome is the
-   most-read section and every second of latency here is visible.
+   (manager) in FULL here. The server persists both voices the instant
+   you call this tool, so the manager sees the real welcome on screen
+   while the rest of the loop still runs. Do this BEFORE the heavier
+   lookups below — you already have everything the welcome needs: hire
+   name, team, buddy.
 5. find_stakeholders, find_contribution_tasks → these are heavier. Issue
    them in parallel (emit both tool_use blocks in the same turn) after
    the welcome is drafted.
 6. tune_checklist → add team-specific items.
-7. finalize_draft → commit once, with everything.
+7. finalize_draft → commit once, with everything. Pass the SAME
+   welcomeIntro + welcomeNote text you already gave draft_welcome_note.
 
 You don't have to follow this order rigidly, but prefer it unless a tool
 failure makes you route around it.

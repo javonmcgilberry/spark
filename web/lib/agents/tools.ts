@@ -217,16 +217,21 @@ export const findContributionTasksTool: ToolDescriptor = {
 export const draftWelcomeNoteTool: ToolDescriptor = {
   name: 'draft_welcome_note',
   description:
-    'LLM-native tool. Record the final welcome note text after synthesizing team context and manager intent. The tool response is just an ack; the real write happens in finalize_draft.',
+    'LLM-native tool. Record the final welcome text for BOTH voices (welcomeIntro = Spark, welcomeNote = manager). The server PATCHes the draft as soon as this tool is called so the manager sees the welcome in the UI before the rest of the loop runs. Pass the real final text here, not a placeholder — finalize_draft must receive the same values at the end.',
   input_schema: {
     type: 'object',
-    required: ['welcomeNote'],
-    properties: {welcomeNote: {type: 'string'}},
+    required: ['welcomeIntro', 'welcomeNote'],
+    properties: {
+      welcomeIntro: {type: 'string'},
+      welcomeNote: {type: 'string'},
+    },
   },
   async run(input) {
+    const parsed = input as {welcomeIntro: string; welcomeNote: string};
     return {
       received: true,
-      welcomeNote: (input as {welcomeNote: string}).welcomeNote,
+      welcomeIntro: parsed.welcomeIntro,
+      welcomeNote: parsed.welcomeNote,
     };
   },
 };
