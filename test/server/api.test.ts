@@ -212,6 +212,69 @@ describe('Spark API — routes (happy path)', () => {
     expect(res.body.roleTrack).toBe('frontend');
   });
 
+  it('GET /api/lookup/slack-users returns cached Slack directory hits', async () => {
+    const bundle = createTestServices();
+    const env = makeEnv(bundle);
+    const app = createHttpServer(env, bundle.services, stubSlackClient);
+    bundle.services.slackUserDirectory._primeForTests([
+      {
+        slackUserId: 'U01ADA',
+        name: 'Ada Lovelace',
+        displayName: 'Ada',
+        email: 'ada@webflow.com',
+      },
+      {
+        slackUserId: 'U01LIN',
+        name: 'Lin Clark',
+        displayName: 'Lin',
+        email: 'lin@webflow.com',
+      },
+      {
+        slackUserId: 'U01RIL',
+        name: 'Riley Chen',
+        displayName: 'Riley',
+        email: 'riley@webflow.com',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/lookup/slack-users')
+      .query({q: 'lin'})
+      .set(authedHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.users).toHaveLength(1);
+    expect(res.body.users[0].slackUserId).toBe('U01LIN');
+  });
+
+  it('GET /api/lookup/slack-users returns all when q is empty (top N)', async () => {
+    const bundle = createTestServices();
+    const env = makeEnv(bundle);
+    const app = createHttpServer(env, bundle.services, stubSlackClient);
+    bundle.services.slackUserDirectory._primeForTests([
+      {
+        slackUserId: 'U01A',
+        name: 'A',
+        displayName: 'A',
+        email: 'a@x.com',
+      },
+      {
+        slackUserId: 'U01B',
+        name: 'B',
+        displayName: 'B',
+        email: 'b@x.com',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/lookup/slack-users')
+      .query({q: ''})
+      .set(authedHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.users.length).toBe(2);
+  });
+
   it('GET /api/lookup/contribution-tasks returns tasks from the scanner', async () => {
     const bundle = createTestServices();
     const env = makeEnv(bundle);

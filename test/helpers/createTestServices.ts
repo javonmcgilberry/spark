@@ -28,6 +28,7 @@ import {LlmService} from '../../src/services/llmService.js';
 import {OnboardingPackageService} from '../../src/services/onboardingPackageService.js';
 import {PeopleInsightsService} from '../../src/services/peopleInsightsService.js';
 import {SkillDiscoveryService} from '../../src/services/skillDiscoveryService.js';
+import {SlackUserDirectoryService} from '../../src/services/slackUserDirectoryService.js';
 import {StatsigService} from '../../src/services/statsigService.js';
 import {TaskScannerService} from '../../src/services/taskScannerService.js';
 
@@ -72,6 +73,7 @@ export function createTestServices(
   });
   const peopleInsights = new PeopleInsightsService(llm, jira, github, logger);
   const skillDiscovery = new SkillDiscoveryService();
+  const slackUserDirectory = new SlackUserDirectoryService(logger);
   const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
   const taskScanner = new FixedTaskScannerService(
     tasks,
@@ -117,6 +119,7 @@ export function createTestServices(
     jira,
     peopleInsights,
     skillDiscovery,
+    slackUserDirectory,
     taskScanner,
     contributionGuide,
     onboardingPackages,

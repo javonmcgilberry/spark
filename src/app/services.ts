@@ -13,6 +13,7 @@ import {LlmService} from '../services/llmService.js';
 import {OnboardingPackageService} from '../services/onboardingPackageService.js';
 import {PeopleInsightsService} from '../services/peopleInsightsService.js';
 import {SkillDiscoveryService} from '../services/skillDiscoveryService.js';
+import {SlackUserDirectoryService} from '../services/slackUserDirectoryService.js';
 import {StatsigService} from '../services/statsigService.js';
 import {TaskScannerService} from '../services/taskScannerService.js';
 import type {Logger} from './logger.js';
@@ -31,6 +32,7 @@ export interface Services {
   jira: JiraService;
   peopleInsights: PeopleInsightsService;
   skillDiscovery: SkillDiscoveryService;
+  slackUserDirectory: SlackUserDirectoryService;
   taskScanner: TaskScannerService;
   contributionGuide: ContributionGuideService;
   onboardingPackages: OnboardingPackageService;
@@ -58,6 +60,7 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
   const peopleInsights = new PeopleInsightsService(llm, jira, github, logger);
   const statsig = new StatsigService(env.statsigConsoleSdkKey, logger);
   const skillDiscovery = new SkillDiscoveryService();
+  const slackUserDirectory = new SlackUserDirectoryService(logger);
   const taskScanner = new TaskScannerService(skillDiscovery, statsig, codebase);
   const contributionGuide = new ContributionGuideService(llm);
   const identityResolver = new IdentityResolver(env, logger, docs, codeowners);
@@ -91,6 +94,7 @@ export function createServices(env: EnvConfig, logger: Logger): Services {
     jira,
     peopleInsights,
     skillDiscovery,
+    slackUserDirectory,
     taskScanner,
     contributionGuide,
     onboardingPackages,

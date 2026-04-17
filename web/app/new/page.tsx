@@ -2,12 +2,12 @@
 
 import {useState, type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
+import {SlackUserPicker} from '../../components/SlackUserPicker';
+import type {SlackUserHit} from '../../lib/sparkApi';
 
 export default function NewDraftPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [slackId, setSlackId] = useState('');
-  const [email, setEmail] = useState('');
+  const [hire, setHire] = useState<SlackUserHit | null>(null);
   const [teamHint, setTeamHint] = useState('');
   const [startDate, setStartDate] = useState('');
   const [intent, setIntent] = useState('');
@@ -16,8 +16,8 @@ export default function NewDraftPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!slackId && !email) {
-      setError('Provide a Slack id or email for the new hire.');
+    if (!hire) {
+      setError('Pick a new hire from the Slack workspace.');
       return;
     }
     setSubmitting(true);
@@ -27,8 +27,8 @@ export default function NewDraftPage() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          newHireSlackId: slackId || undefined,
-          newHireEmail: email || undefined,
+          newHireSlackId: hire.slackUserId,
+          newHireEmail: hire.email,
         }),
       });
       if (!res.ok) {
@@ -38,13 +38,11 @@ export default function NewDraftPage() {
         throw new Error(body?.error ?? `Create failed (${res.status})`);
       }
       const body = (await res.json()) as {pkg: {userId: string}};
-      // Kick the generator off with the input we gathered — the draft
-      // page will pick up streaming events.
       const generatorPayload = {
         v: 1,
-        newHireName: name,
-        slackUserIdIfKnown: slackId || undefined,
-        email: email || undefined,
+        newHireName: hire.name,
+        slackUserIdIfKnown: hire.slackUserId,
+        email: hire.email,
         teamHint: teamHint || undefined,
         startDate: startDate || undefined,
         intent: intent || undefined,
@@ -67,49 +65,28 @@ export default function NewDraftPage() {
         <p style={eyebrowStyle}>New onboarding plan</p>
         <h1 style={headingStyle}>Tell Spark about the new hire</h1>
         <p style={bodyStyle}>
-          Give the agent a sentence or two of context. It&apos;ll look up the
-          team, pick candidates for buddy, draft the welcome, and tune the
-          checklist. You&apos;ll review before anything reaches Slack.
+          Search the Slack workspace to pick the new hire. Spark uses their
+          profile to look up the team, pick candidates for buddy, draft the
+          welcome, and tune the checklist. You&apos;ll review before anything
+          reaches Slack.
         </p>
 
         <form
           onSubmit={handleSubmit}
           style={{marginTop: 24, display: 'grid', gap: 16}}
         >
-          <Field label="New hire name" required>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Maria Vega"
-              style={inputStyle}
-              required
-            />
-          </Field>
-          <div
-            style={{display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr'}}
+          <Field
+            label="New hire"
+            hint={
+              hire
+                ? `${hire.name} · ${hire.email}`
+                : 'Type a name, display name, or email'
+            }
+            required
           >
-            <Field label="Slack user id" hint="Preferred. Starts with U…">
-              <input
-                type="text"
-                value={slackId}
-                onChange={(event) =>
-                  setSlackId(event.target.value.trim().toUpperCase())
-                }
-                placeholder="U01ABCDEFG"
-                style={inputStyle}
-              />
-            </Field>
-            <Field label="Work email" hint="If no Slack id yet">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="maria@webflow.com"
-                style={inputStyle}
-              />
-            </Field>
-          </div>
+            <SlackUserPicker value={hire} onChange={setHire} autoFocus />
+          </Field>
+
           <Field label="Start date" hint="For the week-by-week plan">
             <input
               type="date"
@@ -150,21 +127,21 @@ export default function NewDraftPage() {
           <div style={{display: 'flex', gap: 12}}>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !hire}
               style={{
                 padding: '12px 18px',
-                background: submitting ? '#0891b2' : '#38bdf8',
+                background: submitting || !hire ? '#0891b2' : '#38bdf8',
                 color: '#0f172a',
                 borderRadius: 8,
                 fontWeight: 700,
                 border: 'none',
-                cursor: submitting ? 'wait' : 'pointer',
+                cursor: submitting || !hire ? 'not-allowed' : 'pointer',
               }}
             >
               {submitting ? 'Creating draft…' : 'Create draft & run agent'}
             </button>
             <a
-              href="/spark-manager"
+              href="/"
               style={{
                 padding: '12px 18px',
                 color: '#cbd5e1',
@@ -197,10 +174,12 @@ function Field({
     <label style={{display: 'grid', gap: 6}}>
       <span style={{fontSize: 13, color: '#e2e8f0'}}>
         {label}
-        {required && <span style={{color: '#f87171'}}> *</span>}
+        {required ? <span style={{color: '#f87171'}}> *</span> : null}
       </span>
       {children}
-      {hint && <span style={{fontSize: 12, color: '#64748b'}}>{hint}</span>}
+      {hint ? (
+        <span style={{fontSize: 12, color: '#64748b'}}>{hint}</span>
+      ) : null}
     </label>
   );
 }

@@ -87,6 +87,7 @@ export function createSparkApiRouter(
     canvas,
     confluenceSearch,
     peopleInsights,
+    slackUserDirectory,
     taskScanner,
   } = services;
 
@@ -391,6 +392,23 @@ export function createSparkApiRouter(
       const people = [profile.manager, profile.buddy, ...profile.teammates];
       const guides = await confluenceSearch.findPeopleGuides(profile, people);
       res.json({guides});
+    })
+  );
+
+  router.get(
+    '/lookup/slack-users',
+    wrap(async (req, res) => {
+      const q = stringQuery(req, 'q') ?? '';
+      const rawLimit = Number(stringQuery(req, 'limit') ?? '10');
+      const limit = Number.isFinite(rawLimit)
+        ? Math.max(1, Math.min(25, Math.floor(rawLimit)))
+        : 10;
+      if (!slackClient) {
+        res.status(503).json({error: 'slack client not available'});
+        return;
+      }
+      const users = await slackUserDirectory.search(slackClient, q, limit);
+      res.json({users});
     })
   );
 

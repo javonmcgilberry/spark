@@ -187,6 +187,25 @@ export async function lookupConfluencePeople(
   return sparkJson(res);
 }
 
+export interface SlackUserHit {
+  slackUserId: string;
+  name: string;
+  displayName: string;
+  email: string;
+  title?: string;
+  avatarUrl?: string;
+}
+
+export async function lookupSlackUsers(
+  ctx: SparkApiContext,
+  query: string,
+  limit = 10
+): Promise<{users: SlackUserHit[]}> {
+  const qs = new URLSearchParams({q: query, limit: String(limit)});
+  const res = await sparkFetch(ctx, `/api/lookup/slack-users?${qs}`);
+  return sparkJson(res);
+}
+
 export async function lookupContributionTasks(
   ctx: SparkApiContext,
   email: string
