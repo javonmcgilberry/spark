@@ -157,11 +157,11 @@ describe('makeOrgGraphClient circuit breaker', () => {
   });
 
   it('identityResolver callers (lookupTeammates etc.) keep the silent-fallback semantic so they degrade to Slack inside a try', async () => {
-    // lookupTeammates/lookupCrossFunctional/lookupManagerChain MUST
-    // continue to return empty collections on failure. identityResolver
-    // catches around them, observes the empty result, and switches to
-    // the Slack fallback roster builder. If they threw, a one-off
-    // hiccup would blow up draft creation.
+    // lookupTeammates / lookupCrossFunctional / lookupManagerChain
+    // resolve to empty collections on failure. identityResolver
+    // catches around them, sees the empty result, and switches to
+    // the Slack fallback roster builder. If any of them threw, a
+    // one-off hiccup would blow up draft creation.
     const client = makeOrgGraphClient(
       {DX_WAREHOUSE_DSN: 'postgres://nonexistent.invalid:5432/x'},
       createSilentLogger()

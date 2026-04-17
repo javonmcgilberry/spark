@@ -382,11 +382,10 @@ async function buildOrgRoster(
 }
 
 /**
- * Slack-only fallback. No Direct-Reports parsing, no division heuristic,
- * no full-engineer scan — just the hire's team name attached to the
- * default catalog templates so the UI has something meaningful to
- * render while an operator investigates why the warehouse call didn't
- * work.
+ * Fallback roster for when the warehouse is unavailable: the hire's
+ * team name stamped onto the default catalog templates so the UI has
+ * real layout with real manager + placeholder peer slots while an
+ * operator sorts out why the warehouse isn't answering.
  */
 function buildSlackFallbackRoster(
   ctx: HandlerCtx,
@@ -498,10 +497,8 @@ async function lookupSlackSeedByEmail(
  *
  * users.profile.get returns display_name, real_name, first_name, email,
  * title, images, and the custom `fields` map — everything buildSlackSeed
- * needs. The older implementation also called users.info in parallel to
- * get top-level `real_name`, but that was fully redundant: the same
- * data is available on `profile.real_name`. Removing it saves one
- * Tier-4 round trip on every draft create / resolve.
+ * needs. `profile.real_name` is the canonical source for the real name,
+ * so one Tier-4 call covers the whole seed.
  */
 async function lookupSlackSeed(
   ctx: HandlerCtx,

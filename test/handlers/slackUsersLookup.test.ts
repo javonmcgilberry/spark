@@ -132,13 +132,13 @@ describe('handleLookupSlackUsers', () => {
   });
 
   it('falls back to the Slack directory when the warehouse throws (e.g. TCP timeout or breaker open)', async () => {
-    // Regression guard: when the warehouse is CONFIGURED but unreachable
+    // Invariant: when the warehouse is CONFIGURED but unreachable
     // (DSN set, socket times out, breaker flips open), searchByName
-    // throws. The picker must catch that, fall back to Slack, and keep
-    // serving results. Prior to this guard, a single timeout flipped
-    // the breaker which then silently returned [] for 60s — turning
-    // the picker into a no-results dead zone across the whole
-    // workspace for every subsequent query.
+    // throws. The picker catches the throw and serves results from
+    // the Slack directory instead. If a degraded warehouse returned
+    // `[]` instead of throwing, the picker would treat that as an
+    // authoritative "no matches" and serve zero results workspace-
+    // wide for the cooldown window — so the throw is load-bearing.
     const ctx = makeTestCtx({
       org: {
         configured: true,

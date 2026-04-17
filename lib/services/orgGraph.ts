@@ -3,17 +3,16 @@
  * "who's on this team, who reports into whom, and which PM/designer/
  * director/people-partner should the new hire meet."
  *
- * Replaces the Slack-custom-field heuristics that lived in
- * identityResolver.ts. Slack stays for avatar/display-name hydration
- * (via listAllUsers) and as a degraded fallback when the DSN is missing
- * or the warehouse is unreachable.
+ * Slack is the hydration layer (avatar, display name, Slack user id via
+ * listAllUsers) and the degraded fallback when DX_WAREHOUSE_DSN is
+ * missing or the warehouse is unreachable.
  *
- * Runtime note: Cloudflare Workers does not support the node-postgres
- * `pg` driver (uses Node's `net` TCP APIs directly). We lazy-import
- * `postgres` (postgres.js v3), which speaks TCP via `cloudflare:sockets`
- * when `nodejs_compat` is on — which Spark's wrangler.jsonc already sets.
- * We load it dynamically so the stub and tests never pull the driver
- * into the bundle or try to resolve it on machines without `postgres`
+ * Runtime note: the node-postgres `pg` driver isn't compatible with
+ * Cloudflare Workers (it uses Node's `net` TCP APIs directly). We
+ * lazy-import `postgres` (postgres.js v3), which speaks TCP via
+ * `cloudflare:sockets` when `nodejs_compat` is on — and Spark's
+ * wrangler.jsonc sets that. The dynamic import keeps the driver out
+ * of test bundles and out of machines that don't have `postgres`
  * installed.
  */
 
@@ -84,11 +83,10 @@ export interface OrgGraphEnv {
 const QUERY_TIMEOUT_SECONDS = 1.5;
 /**
  * Circuit-breaker window. When the warehouse throws (TCP timeout, DNS
- * failure, anything non-transient from postgres.js), skip the next N ms
- * of warehouse calls and route straight to the Slack fallback. Without
- * this, every picker keystroke and every create-draft pays another
- * full timeout before degrading — catastrophic for local dev and for
- * any prod window when the DX warehouse is unreachable.
+ * failure, anything non-transient from postgres.js), subsequent calls
+ * short-circuit for N ms and route straight to the Slack fallback, so
+ * picker keystrokes and create-draft flows don't pay a fresh connect
+ * timeout on every request while the warehouse is unreachable.
  *
  * Module-scoped `globalThis` binding so the breaker survives across
  * request-scoped HandlerCtx instances within the same Worker isolate.
@@ -223,9 +221,9 @@ export function makeOrgGraphClient(
     const breaker = getBreaker();
     const now = Date.now();
     if (breaker.openUntil > now) {
-      // Breaker is open — skip the warehouse entirely, let the caller
-      // fall back. Keeps picker latency at ~Slack-only instead of
-      // ~Slack-plus-warehouse-timeout on every request.
+      // Breaker is open — skip the warehouse entirely and let the
+      // caller fall back. Picker latency stays at Slack-directory
+      // speed; no connect timeout on top.
       return fallback;
     }
     try {

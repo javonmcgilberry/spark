@@ -100,13 +100,11 @@ export function DraftProvider({
               line.replace(/^data:\s*/, '')
             ) as GeneratorEvent;
             setAgentEvents((prev) => [...prev, parsed]);
-            // Only reload on `draft_persisted` — that's the signal that
-            // the server has actually written the latest pkg to D1.
-            // Reloading on `draft_ready` used to cause two problems:
-            // (1) a full GET round-trip before the patch had landed, so
-            // we'd briefly show stale data, and (2) the subsequent
-            // `draft_persisted` then did the same GET again, doubling
-            // the network cost of every generate run for no benefit.
+            // Reload only on `draft_persisted`. That event means the
+            // server has just written the latest pkg to D1, so a GET
+            // here reflects what's on disk. `draft_ready` fires before
+            // the final write lands; reloading on it would serve stale
+            // data and then redo the GET a few ms later.
             if (parsed.type === 'draft_persisted') {
               await draft.reload();
             }

@@ -170,10 +170,9 @@ function buildRosterPreflight(
     ['pm', 'designer', 'director', 'people-partner'].includes(p.kind ?? '')
   ).length;
   const manager = people.find((p) => p.kind === 'manager');
-  // Heuristic source detection: if every non-manager, non-buddy slot is
-  // a placeholder (no slackUserId), we fell back to Slack-only. If any
-  // teammate or cross-functional row has a Slack id, the warehouse (or
-  // its fallback resolver) filled it in.
+  // Infer the source from what's filled in. A populated teammate or
+  // cross-functional row means the warehouse answered; otherwise, if
+  // the manager is the only resolved slot, the fallback resolver did.
   const source: RosterPreflight['preview']['source'] =
     teammates > 0 || crossFunctional > 0
       ? 'warehouse'

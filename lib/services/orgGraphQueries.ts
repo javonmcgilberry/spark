@@ -6,11 +6,11 @@
  * tagged-template builder from postgres.js passed in at call time — this
  * file never imports the driver directly.
  *
- * The column names mirror the legacy IdentityResolver query pattern (see
- * the deleted spark/src/services/identityResolver.ts prior to cd04fc6):
- * dx_users + dx_versioned_team_members + dx_versioned_teams +
- * dx_versioned_team_dates, with MAX(date) per user to pin to the most
- * recent team assignment.
+ * Schema assumptions: dx_users joined against dx_versioned_team_members,
+ * dx_versioned_teams, and dx_versioned_team_dates. Every query picks
+ * each user's most recent assignment by taking MAX(date) per user, so
+ * callers always see the current team even when the warehouse retains
+ * historical versions.
  */
 
 export interface WarehouseRow {

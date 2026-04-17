@@ -76,10 +76,9 @@ export function SlackUserPicker({
 
   useEffect(() => {
     if (!open) return;
-    // Don't fire a lookup for an empty query. The old behavior paginated
-    // the whole Slack directory just to surface a generic alphabetical
-    // slice on focus — a free Tier 2 crawl per page mount when the
-    // user hadn't even typed yet. Wait for a real keystroke.
+    // Wait for a real keystroke before calling the lookup. An empty
+    // query paginates Slack's users.list (Tier 2) to surface a generic
+    // alphabetical slice, which isn't worth a crawl per page mount.
     if (query.trim().length === 0) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
